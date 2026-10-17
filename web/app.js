@@ -79,6 +79,9 @@ const state = {
   outlineExport: true,
   analysis: null,
   plot: '',
+  pages: [],          // 多页：{tplId, images, bubbles, lines}
+  pageIdx: 0,
+  cands: {},          // slotId -> [href...] 候选图
   clipboard: null,    // 内部剪贴板（图片或气泡）
   history: { past: [], future: [] },
 };
@@ -195,6 +198,11 @@ async function init() {
     state.hollow = true;
     $('#chkHollow').checked = true;
     renderStage();
+  }
+  if (!state.pages.length) {
+    state.pages = [currentPageSnapshot()];
+    state.pageIdx = 0;
+    renderPageTabs();
   }
   if (params.get('keyselftest') === '1') await runKeySelfTest();
   if (params.get('aiselftest') === '1') await runAiSelfTest();
@@ -1025,6 +1033,33 @@ function bindUI() {
     toast('已填入本格句子');
   });
   $('#btnAiImage')?.addEventListener('click', generateSlotImage);
+  $('#candGrid')?.addEventListener('click', (ev) => {
+    const del = ev.target.closest('[data-del]');
+    if (del) {
+      ev.stopPropagation();
+      const list = candsOf(state.selectedId);
+      list.splice(Number(del.dataset.del), 1);
+      renderCands();
+      return;
+    }
+    const b = ev.target.closest('.cand');
+    if (b) applyCand(Number(b.dataset.i));
+  });
+  $('#btnCandNext')?.addEventListener('click', () => {
+    const list = state.selectedId ? candsOf(state.selectedId) : [];
+    if (list.length < 2) { toast('候选还不够，再生一张吧'); return; }
+    applyCand(Math.floor(Math.random() * list.length));
+  });
+  $('#btnCandClear')?.addEventListener('click', () => {
+    if (state.selectedId) state.cands[state.selectedId] = [];
+    renderCands();
+  });
+  $('#pageTabs')?.addEventListener('click', (ev) => {
+    const b = ev.target.closest('.pb-tab');
+    if (b) switchPage(Number(b.dataset.i));
+  });
+  $('#btnAddPage')?.addEventListener('click', addPage);
+  $('#btnExportAll')?.addEventListener('click', exportAllPages);
   $('#charSheet').addEventListener('input', debounce(saveLlm, 400));
   $('#btnAiPrompts').addEventListener('click', runAiPrompts);
 
@@ -1324,6 +1359,7 @@ function renderSlotPanel() {
     $('#suggestFrom').textContent = fromAi ? 'AI 的思路' : (sug ? '按剧情推的' : '还没剧情');
     $('#suggestText').textContent = sug || '先在左边写一段剧情，或用 AI 导演排一次戏';
     $('#btnUseSuggest').disabled = !sug;
+  renderCands();
     state._suggest = sug || '';
   }
   $('#shapeTip').innerHTML = shape
@@ -1381,6 +1417,7 @@ function loadLlm() {
   $('#llmKey').value = state.llm.apiKey || '';
   $('#llmModel').value = state.llm.model || '';
   if ($('#imgModel')) $('#imgModel').value = state.llm.imgModel || '';
+  if ($('#imgProvider')) $('#imgProvider').value = state.llm.imageProvider || 'openai';
   $('#charSheet').value = state.charSheet;
   if ($('#chkKeySession')) $('#chkKeySession').checked = !!state.llm.sessionOnly;
 }
@@ -1393,6 +1430,7 @@ function saveLlm() {
     apiKey: $('#llmKey').value.trim(),
     model: $('#llmModel').value.trim(),
     imgModel: $('#imgModel') ? $('#imgModel').value.trim() : '',
+    imageProvider: $('#imgProvider') ? $('#imgProvider').value : 'openai',
     sessionOnly,
   };
   state.charSheet = $('#charSheet').value.trim();
@@ -1711,6 +1749,129 @@ function slotSuggest(slotId) {
   return page?.panels?.find((p) => p.id === slotId)?.suggest || '';
 }
 
+/* ---------------- 候选图（重画 / 换一张） ---------------- */
+function candsOf(slotId) {
+  if (!state.cands[slotId]) state.cands[slotId] = [];
+  return state.cands[slotId];
+}
+
+function renderCands() {
+  const strip = $('#candStrip');
+  const grid = $('#candGrid');
+  if (!strip || !grid) return;
+  const list = state.selectedId ? candsOf(state.selectedId) : [];
+  strip.classList.toggle('hidden', list.length === 0);
+  if (!list.length) { grid.innerHTML = ''; return; }
+  grid.innerHTML = list.map((href, i) => `
+    <button class="cand" data-i="${i}" title="点一下用这张">
+      <img src="${escapeHtml(href)}" alt="候选 ${i + 1}">
+      <span class="del" data-del="${i}" title="删掉这张">×</span>
+    </button>`).join('');
+}
+
+function applyCand(i) {
+  const list = state.selectedId ? candsOf(state.selectedId) : [];
+  const href = list[i];
+  if (!href) return;
+  imageSize(href).then((dim) => {
+    commit();
+    state.images[state.selectedId] = { href, iw: dim.w, ih: dim.h, zoom: 1, panX: 0, panY: 0, mode: 'cover', name: 'ai' };
+    renderStage(); renderSlotPanel(); refreshScript();
+    toast('已换成候选 ' + (i + 1));
+  }).catch((e) => toast('这张图读不出来：' + e.message));
+}
+
+/* ---------------- 多页 ---------------- */
+function currentPageSnapshot() {
+  return {
+    tplId: state.tpl?.id || 'ref-4band-2col',
+    images: { ...state.images },
+    bubbles: state.bubbles.map((b) => ({ ...b })),
+    lines: { ...state.lines },
+  };
+}
+
+function savePage() {
+  if (!state.tpl) return;
+  state.pages[state.pageIdx] = currentPageSnapshot();
+}
+
+function renderPageTabs() {
+  const tabs = $('#pageTabs');
+  if (!tabs) return;
+  tabs.innerHTML = state.pages.map((pg, i) => `
+    <button class="pb-tab${i === state.pageIdx ? ' on' : ''}" data-i="${i}" title="${escapeHtml(pg.tplId)}">
+      ${i + 1}${Object.keys(pg.images || {}).length ? ` · ${Object.keys(pg.images).length}图` : ''}
+    </button>`).join('');
+}
+
+async function switchPage(i) {
+  if (i === state.pageIdx || !state.pages[i]) return;
+  savePage();
+  state.pageIdx = i;
+  const pg = state.pages[i];
+  await selectTemplate(pg.tplId, { silent: true });
+  state.images = { ...(pg.images || {}) };
+  state.bubbles = (pg.bubbles || []).map((b) => ({ ...b }));
+  state.lines = { ...(pg.lines || {}) };
+  state.selBubble = null;
+  state.cands = {};
+  resetHistory();
+  renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
+}
+
+async function addPage() {
+  if (!state.tpl) return;
+  savePage();
+  const copyTpl = state.tpl.id;
+  state.pages.push({ tplId: copyTpl, images: {}, bubbles: [], lines: {} });
+  await switchPage(state.pages.length - 1);
+  toast('已加一页（同一套版式，空图）');
+}
+
+async function exportAllPages() {
+  if (!state.pages.length) { toast('还没有页'); return; }
+  savePage();
+  const btn = $('#btnExportAll');
+  const old = btn.textContent;
+  btn.disabled = true;
+  let n = 0;
+  try {
+    for (let i = 0; i < state.pages.length; i++) {
+      btn.textContent = `导出中 ${i + 1}/${state.pages.length}…`;
+      await switchPage(i);
+      await new Promise((r) => setTimeout(r, 420));
+      const svg = stageSVG();
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const img = await new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = () => rej(new Error('栅格化失败'));
+        im.src = url;
+      });
+      const w = state.exportWidth;
+      const h = Math.round((w * state.tpl.page.h) / state.tpl.page.w);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const png = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+      downloadBlob(png, `${String(i + 1).padStart(2, '0')}-${state.tpl.id}.png`);
+      n++;
+      await new Promise((r) => setTimeout(r, 260));
+    }
+    toast(`已导出 ${n} 页`);
+  } catch (e) {
+    toast('导出中断：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
+  }
+}
+
 function copyShapePrefixZh() {
   const p = currentPlanPanel();
   const slot = state.tpl?.slots?.find((s) => s.id === state.selectedId);
@@ -1737,6 +1898,7 @@ async function generateSlotImage() {
       prompt: negative ? promptEn + ' | avoid: ' + negative : promptEn,
       size: panel?.genSize || undefined,
       model: state.llm.imgModel || undefined,
+      provider: state.llm.imageProvider || 'openai',
       llm: state.llm,
       templateId: state.tpl.id,
       slotId: state.selectedId,
@@ -1747,12 +1909,16 @@ async function generateSlotImage() {
     if (!href && res.url) href = await api.proxyImage ? await blobToDataURL(await api.proxyImage(res.url)) : res.url;
     if (!href) throw new Error('生图接口没有返回可用的图片');
     const dim = await imageSize(href);
+    const sid = state.selectedId;
+    const list = candsOf(sid);
+    list.unshift(href);
+    if (list.length > 8) list.pop();
     commit();
-    state.images[state.selectedId] = {
+    state.images[sid] = {
       href, iw: dim.w, ih: dim.h, zoom: 1, panX: 0, panY: 0, mode: 'cover', name: 'ai',
     };
-    renderStage(); renderSlotPanel(); refreshScript();
-    toast('这一格已用 AI 生成，不满意可以再点一次');
+    renderStage(); renderSlotPanel(); refreshScript(); renderCands();
+    toast('已生成并填入这一格（候选里还留着，可以换一张）');
   } catch (e) {
     toast('生图失败：' + e.message);
     $('#footMsg') && ($('#footMsg').textContent = '生图失败：' + e.message);

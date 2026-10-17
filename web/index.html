@@ -126,8 +126,15 @@
         <label class="field"><span>模型</span>
           <input id="llmModel" type="text" spellcheck="false" placeholder="deepseek-chat">
         </label>
+        <label class="field"><span>生图服务商</span>
+          <select id="imgProvider">
+            <option value="openai">OpenAI / DALL·E / gpt-image</option>
+            <option value="siliconflow">硅基流动 SiliconFlow</option>
+            <option value="stability">Stability (SD3)</option>
+          </select>
+        </label>
         <label class="field"><span>生图模型（可选）</span>
-          <input id="imgModel" type="text" spellcheck="false" placeholder="gpt-image-1 / dall-e-3 / Kwai-Kolors/Kolors">
+          <input id="imgModel" type="text" spellcheck="false" placeholder="gpt-image-1 / dall-e-3 / Kwai-Kolors/Kolors / sd3.5-large">
         </label>
       </div>
       <label class="field"><span>Base URL</span>
@@ -218,6 +225,13 @@
       <span id="fabText">编辑这一格</span>
     </button>
 
+    <div class="page-bar" id="pageBar">
+      <span class="pb-label">页</span>
+      <div class="pb-tabs" id="pageTabs"></div>
+      <button class="btn tiny" id="btnAddPage" title="把当前页存下来，再加一页">＋ 加一页</button>
+      <span class="pb-sep"></span>
+      <button class="btn tiny" id="btnExportAll" title="把每一页都导成 PNG">⇩ 导出全部页</button>
+    </div>
     <div class="stage-foot" id="stageFoot">
       <span id="footMsg">拖图片进画布即可填充（自动裁切到格子形状，斜切格也不会变形）</span>
       <span class="muted" id="footOrder"></span>
@@ -281,6 +295,16 @@
 
         <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
         <button class="btn wide" id="btnAiImage" title="用你自己的生图模型直接生成这一格，画完自动填入">✨ 用 AI 生这一格</button>
+        <div class="cand-strip hidden" id="candStrip">
+          <div class="cand-head">
+            <span>这一格的候选图</span>
+            <span class="cand-acts">
+              <button class="btn tiny" id="btnCandNext" title="换一张（随机）">换一张</button>
+              <button class="btn tiny" id="btnCandClear">清空候选</button>
+            </span>
+          </div>
+          <div class="cand-grid" id="candGrid"></div>
+        </div>
         <div class="row2">
           <button class="btn tiny" id="btnUrl">用图片链接</button>
           <button class="btn tiny danger" id="btnRemoveImage">移除图片</button>

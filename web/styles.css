@@ -321,6 +321,42 @@ input[type=range]::-moz-range-thumb{
   box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 3px 8px rgba(0,0,0,.18),0 1px 2px rgba(0,0,0,.12);
 }
 
+
+/* ---------------- 多页工作条 ---------------- */
+.page-bar{
+  display:flex;align-items:center;gap:8px;padding:6px 16px;border-top:.5px solid var(--sep);
+  background:var(--bar);color:var(--label-2);font-size:12px;flex:0 0 auto;
+}
+.pb-label{font-size:11px;color:var(--label-3);letter-spacing:.5px}
+.pb-tabs{display:flex;gap:6px;overflow-x:auto;max-width:52%;scrollbar-width:none}
+.pb-tabs::-webkit-scrollbar{display:none}
+.pb-tab{
+  border:.5px solid var(--sep-strong);background:var(--fill-2);color:var(--label-2);
+  border-radius:7px;padding:3px 9px;font-size:11.5px;cursor:pointer;white-space:nowrap;
+  transition:transform .18s var(--spring),background .18s,color .18s,border-color .18s;
+}
+.pb-tab:hover{transform:translateY(-1px);color:var(--label)}
+.pb-tab.on{background:var(--tint);border-color:transparent;color:#fff;box-shadow:0 2px 8px rgba(0,122,255,.28)}
+.pb-sep{flex:1}
+
+/* ---------------- 候选图 ---------------- */
+.cand-strip{border:.5px solid var(--sep);border-radius:10px;padding:8px;background:var(--fill-2);margin-top:8px}
+.cand-head{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--label-2);margin-bottom:6px}
+.cand-acts{display:flex;gap:6px}
+.cand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px}
+.cand{
+  position:relative;padding:0;border:.5px solid var(--sep-strong);border-radius:7px;overflow:hidden;
+  background:#fff;cursor:pointer;aspect-ratio:1;transition:transform .18s var(--spring),border-color .18s;
+}
+.cand:hover{transform:translateY(-1px) scale(1.02);border-color:var(--tint)}
+.cand img{width:100%;height:100%;object-fit:cover;display:block}
+.cand .del{
+  position:absolute;top:1px;right:2px;width:15px;height:15px;border-radius:50%;
+  background:rgba(0,0,0,.55);color:#fff;font-size:11px;line-height:14px;text-align:center;
+  opacity:0;transition:opacity .15s;
+}
+.cand:hover .del{opacity:1}
+
 /* 建议句 */
 .suggest-box{border-color:rgba(255,214,10,.28)}
 .suggest-text{font-size:12.5px;line-height:1.65;color:var(--label);padding:2px 1px 1px}
