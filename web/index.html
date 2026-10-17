@@ -143,8 +143,8 @@
         <button class="btn tiny" id="btnFill" title="导入多张图片，按阅读顺序填充空格">按顺序填充</button>
         <button class="btn tiny" id="btnDemo" title="用占位图预览填充效果">示例</button>
         <button class="btn tiny" id="btnClear" title="移除全部图片">清空图片</button>
-        <label class="switch"><input type="checkbox" id="chkHollow"> 镂空</label>
-        <label class="switch"><input type="checkbox" id="chkLabels" checked> 格号</label>
+        <label class="switch" title="只显示格线、不显示图片：用来单独看版式排版"><input type="checkbox" id="chkHollow"> 镂空</label>
+        <label class="switch" title="在格子上标出阅读顺序编号"><input type="checkbox" id="chkLabels" checked> 格号</label>
       </div>
     </div>
 
@@ -190,22 +190,6 @@
             <div class="muted small" id="slotShot">—</div>
           </div>
         </div>
-        <div class="slot-thumb" id="slotThumb"><span class="muted small">空格子</span></div>
-        <div class="kv" id="slotKv"></div>
-
-        <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
-        <div class="row2">
-          <button class="btn tiny" id="btnUrl">用图片链接</button>
-          <button class="btn tiny danger" id="btnRemoveImage">移除图片</button>
-        </div>
-
-        <label class="field"><span>缩放 <b id="zoomVal">100%</b></span>
-          <input type="range" id="zoom" min="50" max="400" value="100">
-        </label>
-        <div class="row2">
-          <button class="btn tiny" id="btnFitMode">填满 / 完整</button>
-          <button class="btn tiny" id="btnResetPan">复位位置</button>
-        </div>
 
         <div class="line-box">
           <div class="prompt-head">
@@ -222,6 +206,23 @@
           </div>
           <pre id="shapePrefix">—</pre>
           <div class="shape-tip" id="shapeTip">粘到你自己的提示词<b>最前面</b>，构图就会自动适配这个格子的形状。</div>
+        </div>
+
+        <div class="slot-thumb" id="slotThumb"><span class="muted small">空格子</span></div>
+        <div class="kv" id="slotKv"></div>
+
+        <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
+        <div class="row2">
+          <button class="btn tiny" id="btnUrl">用图片链接</button>
+          <button class="btn tiny danger" id="btnRemoveImage">移除图片</button>
+        </div>
+
+        <label class="field"><span>缩放 <b id="zoomVal">100%</b></span>
+          <input type="range" id="zoom" min="50" max="400" value="100">
+        </label>
+        <div class="row2">
+          <button class="btn tiny" id="btnFitMode">填满 / 完整</button>
+          <button class="btn tiny" id="btnResetPan">复位位置</button>
         </div>
 
         <div class="prompt-box">

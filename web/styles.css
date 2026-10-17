@@ -262,8 +262,8 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:6px 0 2px}
 }
 .slot-head b{font-size:13px}
 .slot-thumb{
-  height:158px;border-radius:8px;border:1px solid var(--line-2);background:#fff;
-  display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:10px;
+  height:118px;border-radius:8px;border:1px solid var(--line-2);background:#fff;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;margin:2px 0 8px;
 }
 .slot-thumb img{max-width:100%;max-height:100%;object-fit:contain}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11.5px;margin:10px 0}

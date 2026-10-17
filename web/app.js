@@ -112,6 +112,11 @@ async function init() {
     renderStage(); renderSlotPanel();
   }
   if (params.get('demo') === '1') await demoFill();
+  if (params.get('hollow') === '1') {
+    state.hollow = true;
+    $('#chkHollow').checked = true;
+    renderStage();
+  }
   if (params.get('tab')) activateTab(params.get('tab'));
   if (params.get('plot')) {
     $('#plot').value = params.get('plot');
@@ -228,6 +233,14 @@ function renderStage() {
     holder.innerHTML = svg;
     const el = holder.querySelector('svg');
     if (el) el.addEventListener('dblclick', onCanvasDblClick);
+    // 镂空模式要说清楚：图片是故意藏起来，不是丢了
+    const foot = $('#footMsg');
+    if (foot) {
+      foot.textContent = state.hollow
+        ? '⚠ 镂空模式：只显示格线，图片被隐藏 —— 取消勾选右上角「镂空」就能看到图片'
+        : '拖图片进画布即可填充（自动裁切到格子形状，斜切格也不会变形）';
+      foot.style.color = state.hollow ? 'var(--accent-2)' : '';
+    }
   });
 }
 
