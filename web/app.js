@@ -199,10 +199,40 @@ async function init() {
     $('#chkHollow').checked = true;
     renderStage();
   }
+  // 先把第一页立起来（页签必须马上有，不能因为读草稿卡住而空白）
   if (!state.pages.length) {
-    state.pages = [currentPageSnapshot()];
+    state.pages = [{ tplId: state.tpl?.id || 'ref-4band-2col', name: '第 1 页', images: {}, bubbles: [], lines: {} }];
     state.pageIdx = 0;
-    renderPageTabs();
+  }
+  renderPageTabs();
+
+  // 再尝试恢复草稿：IndexedDB 不可用/被策略拦住时也不能拖死启动
+  try {
+    const draft = await Promise.race([
+      loadDraft(),
+      new Promise((r) => setTimeout(() => r(null), 1500)),
+    ]);
+    if (draft && draft.pages?.length) {
+      state.pages = draft.pages;
+      state.pageIdx = Math.min(draft.pageIdx || 0, draft.pages.length - 1);
+      const pg = state.pages[state.pageIdx];
+      if (pg?.tplId) await selectTemplate(pg.tplId, { silent: true });
+      state.images = { ...(pg?.images || {}) };
+      state.bubbles = (pg?.bubbles || []).map((b) => ({ ...b }));
+      state.lines = { ...(pg?.lines || {}) };
+      state.selectedId = state.tpl?.slots?.[0]?.id || null;
+      renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
+      toast('已恢复上次的 ' + state.pages.length + ' 页草稿');
+    }
+  } catch (e) {
+    console.warn('[PanelForge] 草稿恢复失败（不影响使用）', e);
+  }
+  if (new URLSearchParams(location.search).get('dbg') === '1') {
+    const f = document.querySelector('#footMsg');
+    if (f) {
+      f.textContent = 'dbg pages=' + state.pages.length + ' idx=' + state.pageIdx
+        + ' tabs=' + document.querySelectorAll('.pb-tab').length + ' tpl=' + state.tpl?.id;
+    }
   }
   if (params.get('keyselftest') === '1') await runKeySelfTest();
   if (params.get('aiselftest') === '1') await runAiSelfTest();
@@ -624,6 +654,7 @@ function renderStage() {
     }
     const holder = $('#canvas');
     holder.innerHTML = svg;
+    queueSave();
     if (state.pageEnter) {
       state.pageEnter = false;
       replay(holder, 'page-enter');
@@ -1057,6 +1088,10 @@ function bindUI() {
   $('#pageTabs')?.addEventListener('click', (ev) => {
     const b = ev.target.closest('.pb-tab');
     if (b) switchPage(Number(b.dataset.i));
+  });
+  $('#pageTabs')?.addEventListener('dblclick', (ev) => {
+    const b = ev.target.closest('.pb-tab');
+    if (b) { ev.preventDefault(); renamePage(Number(b.dataset.i)); }
   });
   $('#btnAddPage')?.addEventListener('click', addPage);
   $('#btnExportAll')?.addEventListener('click', exportAllPages);
@@ -1781,6 +1816,91 @@ function applyCand(i) {
   }).catch((e) => toast('这张图读不出来：' + e.message));
 }
 
+/* ---------------- 多页：IndexedDB 草稿（关掉浏览器也不丢） ---------------- */
+const DB_NAME = 'panelforge';
+const DB_STORE = 'drafts';
+let dbPromise = null;
+let dirty = false;
+let saveTimer = 0;
+
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((res) => {
+    try {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
+      };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => res(null);
+    } catch { res(null); }
+  });
+  return dbPromise;
+}
+
+async function idbSet(key, value) {
+  const db = await openDb();
+  if (!db) return false;
+  return new Promise((res) => {
+    try {
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).put(value, key);
+      tx.oncomplete = () => res(true);
+      tx.onerror = () => res(false);
+    } catch { res(false); }
+  });
+}
+
+async function idbGet(key) {
+  const db = await openDb();
+  if (!db) return null;
+  return new Promise((res) => {
+    try {
+      const tx = db.transaction(DB_STORE, 'readonly');
+      const r = tx.objectStore(DB_STORE).get(key);
+      r.onsuccess = () => res(r.result || null);
+      r.onerror = () => res(null);
+    } catch { res(null); }
+  });
+}
+
+function queueSave() {
+  dirty = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveDraft, 1200);
+}
+
+async function saveDraft() {
+  if (!state.tpl || !state.pages.length) return;
+  savePage();
+  const ok = await idbSet('pages', {
+    pages: state.pages, pageIdx: state.pageIdx, savedAt: Date.now(), v: 1,
+  });
+  if (ok) dirty = false;
+}
+
+async function loadDraft() {
+  const d = await idbGet('pages');
+  if (!d || !Array.isArray(d.pages) || !d.pages.length) return null;
+  return d;
+}
+
+function pageLabel(pg, i) {
+  return (pg && pg.name) || '第 ' + (i + 1) + ' 页';
+}
+
+async function renamePage(i) {
+  const pg = state.pages[i];
+  if (!pg) return;
+  const cur = pg.name || '';
+  const name = prompt('给这一页起个名字（比如：开场 / 对峙 / 收束）', cur || pageLabel(pg, i));
+  if (name === null) return;
+  pg.name = String(name).trim().slice(0, 24);
+  renderPageTabs();
+  queueSave();
+}
+
 /* ---------------- 多页 ---------------- */
 function currentPageSnapshot() {
   return {
@@ -1800,8 +1920,9 @@ function renderPageTabs() {
   const tabs = $('#pageTabs');
   if (!tabs) return;
   tabs.innerHTML = state.pages.map((pg, i) => `
-    <button class="pb-tab${i === state.pageIdx ? ' on' : ''}" data-i="${i}" title="${escapeHtml(pg.tplId)}">
-      ${i + 1}${Object.keys(pg.images || {}).length ? ` · ${Object.keys(pg.images).length}图` : ''}
+    <button class="pb-tab${i === state.pageIdx ? ' on' : ''}" data-i="${i}"
+      title="${escapeHtml(pg.name || pageLabel(pg, i))} · ${escapeHtml(pg.tplId)} · 双击改名">
+      <b>${i + 1}</b> ${escapeHtml(pageLabel(pg, i))}${Object.keys(pg.images || {}).length ? ` · ${Object.keys(pg.images).length}图` : ''}
     </button>`).join('');
 }
 
@@ -1818,6 +1939,7 @@ async function switchPage(i) {
   state.cands = {};
   resetHistory();
   renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
+  queueSave();
 }
 
 async function addPage() {
@@ -1827,6 +1949,7 @@ async function addPage() {
   state.pages.push({ tplId: copyTpl, images: {}, bubbles: [], lines: {} });
   await switchPage(state.pages.length - 1);
   toast('已加一页（同一套版式，空图）');
+  queueSave();
 }
 
 async function exportAllPages() {
@@ -1859,7 +1982,8 @@ async function exportAllPages() {
       ctx.drawImage(img, 0, 0, w, h);
       URL.revokeObjectURL(url);
       const png = await new Promise((res) => canvas.toBlob(res, 'image/png'));
-      downloadBlob(png, `${String(i + 1).padStart(2, '0')}-${state.tpl.id}.png`);
+      const safe = String(pageLabel(state.pages[i], i)).replace(/[\\/:*?"<>|]/g, '_');
+      downloadBlob(png, `${String(i + 1).padStart(2, '0')}-${safe}.png`);
       n++;
       await new Promise((r) => setTimeout(r, 260));
     }

@@ -336,6 +336,7 @@ input[type=range]::-moz-range-thumb{
   transition:transform .18s var(--spring),background .18s,color .18s,border-color .18s;
 }
 .pb-tab:hover{transform:translateY(-1px);color:var(--label)}
+.pb-tab b{font-weight:600;opacity:.75;margin-right:2px}
 .pb-tab.on{background:var(--tint);border-color:transparent;color:#fff;box-shadow:0 2px 8px rgba(0,122,255,.28)}
 .pb-sep{flex:1}
 
