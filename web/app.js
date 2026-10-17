@@ -68,6 +68,8 @@ const state = {
   outlineExport: true,
   analysis: null,
   plot: '',
+  clipboard: null,    // 内部剪贴板（图片或气泡）
+  history: { past: [], future: [] },
 };
 
 const CULTURE_LABEL = { jp: '日', cn: '中', kr: '韩', core: '通' };
@@ -119,11 +121,152 @@ async function init() {
     $('#chkHollow').checked = true;
     renderStage();
   }
+  if (params.get('keyselftest') === '1') await runKeySelfTest();
+  if (params.get('shortcuts') === '1') toggleShortcuts(true);
   if (params.get('tab')) activateTab(params.get('tab'));
   if (params.get('plot')) {
     $('#plot').value = params.get('plot');
     await runMatch();
   }
+}
+
+/* ================================================================== *
+ * 快捷键自检（?keyselftest=1）：派发真实 keydown 事件，检查状态变化
+ * ================================================================== */
+async function runKeySelfTest() {
+  const rows = [];
+  const ok = (name, cond, extra = '') => rows.push({ name, cond: !!cond, extra });
+  const press = (key, opts = {}) => {
+    if (document.activeElement?.blur) document.activeElement.blur();
+    window.dispatchEvent(new KeyboardEvent('keydown', {
+      key, ctrlKey: !!opts.ctrl, shiftKey: !!opts.shift, bubbles: true, cancelable: true,
+    }));
+  };
+  const slots = state.tpl.slots;
+  const s0 = slots[0].id;
+  const s1 = slots[1]?.id || slots[0].id;
+
+  state.images = {}; state.bubbles = []; state.lines = {};
+  state.selBubble = null; state.selectedId = s0;
+  resetHistory();
+
+  // 撤销 / 重做
+  commit();
+  state.images[s0] = { href: 'data:image/png;base64,iVBORw0KGgo=', iw: 8, ih: 8, zoom: 1, panX: 0, panY: 0, mode: 'cover', name: 't' };
+  ok('准备：第 1 格有图', !!state.images[s0]);
+  press('z', { ctrl: true });
+  ok('Ctrl+Z 撤销 → 图没了', !state.images[s0], `${Object.keys(state.images).length} 张`);
+  press('z', { ctrl: true, shift: true });
+  ok('Ctrl+Shift+Z 重做 → 图回来', !!state.images[s0]);
+
+  // 复制 / 粘贴 / 删除
+  state.selectedId = s0;
+  press('c', { ctrl: true });
+  ok('Ctrl+C 复制图片', state.clipboard?.kind === 'image');
+  state.selectedId = s1;
+  press('v', { ctrl: true });
+  ok('Ctrl+V 粘贴到第 2 格', !!state.images[s1]);
+  press('Delete');
+  ok('Delete 移除第 2 格图片', !state.images[s1]);
+
+  // 气泡：尺寸 / 微调 / 复制 / 删除
+  state.selectedId = s0;
+  addBubble('talk-ellipse', { noCommit: true });
+  const b0 = selectedBubble();
+  ok('气泡已添加', !!b0);
+  if (b0) {
+    const w0 = b0.w;
+    press(']');
+    ok('] 放大气泡', selectedBubble().w > w0, `${w0}→${selectedBubble().w}`);
+    const w1 = selectedBubble().w;
+    press('[');
+    ok('[ 缩小气泡', selectedBubble().w < w1);
+    const y0 = selectedBubble().y;
+    press('ArrowDown', { shift: true });
+    ok('Shift+↓ 下移 10', selectedBubble().y === y0 + 10, `${y0}→${selectedBubble().y}`);
+    const n0 = state.bubbles.length;
+    press('d', { ctrl: true });
+    ok('Ctrl+D 复制气泡', state.bubbles.length === n0 + 1, `${n0}→${state.bubbles.length}`);
+    press('Delete');
+    ok('Delete 删除气泡', state.bubbles.length === n0);
+  }
+
+  // 视图开关 / 数字跳格 / 帮助
+  const hollow0 = $('#chkHollow').checked;
+  press('h');
+  ok('H 切换镂空', $('#chkHollow').checked !== hollow0);
+  press('h');
+  const labels0 = $('#chkLabels').checked;
+  press('g');
+  ok('G 切换格号', $('#chkLabels').checked !== labels0);
+  press('2');
+  ok('数字键 2 跳到第 2 格', state.selectedId === s1);
+  press('?');
+  ok('? 打开快捷键表', !$('#shortcuts').classList.contains('hidden'));
+  press('Escape');
+  ok('Esc 关闭快捷键表', $('#shortcuts').classList.contains('hidden'));
+
+  const pass = rows.filter((r) => r.cond).length;
+  const box = document.createElement('div');
+  box.className = 'selftest';
+  box.innerHTML = `<b>快捷键自检：${pass}/${rows.length} 通过</b>` +
+    rows.map((r) => `<div class="${r.cond ? '' : 'no'}">${r.cond ? '✅' : '❌'} ${r.name}${r.extra ? ' — ' + r.extra : ''}</div>`).join('');
+  document.body.appendChild(box);
+  console.log(box.textContent);
+  return pass === rows.length;
+}
+
+/* ================================================================== *
+ * 撤销 / 重做
+ * 快照只克隆对象的外壳，图片的 dataURL 字符串是共享引用，所以很轻
+ * ================================================================== */
+const HIST_MAX = 60;
+
+function snapshot() {
+  return {
+    images: Object.fromEntries(Object.entries(state.images).map(([k, v]) => [k, { ...v }])),
+    bubbles: state.bubbles.map((b) => ({ ...b })),
+    lines: { ...state.lines },
+    selectedId: state.selectedId,
+    selBubble: state.selBubble,
+  };
+}
+
+function restore(snap) {
+  state.images = Object.fromEntries(Object.entries(snap.images).map(([k, v]) => [k, { ...v }]));
+  state.bubbles = snap.bubbles.map((b) => ({ ...b }));
+  state.lines = { ...snap.lines };
+  state.selectedId = snap.selectedId;
+  state.selBubble = snap.selBubble;
+  renderStage();
+  renderSlotPanel();
+  renderBubbles();
+}
+
+/** 在改动之前调用：把当前状态压进历史 */
+function commit() {
+  if (!state.tpl) return;
+  state.history.past.push(snapshot());
+  if (state.history.past.length > HIST_MAX) state.history.past.shift();
+  state.history.future.length = 0;
+}
+
+function undo() {
+  if (!state.history.past.length) { toast('没有可撤销的操作'); return; }
+  state.history.future.push(snapshot());
+  restore(state.history.past.pop());
+  toast('已撤销');
+}
+
+function redo() {
+  if (!state.history.future.length) { toast('没有可重做的操作'); return; }
+  state.history.past.push(snapshot());
+  restore(state.history.future.pop());
+  toast('已重做');
+}
+
+function resetHistory() {
+  state.history = { past: [], future: [] };
 }
 
 /* ================================================================== *
@@ -245,6 +388,7 @@ async function selectTemplate(id, opts = {}) {
   if (state.aiPlan && state.aiPlan.template?.id !== tpl.id) { state.aiPlan = null; state.aiDecision = null; }
   state.bubbles = [];
   state.selBubble = null;
+  resetHistory();
   loadLines(tpl.id);
   state.selectedId = tpl.slots[0]?.id || null;
   state.plan = null;
@@ -358,7 +502,10 @@ function bindUI() {
       return;
     }
     const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
-    if (!drag.moved && Math.hypot(dx, dy) > 4) drag.moved = true;
+    if (!drag.moved && Math.hypot(dx, dy) > 4) {
+      drag.moved = true;
+      if (drag.bubble || (drag.slot && state.images[drag.slot.id])) commit();
+    }
     if (drag.moved && drag.bubble) {
       const svg = $('#canvas svg');
       const r = svg.getBoundingClientRect();
@@ -456,24 +603,143 @@ function bindUI() {
   // 键盘
   window.addEventListener('keydown', (ev) => {
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '');
-    if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') { ev.preventDefault(); runMatch(); return; }
+    const mod = ev.metaKey || ev.ctrlKey;
+    const k = ev.key;
+    const lower = k.length === 1 ? k.toLowerCase() : k;
+
+    // Ctrl+Enter：按规则匹配（输入框里也能用）
+    if (mod && k === 'Enter') { ev.preventDefault(); runMatch(); return; }
+    // Ctrl+Shift+Enter：AI 导演
+    if (mod && ev.shiftKey && k === 'Enter') { ev.preventDefault(); runAiDecide(); return; }
+
     if (typing) return;
-    if (!state.tpl) return;
-    const idx = state.tpl.slots.findIndex((s) => s.id === state.selectedId);
-    if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') {
-      ev.preventDefault();
-      const dir = ev.key === 'ArrowRight' ? 1 : -1;
-      const next = state.tpl.slots[clamp(idx + dir, 0, state.tpl.slots.length - 1)];
-      state.selectedId = next.id; renderStage(); renderSlotPanel();
-    }
-    if ((ev.key === 'Delete' || ev.key === 'Backspace') && state.selectedId) {
-      if (!state.images[state.selectedId]) return;
-      ev.preventDefault();
-      delete state.images[state.selectedId];
+
+    // ?：快捷键表（任何状态都能开）
+    if (k === '?' || (ev.shiftKey && k === '/')) { ev.preventDefault(); toggleShortcuts(); return; }
+    if (k === 'Escape') {
+      if (!$('#shortcuts').classList.contains('hidden')) { toggleShortcuts(false); return; }
+      state.selectedId = null; state.selBubble = null;
       renderStage(); renderSlotPanel();
-      toast('已移除该格图片');
+      return;
     }
-    if (ev.key === 'v' && (ev.metaKey || ev.ctrlKey)) return; // 由 paste 处理
+    if (!state.tpl) return;
+
+    // ---- 撤销 / 重做 ----
+    if (mod && lower === 'z') {
+      ev.preventDefault();
+      if (ev.shiftKey) redo(); else undo();
+      return;
+    }
+    if (mod && lower === 'y') { ev.preventDefault(); redo(); return; }
+
+    // ---- 复制 / 剪切 / 粘贴 / 复制气泡 ----
+    if (mod && lower === 'c') { ev.preventDefault(); copySelection(); return; }
+    if (mod && lower === 'x') { ev.preventDefault(); cutSelection(); return; }
+    if (mod && lower === 'v') { /* 交给 paste 事件处理系统剪贴板；内部剪贴板在下面兜底 */ }
+    if (mod && lower === 'd') { ev.preventDefault(); duplicateBubble(); return; }
+    if (mod && lower === 's') { ev.preventDefault(); exportPNG(); return; }
+
+    // ---- 切换类 ----
+    if (!mod && lower === 'g') { ev.preventDefault(); toggleCheck('#chkLabels'); return; }
+    if (!mod && lower === 'h') { ev.preventDefault(); toggleCheck('#chkHollow'); return; }
+    if (!mod && lower === 'e') {
+      ev.preventDefault();
+      if (ev.shiftKey) exportSVG(); else exportPNG();
+      return;
+    }
+    if (!mod && lower === 'n') { ev.preventDefault(); jumpNextEmpty(); return; }
+
+    // ---- 图片操作（选中格子有图时）----
+    const img = state.selectedId ? state.images[state.selectedId] : null;
+    if (!mod && lower === 'f' && img) {
+      ev.preventDefault(); commit();
+      img.mode = img.mode === 'contain' ? 'cover' : 'contain';
+      renderStage(); renderSlotPanel();
+      toast(img.mode === 'contain' ? '完整显示' : '填满裁切');
+      return;
+    }
+    if (!mod && lower === 'r' && img) {
+      ev.preventDefault(); commit();
+      img.panX = 0; img.panY = 0; img.zoom = 1;
+      syncZoomSlider(); renderStage(); renderSlotPanel();
+      toast('图片已复位');
+      return;
+    }
+
+    // ---- 格子导航 ----
+    const idx = state.tpl.slots.findIndex((s) => s.id === state.selectedId);
+    if (k === 'ArrowRight' || k === 'ArrowLeft') {
+      ev.preventDefault();
+      const dir = k === 'ArrowRight' ? 1 : -1;
+      const next = state.tpl.slots[clamp(idx + dir, 0, state.tpl.slots.length - 1)];
+      state.selectedId = next.id; state.selBubble = null;
+      renderStage(); renderSlotPanel();
+      return;
+    }
+
+    // ---- 气泡微调 / 尺寸 ----
+    const bub = selectedBubble();
+    if (bub && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight')) {
+      ev.preventDefault();
+      const step = ev.shiftKey ? 10 : 1;
+      commitThrottled(300);
+      if (k === 'ArrowUp') bub.y -= step;
+      if (k === 'ArrowDown') bub.y += step;
+      if (k === 'ArrowLeft') bub.x -= step;
+      if (k === 'ArrowRight') bub.x += step;
+      renderStage();
+      return;
+    }
+    if (k === '[' || k === ']') {
+      ev.preventDefault();
+      const grow = k === ']';
+      commitThrottled(250);
+      if (bub) {
+        const cx = bub.x + bub.w / 2, cy = bub.y + bub.h / 2;
+        const f = grow ? 1.08 : 0.93;
+        bub.w = Math.round((bub.baseW || bub.w) * ((bub.w / (bub.baseW || bub.w)) * f));
+        bub.h = Math.round((bub.baseH || bub.h) * ((bub.h / (bub.baseH || bub.h)) * f));
+        bub.x = Math.round(cx - bub.w / 2);
+        bub.y = Math.round(cy - bub.h / 2);
+        renderStage(); renderBubbles();
+      } else if (img) {
+        img.zoom = clamp((img.zoom || 1) * (grow ? 1.08 : 0.93), 0.3, 6);
+        syncZoomSlider(); renderStage();
+      }
+      return;
+    }
+
+    // ---- 数字键：跳到第 N 格 ----
+    if (!mod && /^[1-9]$/.test(k)) {
+      const slot = state.tpl.slots[Number(k) - 1];
+      if (slot) {
+        ev.preventDefault();
+        state.selectedId = slot.id; state.selBubble = null;
+        renderStage(); renderSlotPanel();
+      }
+      return;
+    }
+
+    // ---- 删除 ----
+    if (k === 'Delete' || k === 'Backspace') {
+      if (bub) {
+        ev.preventDefault(); commit(); deleteBubble();
+        return;
+      }
+      if (state.selectedId && state.images[state.selectedId]) {
+        ev.preventDefault(); commit();
+        delete state.images[state.selectedId];
+        renderStage(); renderSlotPanel();
+        toast('已移除该格图片');
+      }
+      return;
+    }
+
+    // ---- 内部剪贴板粘贴（系统图片由 paste 事件处理）----
+    if (mod && lower === 'v' && state.clipboard) {
+      ev.preventDefault();
+      pasteSelection();
+    }
   });
 
   window.addEventListener('paste', async (ev) => {
@@ -511,6 +777,7 @@ function bindUI() {
   $('#btnAiDecide').addEventListener('click', runAiDecide);
   $('#btnClear').addEventListener('click', () => {
     if (!Object.keys(state.images).length) return;
+    commit();
     state.images = {}; renderStage(); renderSlotPanel(); refreshScript(); toast('已清空全部图片');
   });
   $('#chkHollow').addEventListener('change', (ev) => { state.hollow = ev.target.checked; renderStage(); });
@@ -526,6 +793,7 @@ function bindUI() {
   $('#btnPickImage').addEventListener('click', () => { $('#filePick').dataset.mode = 'slot'; $('#filePick').click(); });
   $('#btnRemoveImage').addEventListener('click', () => {
     if (!state.selectedId) return;
+    commit();
     delete state.images[state.selectedId];
     renderStage(); renderSlotPanel(); toast('已移除');
   });
@@ -533,6 +801,7 @@ function bindUI() {
   $('#zoom').addEventListener('input', (ev) => {
     const img = state.images[state.selectedId];
     if (!img) return;
+    commitThrottled(600);
     img.zoom = Number(ev.target.value) / 100;
     $('#zoomVal').textContent = ev.target.value + '%';
     renderStage();
@@ -540,6 +809,7 @@ function bindUI() {
   $('#btnFitMode').addEventListener('click', () => {
     const img = state.images[state.selectedId];
     if (!img) return;
+    commit();
     img.mode = img.mode === 'contain' ? 'cover' : 'contain';
     renderSlotPanel(); renderStage();
     toast(img.mode === 'contain' ? '完整显示（可留白）' : '填满格子（裁切）');
@@ -547,6 +817,7 @@ function bindUI() {
   $('#btnResetPan').addEventListener('click', () => {
     const img = state.images[state.selectedId];
     if (!img) return;
+    commit();
     img.panX = 0; img.panY = 0; img.zoom = 1;
     syncZoomSlider(); renderStage(); toast('已复位');
   });
@@ -557,6 +828,11 @@ function bindUI() {
   $('#btnCopyShape').addEventListener('click', copyShapePrefix);
   $('#charSheet').addEventListener('input', debounce(saveLlm, 400));
   $('#btnAiPrompts').addEventListener('click', runAiPrompts);
+
+  // 快捷键表
+  $('#btnShortcuts').addEventListener('click', () => toggleShortcuts(true));
+  $('#btnCloseShortcuts').addEventListener('click', () => toggleShortcuts(false));
+  $('#shortcuts').addEventListener('click', (ev) => { if (ev.target.id === 'shortcuts') toggleShortcuts(false); });
 
   // 气泡素材库
   $('#bubTabs').addEventListener('click', (ev) => {
@@ -569,6 +845,7 @@ function bindUI() {
   $('#bubOpacity').addEventListener('input', (ev) => {
     const b = selectedBubble();
     if (!b) return;
+    commitThrottled(600);
     b.opacity = Number(ev.target.value) / 100;
     $('#opVal').textContent = ev.target.value + '%';
     renderStage();
@@ -576,6 +853,7 @@ function bindUI() {
   $('#bubSize').addEventListener('input', (ev) => {
     const b = selectedBubble();
     if (!b) return;
+    commitThrottled(600);
     const k = Number(ev.target.value) / 100;
     const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
     b.w = Math.round((b.baseW || b.w) * k);
@@ -588,6 +866,7 @@ function bindUI() {
   $('#bubRot').addEventListener('input', (ev) => {
     const b = selectedBubble();
     if (!b) return;
+    commitThrottled(600);
     b.rot = Number(ev.target.value);
     $('#rotVal').textContent = ev.target.value + '°';
     renderStage();
@@ -595,6 +874,7 @@ function bindUI() {
   $('#bubText').addEventListener('input', (ev) => {
     const b = selectedBubble();
     if (!b) return;
+    commitThrottled(900);
     b.text = ev.target.value;
     renderStage();
   });
@@ -602,6 +882,7 @@ function bindUI() {
   $('#bubDel').addEventListener('click', deleteBubble);
   $('#bubClear').addEventListener('click', () => {
     if (!state.bubbles.length) return;
+    commit();
     state.bubbles = [];
     state.selBubble = null;
     renderStage(); renderBubbles();
@@ -611,6 +892,7 @@ function bindUI() {
   // 本格句子
   $('#slotLine').addEventListener('input', (ev) => {
     if (!state.selectedId) return;
+    commitThrottled(900);
     state.lines[state.selectedId] = ev.target.value;
     saveLines();
   });
@@ -685,6 +967,7 @@ function activateTab(tab) {
  * 图片
  * ================================================================== */
 async function putImage(slotId, file, opts = {}) {
+  if (!opts.noCommit) commit();
   const href = await fileToDataURL(file);
   const dim = await imageSize(href);
   state.images[slotId] = {
@@ -706,6 +989,7 @@ async function importByUrl() {
       href = await blobToDataURL(await api.proxyImage(href));
     }
     const dim = await imageSize(href);
+    commit();
     state.images[state.selectedId] = { href, iw: dim.w, ih: dim.h, zoom: 1, panX: 0, panY: 0, mode: 'cover', name: 'url' };
     renderStage(); renderSlotPanel(); refreshScript();
     toast('已填入链接图片');
@@ -1347,6 +1631,97 @@ function renderExportKv() {
 }
 
 /* ================================================================== *
+ * 快捷键辅助：复制/粘贴/切换/跳转
+ * ================================================================== */
+let lastCommitAt = 0;
+function commitThrottled(ms = 700) {
+  const now = Date.now();
+  if (now - lastCommitAt < ms) return;
+  lastCommitAt = now;
+  commit();
+}
+
+function toggleCheck(sel) {
+  const el = $(sel);
+  if (!el) return;
+  el.checked = !el.checked;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function toggleShortcuts(force) {
+  const el = $('#shortcuts');
+  if (!el) return;
+  const show = force === undefined ? el.classList.contains('hidden') : !!force;
+  el.classList.toggle('hidden', !show);
+}
+
+function jumpNextEmpty() {
+  if (!state.tpl) return;
+  const list = state.tpl.slots;
+  const i = list.findIndex((s) => s.id === state.selectedId);
+  for (let k = 1; k <= list.length; k++) {
+    const s = list[(i + k) % list.length];
+    if (!state.images[s.id]) {
+      state.selectedId = s.id;
+      state.selBubble = null;
+      renderStage(); renderSlotPanel();
+      toast(`跳到第 ${s.order} 格（还是空的）`);
+      return;
+    }
+  }
+  toast('所有格子都填满了');
+}
+
+function copySelection() {
+  const bub = selectedBubble();
+  if (bub) {
+    state.clipboard = { kind: 'bubble', data: { ...bub } };
+    toast('已复制气泡（Ctrl+V 粘贴）');
+    return;
+  }
+  const img = state.selectedId ? state.images[state.selectedId] : null;
+  if (img) {
+    state.clipboard = { kind: 'image', data: { ...img } };
+    toast('已复制图片（选中另一格 Ctrl+V 粘贴）');
+    return;
+  }
+  toast('没有选中的图片或气泡');
+}
+
+function cutSelection() {
+  copySelection();
+  const bub = selectedBubble();
+  if (bub) { deleteBubble(); return; }
+  if (state.selectedId && state.images[state.selectedId]) {
+    commit();
+    delete state.images[state.selectedId];
+    renderStage(); renderSlotPanel(); refreshScript();
+    toast('已剪切');
+  }
+}
+
+function pasteSelection() {
+  const c = state.clipboard;
+  if (!c) { toast('剪贴板里没有东西'); return; }
+  if (c.kind === 'image') {
+    if (!state.selectedId) { toast('先点一个格子再粘贴'); return; }
+    commit();
+    state.images[state.selectedId] = { ...c.data };
+    renderStage(); renderSlotPanel(); refreshScript();
+    toast('已粘贴到该格');
+    return;
+  }
+  if (c.kind === 'bubble') {
+    commit();
+    const nb = { ...c.data, id: 'b' + Math.random().toString(36).slice(2, 8), x: c.data.x + 26, y: c.data.y + 26 };
+    state.bubbles.push(nb);
+    state.selBubble = nb.id;
+    renderStage(); renderBubbles();
+    toast('已粘贴气泡');
+  }
+}
+
+/* ================================================================== *
  * 气泡：素材库 + 画布交互 +  inspectors
  * ================================================================== */
 function bubbleAt(pt) {
@@ -1410,6 +1785,7 @@ function renderBubbleInspector() {
 
 function addBubble(type, opts = {}) {
   if (!state.tpl) { toast('先选一套版式'); return null; }
+  if (!opts.noCommit) commit();
   const slot = state.tpl.slots?.find((s) => s.id === state.selectedId);
   const at = opts.at || (slot ? { x: slot.x + slot.w * 0.5, y: slot.y + Math.max(30, slot.h * 0.28) } : undefined);
   const b = makeBubble(type, { page: state.tpl.page, at, text: opts.text ?? '' });
@@ -1427,6 +1803,7 @@ function addBubble(type, opts = {}) {
 function deleteBubble() {
   const b = selectedBubble();
   if (!b) return;
+  commit();
   state.bubbles = state.bubbles.filter((x) => x.id !== b.id);
   state.selBubble = null;
   renderStage();
@@ -1436,6 +1813,7 @@ function deleteBubble() {
 function duplicateBubble() {
   const b = selectedBubble();
   if (!b) return;
+  commit();
   const copy = { ...b, id: 'b' + Math.random().toString(36).slice(2, 8), x: b.x + 24, y: b.y + 24 };
   state.bubbles.push(copy);
   state.selBubble = copy.id;

@@ -146,6 +146,7 @@
         <button class="btn tiny" id="btnClear" title="移除全部图片">清空图片</button>
         <label class="switch" title="只显示格线、不显示图片：用来单独看版式排版"><input type="checkbox" id="chkHollow"> 镂空</label>
         <label class="switch" title="在格子上标出阅读顺序编号"><input type="checkbox" id="chkLabels" checked> 格号</label>
+        <button class="btn tiny" id="btnShortcuts" title="查看全部快捷键（按 ? 也可以）">⌨ 快捷键</button>
       </div>
     </div>
 
@@ -303,6 +304,60 @@
 </main>
 
 <input type="file" id="filePick" accept="image/*" multiple hidden>
+
+<div class="shortcuts hidden" id="shortcuts">
+  <div class="sc-panel">
+    <div class="sc-head">
+      <b>快捷键</b>
+      <button class="btn tiny" id="btnCloseShortcuts">关闭（Esc）</button>
+    </div>
+    <div class="sc-cols">
+      <section>
+        <h4>编辑</h4>
+        <div class="sc-row"><span>撤销</span><kbd>Ctrl</kbd><kbd>Z</kbd></div>
+        <div class="sc-row"><span>重做</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Z</kbd></div>
+        <div class="sc-row"><span>复制</span><kbd>Ctrl</kbd><kbd>C</kbd></div>
+        <div class="sc-row"><span>剪切</span><kbd>Ctrl</kbd><kbd>X</kbd></div>
+        <div class="sc-row"><span>粘贴</span><kbd>Ctrl</kbd><kbd>V</kbd></div>
+        <div class="sc-row"><span>删除选中（图/气泡）</span><kbd>Del</kbd></div>
+        <div class="sc-row"><span>取消选择</span><kbd>Esc</kbd></div>
+      </section>
+      <section>
+        <h4>格子</h4>
+        <div class="sc-row"><span>上一格 / 下一格</span><kbd>←</kbd><kbd>→</kbd></div>
+        <div class="sc-row"><span>跳到第 N 格</span><kbd>1</kbd>–<kbd>9</kbd></div>
+        <div class="sc-row"><span>跳到下一个空格</span><kbd>N</kbd></div>
+        <div class="sc-row"><span>按规则匹配剧情</span><kbd>Ctrl</kbd><kbd>Enter</kbd></div>
+        <div class="sc-row"><span>AI 导演</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Enter</kbd></div>
+      </section>
+      <section>
+        <h4>图片</h4>
+        <div class="sc-row"><span>填满 ↔ 完整</span><kbd>F</kbd></div>
+        <div class="sc-row"><span>复位（位置+缩放）</span><kbd>R</kbd></div>
+        <div class="sc-row"><span>缩放</span><kbd>[</kbd><kbd>]</kbd></div>
+        <div class="sc-row"><span>格内拖动平移</span><kbd>拖拽</kbd></div>
+        <div class="sc-row"><span>格内缩放</span><kbd>Alt</kbd><kbd>滚轮</kbd></div>
+        <div class="sc-row"><span>导出 PNG / SVG</span><kbd>E</kbd><kbd>Shift</kbd><kbd>E</kbd></div>
+      </section>
+      <section>
+        <h4>气泡</h4>
+        <div class="sc-row"><span>选中 / 拖动</span><kbd>点击</kbd><kbd>拖拽</kbd></div>
+        <div class="sc-row"><span>微调位置（Shift 加速）</span><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></div>
+        <div class="sc-row"><span>缩小 / 放大</span><kbd>[</kbd><kbd>]</kbd></div>
+        <div class="sc-row"><span>复制气泡</span><kbd>Ctrl</kbd><kbd>D</kbd></div>
+        <div class="sc-row"><span>删除气泡</span><kbd>Del</kbd></div>
+      </section>
+      <section>
+        <h4>视图</h4>
+        <div class="sc-row"><span>格号开关</span><kbd>G</kbd></div>
+        <div class="sc-row"><span>镂空预览</span><kbd>H</kbd></div>
+        <div class="sc-row"><span>快捷键表</span><kbd>?</kbd></div>
+      </section>
+    </div>
+    <p class="sc-note">在输入框/文本域里打字时，单键快捷键不生效（避免误触）；带 Ctrl 的组合键仍可用。</p>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script type="module" src="./app.js"></script>
