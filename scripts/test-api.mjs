@@ -111,9 +111,15 @@ const cors = await fetch(base + '/api/health');
 const acao = cors.headers.get('access-control-allow-origin');
 check('CORS 策略', acao === null || acao === '*', acao === null ? '默认同源（安全）' : '显式 API_CORS=*');
 
-// 图片代理：本机默认可用（前端"用图片链接"功能依赖它），公网默认关闭
-const proxied = await get('/api/proxy?url=' + encodeURIComponent(base + '/api/health'));
-check('图片代理（本机）', proxied.status === 200 && proxied.body.ok === true, `status=${proxied.status}`);
+// 图片代理：三道具名门槛（自定义头 + 来源校验 + 内网黑名单）
+const noHeader = await get('/api/proxy?url=' + encodeURIComponent('https://example.com/'));
+check('图片代理需要自定义头', noHeader.status === 403, `status=${noHeader.status}`);
+
+const ssrf = await fetch(base + '/api/proxy?url=' + encodeURIComponent('http://169.254.169.254/latest/meta-data/'), { headers: { 'x-pf-client': '1' } });
+check('图片代理拒绝内网/云元数据', ssrf.status === 403, `status=${ssrf.status}`);
+
+const crossOrigin = await fetch(base + '/api/proxy?url=' + encodeURIComponent('https://example.com/'), { headers: { 'x-pf-client': '1', origin: 'https://evil.example' } });
+check('图片代理拒绝跨站来源', crossOrigin.status === 403, `status=${crossOrigin.status}`);
 
 // 7 规则库（v2）
 const rules = await get('/api/rules');
