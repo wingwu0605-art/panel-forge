@@ -18,7 +18,7 @@ import { matchTemplates, planStory, analyzePlot, buildPlan, RULES_VERSION, RULE_
 import { INTENTS, ROLES, STYLE_PACKS, COMMON_NEGATIVE, SCENES, TONES, DIRECTIVES, NEGATORS, VOCAB_STATS, BEAT_EN } from './lib/taxonomy.mjs';
 import { PAGE_PRESETS } from './lib/geometry.mjs';
 import { aiTools, systemPrompt, openapiSpec } from './lib/aidocs.mjs';
-import { readLlmConfig, llmStatus, testLlm, aiDecide, optimizePrompts } from './lib/llm.mjs';
+import { readLlmConfig, llmStatus, testLlm, aiDecide, optimizePrompts, generateImage } from './lib/llm.mjs';
 import { SHAPES, SHAPE_IDS, classifyShape, prefixSnippet, shapeSummary } from './lib/shapes.mjs';
 import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble } from './lib/bubbles.mjs';
 
@@ -289,6 +289,27 @@ const routes = [
       return { ...r, status: llmStatus(cfg) };
     } catch (err) {
       return { __status: err.code === 'NO_LLM_KEY' ? 400 : 502, ok: false, error: String(err.message), code: err.code || 'LLM_ERROR', hint: err.hint };
+    }
+  }],
+
+  // AI 生图：用用户自己的生图模型；浏览器直连被 CORS 挡时走这里中转
+  ['POST', /^\/api\/ai\/image$/, async (req) => {
+    if (req.headers['x-pf-client'] !== '1') {
+      return { __status: 403, error: '缺少 x-pf-client 头（仅网页编辑器自用）' };
+    }
+    const body = await readBody(req);
+    const cfg = readLlmConfig(body.llm || {});
+    try {
+      const r = await generateImage({ cfg, prompt: body.prompt, size: body.size, model: body.model || cfg.imgModel });
+      return { ...r, ok: true };
+    } catch (err) {
+      return {
+        __status: err.code === 'NO_LLM_KEY' ? 400 : 502,
+        ok: false,
+        error: String(err.message),
+        code: err.code || 'IMAGE_ERROR',
+        hint: err.hint,
+      };
     }
   }],
 

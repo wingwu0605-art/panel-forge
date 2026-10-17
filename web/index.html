@@ -126,6 +126,9 @@
         <label class="field"><span>模型</span>
           <input id="llmModel" type="text" spellcheck="false" placeholder="deepseek-chat">
         </label>
+        <label class="field"><span>生图模型（可选）</span>
+          <input id="imgModel" type="text" spellcheck="false" placeholder="gpt-image-1 / dall-e-3 / Kwai-Kolors/Kolors">
+        </label>
       </div>
       <label class="field"><span>Base URL</span>
         <input id="llmBase" type="text" spellcheck="false" placeholder="https://api.deepseek.com/v1">
@@ -254,16 +257,30 @@
         <div class="prompt-box shape-box">
           <div class="prompt-head">
             <span>形状开头词 · <b id="shapeName">—</b></span>
-            <button class="btn tiny" id="btnCopyShape">复制</button>
+            <button class="btn tiny" id="btnCopyShape" title="英文版，粘到国际模型提示词最前面">复制英文</button>
           </div>
           <pre id="shapePrefix">—</pre>
+          <div class="prompt-head" style="margin-top:6px">
+            <span class="muted small">中文版（喂国内模型更稳）</span>
+            <button class="btn tiny" id="btnCopyShapeZh">复制中文</button>
+          </div>
+          <pre id="shapePrefixZh">—</pre>
           <div class="shape-tip" id="shapeTip">粘到你自己的提示词<b>最前面</b>，构图就会自动适配这个格子的形状。</div>
+        </div>
+
+        <div class="prompt-box suggest-box" id="suggestBox">
+          <div class="prompt-head">
+            <span>这里应该是 · <b id="suggestFrom">建议</b></span>
+            <button class="btn tiny" id="btnUseSuggest">用这一句</button>
+          </div>
+          <div class="suggest-text" id="suggestText">—</div>
         </div>
 
         <div class="slot-thumb" id="slotThumb"><span class="muted small">空格子</span></div>
         <div class="kv" id="slotKv"></div>
 
         <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
+        <button class="btn wide" id="btnAiImage" title="用你自己的生图模型直接生成这一格，画完自动填入">✨ 用 AI 生这一格</button>
         <div class="row2">
           <button class="btn tiny" id="btnUrl">用图片链接</button>
           <button class="btn tiny danger" id="btnRemoveImage">移除图片</button>

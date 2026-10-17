@@ -27,10 +27,21 @@ async function makeApi() {
     template: (id) => getJSON('/api/templates/' + encodeURIComponent(id)),
     match: (body) => postJSON('/api/match', body),
     plan: (body) => postJSON('/api/plan', body),
-    aiDecide: (body) => postJSON('/api/ai/decide', body),
-    prompts: (body) => postJSON('/api/ai/prompts', body),
+    aiDecide: async (body) => (await directFirst('aiDecide', body)) || postJSON('/api/ai/decide', body),
+    prompts: async (body) => (await directFirst('prompts', body)) || postJSON('/api/ai/prompts', body),
     llmStatus: () => getJSON('/api/llm/status'),
-    llmTest: (body) => postJSON('/api/llm/test', body),
+    llmTest: async (body) => (await directFirst('llmTest', body)) || postJSON('/api/llm/test', body),
+    async imageGenerate(body) {
+      // 生图优先也让浏览器直连；被 CORS 挡了再走本机服务端中转
+      const direct = await directFirst('imageGenerate', body);
+      if (direct) return direct;
+      const r = await fetch('/api/ai/image', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-pf-client': '1' },
+        body: JSON.stringify(body),
+      });
+      return r.json();
+    },
     async proxyImage(url) {
       // 带自定义头：强制走 CORS 预检，别的网站的脚本没法盲调这个代理
       const r = await fetch('/api/proxy?url=' + encodeURIComponent(url), { headers: { 'x-pf-client': '1' } });
@@ -117,6 +128,21 @@ init().catch((e) => {
   console.error(e);
   toast('初始化失败：' + e.message);
 });
+
+/** 列表里挑第一个能用的直连实现：浏览器直连失败（CORS）再退回服务端 */
+async function directFirst(name, body) {
+  try {
+    const { createStaticApi } = await import('./api-static.js');
+    const sapi = createStaticApi();
+    const set = sapi[name] ? sapi : null;
+    if (!set) return null;
+    const r = await set[name](body || {});
+    if (r && r.ok === false && (r.code === 'LLM_CORS' || r.code === 'NO_LLM_KEY')) return null;
+    return r;
+  } catch {
+    return null;
+  }
+}
 
 async function init() {
   initChrome();
@@ -519,6 +545,7 @@ async function selectTemplate(id, opts = {}) {
   state.selBubble = null;
   resetHistory();
   loadLines(tpl.id);
+  attachSuggestions($('#plot').value || '', state.plan?.pages?.[0]?.plan);
   state.selectedId = tpl.slots[0]?.id || null;
   state.plan = null;
   location.hash = 'tpl=' + tpl.id;
@@ -544,6 +571,7 @@ function readOrderText(r) {
  * 画布渲染
  * ================================================================== */
 let rafPending = false;
+let pageEnterTimer = 0;
 function renderStage() {
   if (!state.tpl) return;
   if (rafPending) return;
@@ -588,7 +616,13 @@ function renderStage() {
     }
     const holder = $('#canvas');
     holder.innerHTML = svg;
-    if (state.pageEnter) { state.pageEnter = false; replay(holder, 'page-enter'); }
+    if (state.pageEnter) {
+      state.pageEnter = false;
+      replay(holder, 'page-enter');
+      // 动画放完必须摘掉类，否则每次重绘 SVG 都会重放整页入场 → 切格子时整页闪
+      clearTimeout(pageEnterTimer);
+      pageEnterTimer = setTimeout(() => holder.classList.remove('page-enter'), 900);
+    }
     const el = holder.querySelector('svg');
     if (el) el.addEventListener('dblclick', onCanvasDblClick);
     // 镂空模式要说清楚：图片是故意藏起来，不是丢了
@@ -981,6 +1015,16 @@ function bindUI() {
     if (p) copyText(p.promptEn, '提示词已复制');
   });
   $('#btnCopyShape').addEventListener('click', copyShapePrefix);
+  $('#btnCopyShapeZh')?.addEventListener('click', copyShapePrefixZh);
+  $('#btnUseSuggest')?.addEventListener('click', () => {
+    const txt = state._suggest || '';
+    if (!txt) return;
+    const el = $('#slotLine');
+    el.value = el.value ? el.value + '\n' + txt : txt;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    toast('已填入本格句子');
+  });
+  $('#btnAiImage')?.addEventListener('click', generateSlotImage);
   $('#charSheet').addEventListener('input', debounce(saveLlm, 400));
   $('#btnAiPrompts').addEventListener('click', runAiPrompts);
 
@@ -1271,6 +1315,17 @@ function renderSlotPanel() {
   const shape = panel?.shape || slot.shape || null;
   $('#shapeName').textContent = shape ? shape.zh : '—';
   $('#shapePrefix').textContent = shape?.prefixEn || '—';
+  if ($('#shapePrefixZh')) $('#shapePrefixZh').textContent = shape?.prefixZh || '—';
+
+  // 这一格应该是什么：AI 给的优先，没有就用规则引擎算的建议句
+  if ($('#suggestBox')) {
+    const sug = panel?.suggest || slotSuggest(slot.id);
+    const fromAi = !!panel?.suggestAi;
+    $('#suggestFrom').textContent = fromAi ? 'AI 的思路' : (sug ? '按剧情推的' : '还没剧情');
+    $('#suggestText').textContent = sug || '先在左边写一段剧情，或用 AI 导演排一次戏';
+    $('#btnUseSuggest').disabled = !sug;
+    state._suggest = sug || '';
+  }
   $('#shapeTip').innerHTML = shape
     ? `粘到你自己的提示词<b>最前面</b>，构图就会适配这个形状。${escapeHtml(shape.hintZh || '')}`
     : '粘到你自己的提示词<b>最前面</b>。';
@@ -1325,6 +1380,7 @@ function loadLlm() {
   $('#llmBase').value = state.llm.baseUrl || '';
   $('#llmKey').value = state.llm.apiKey || '';
   $('#llmModel').value = state.llm.model || '';
+  if ($('#imgModel')) $('#imgModel').value = state.llm.imgModel || '';
   $('#charSheet').value = state.charSheet;
   if ($('#chkKeySession')) $('#chkKeySession').checked = !!state.llm.sessionOnly;
 }
@@ -1336,6 +1392,7 @@ function saveLlm() {
     baseUrl: $('#llmBase').value.trim(),
     apiKey: $('#llmKey').value.trim(),
     model: $('#llmModel').value.trim(),
+    imgModel: $('#imgModel') ? $('#imgModel').value.trim() : '',
     sessionOnly,
   };
   state.charSheet = $('#charSheet').value.trim();
@@ -1350,6 +1407,7 @@ function clearLlm() {
   try { localStorage.removeItem(LLM_STORE); } catch { /* ignore */ }
   state.llm = { protocol: 'openai', baseUrl: '', apiKey: '', model: '' };
   $('#llmBase').value = ''; $('#llmKey').value = ''; $('#llmModel').value = '';
+  if ($('#imgModel')) $('#imgModel').value = '';
   syncLlmStatus();
   toast('已清除本机 AI 配置');
 }
@@ -1563,6 +1621,7 @@ async function refreshScript(force = false) {
       pageWidth: state.exportWidth,
     });
     if (res.error) throw new Error(res.error);
+    attachSuggestions(plot, res?.pages?.[0]?.plan);
     state.plan = res;
     renderScript();
     renderSlotPanel();
@@ -1601,9 +1660,12 @@ function renderScript() {
       ${p.content ? `<div class="ct">${escapeHtml(p.content)}</div>` : ''}
       ${p.dialogue ? `<div class="dl">「${escapeHtml(p.dialogue)}」</div>` : ''}
       <div class="pr">${escapeHtml(p.promptEn)}</div>
+      ${p.promptZh ? `<div class="pr zh">${escapeHtml(p.promptZh)}</div>` : ''}
       <div class="act">
         <button class="btn tiny" data-act="copy">复制提示词</button>
         <button class="btn tiny" data-act="prefix">复制形状词</button>
+        <button class="btn tiny" data-act="prefixZh">复制中文形状词</button>
+        <button class="btn tiny" data-act="promptZh">复制中文提示词</button>
         <button class="btn tiny" data-act="fill">填入选中格</button>
       </div>
     </div>`).join('');
@@ -1615,6 +1677,8 @@ function renderScript() {
       const act = ev.target.closest('button')?.dataset.act;
       if (act === 'copy') copyText(p.promptEn, '该格提示词已复制');
       else if (act === 'prefix') copyText(p.shape?.prefixEn || '', '形状开头词已复制');
+      else if (act === 'prefixZh') copyText(p.shape?.prefixZh || '', '中文形状词已复制');
+      else if (act === 'promptZh') copyText(p.promptZh || '', '中文提示词已复制');
       else if (act === 'fill') { state.selectedId = p.id; renderStage(); renderSlotPanel(); toast('已选中第 ' + p.order + ' 格'); }
       else { state.selectedId = p.id; renderStage(); renderSlotPanel(); }
     });
@@ -1624,6 +1688,80 @@ function renderScript() {
 /* ================================================================== *
  * AI 提示词优化
  * ================================================================== */
+/** 把剧情按标点切成短句，按格数均匀铺开（AI 接管时以 AI 的 say 为准） */
+function attachSuggestions(plot, plan) {
+  const panels = plan?.panels || [];
+  if (!panels.length) return plan;
+  const clauses = String(plot || '')
+    .split(/[。！？；\n]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 1);
+  if (!clauses.length) return plan;
+  panels.forEach((p, i) => {
+    if (p.suggest) return;              // AI 已经给了，不覆盖
+    const idx = Math.min(clauses.length - 1, Math.floor((i / panels.length) * clauses.length));
+    p.suggest = clauses[idx];
+    p.suggestAi = false;
+  });
+  return plan;
+}
+
+function slotSuggest(slotId) {
+  const page = pagePlan();
+  return page?.panels?.find((p) => p.id === slotId)?.suggest || '';
+}
+
+function copyShapePrefixZh() {
+  const p = currentPlanPanel();
+  const slot = state.tpl?.slots?.find((s) => s.id === state.selectedId);
+  const prefix = p?.shape?.prefixZh || slot?.shape?.prefixZh;
+  if (!prefix) { toast('这一格没有中文形状词'); return; }
+  copyText(prefix, '中文形状词已复制，粘到你提示词最前面');
+}
+
+/** 用用户自己的生图模型，直接生成当前这一格 */
+async function generateSlotImage() {
+  if (!state.tpl || !state.selectedId) { toast('先点一个格子'); return; }
+  const panel = currentPlanPanel();
+  const slot = state.tpl.slots.find((s) => s.id === state.selectedId);
+  const shape = panel?.shape || slot?.shape || null;
+  const promptEn = panel?.promptEn || [shape?.prefixEn, 'single panel, no text'].filter(Boolean).join(', ');
+  const negative = panel?.negative || '';
+  const btn = $('#btnAiImage');
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '正在生图…（10–60 秒）';
+  saveLlm();
+  try {
+    const res = await api.imageGenerate({
+      prompt: negative ? promptEn + ' | avoid: ' + negative : promptEn,
+      size: panel?.genSize || undefined,
+      model: state.llm.imgModel || undefined,
+      llm: state.llm,
+      templateId: state.tpl.id,
+      slotId: state.selectedId,
+    });
+    if (!res?.ok) throw new Error((res?.code ? res.code + '：' : '') + (res?.error || '生图失败'));
+    let href = res.href;
+    if (!href && res.b64) href = 'data:image/png;base64,' + res.b64;
+    if (!href && res.url) href = await api.proxyImage ? await blobToDataURL(await api.proxyImage(res.url)) : res.url;
+    if (!href) throw new Error('生图接口没有返回可用的图片');
+    const dim = await imageSize(href);
+    commit();
+    state.images[state.selectedId] = {
+      href, iw: dim.w, ih: dim.h, zoom: 1, panX: 0, panY: 0, mode: 'cover', name: 'ai',
+    };
+    renderStage(); renderSlotPanel(); refreshScript();
+    toast('这一格已用 AI 生成，不满意可以再点一次');
+  } catch (e) {
+    toast('生图失败：' + e.message);
+    $('#footMsg') && ($('#footMsg').textContent = '生图失败：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
+  }
+}
+
 function copyShapePrefix() {
   const p = currentPlanPanel();
   const slot = state.tpl?.slots?.find((s) => s.id === state.selectedId);

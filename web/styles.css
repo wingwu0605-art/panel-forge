@@ -321,6 +321,12 @@ input[type=range]::-moz-range-thumb{
   box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 3px 8px rgba(0,0,0,.18),0 1px 2px rgba(0,0,0,.12);
 }
 
+/* 建议句 */
+.suggest-box{border-color:rgba(255,214,10,.28)}
+.suggest-text{font-size:12.5px;line-height:1.65;color:var(--label);padding:2px 1px 1px}
+.suggest-text:empty{color:var(--label-3)}
+.pr.zh{color:var(--label-2);border-top:1px dashed var(--sep);pt:6px;margin-top:4px}
+
 /* 开关（iOS 拨动开关） */
 .switch{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--label-2);cursor:pointer;user-select:none;-webkit-user-select:none;white-space:nowrap}
 .key-note{font-weight:400;font-size:10.5px;color:var(--green);opacity:.9}

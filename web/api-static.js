@@ -19,6 +19,7 @@ import {
   testLlmWith,
   llmStatusOf,
   normalizeCfg,
+  generateImage as generateImageCore,
 } from './lib/llm-core.mjs';
 
 const LLM_STORE = 'pf.llm.v1';
@@ -245,6 +246,22 @@ export function createStaticApi() {
 
     async proxyImage() {
       throw new Error('静态版没有图片代理：跨域图片无法栅格化导出，请改用本地上传');
+    },
+
+    /** AI 生图：浏览器直连用户的生图接口 */
+    async imageGenerate(body = {}) {
+      const cfg = cfgFrom(body.llm);
+      try {
+        const r = await generateImageCore({
+          cfg,
+          prompt: body.prompt,
+          size: body.size,
+          model: body.model || cfg.imgModel,
+        });
+        return { ...r, ok: true };
+      } catch (err) {
+        return llmError(err, cfg);
+      }
     },
   };
 }

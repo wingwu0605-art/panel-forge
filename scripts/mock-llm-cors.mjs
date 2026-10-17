@@ -35,6 +35,13 @@ const server = http.createServer(async (req, res) => {
   let body = {};
   try { body = JSON.parse(raw); } catch { /* ignore */ }
 
+  // 生图接口：返回一个 1x1 PNG 的 b64，够用来验证链路
+  if ((req.url || '').includes('/images/generations')) {
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    reply(res, 200, { created: Date.now(), data: [{ b64_json: png, revised_prompt: 'mock' }] });
+    return;
+  }
+
   const sys = body.messages?.[0]?.content || '';
   const user = body.messages?.[1]?.content || '';
   let content = 'OK';
