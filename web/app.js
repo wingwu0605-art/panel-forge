@@ -122,6 +122,7 @@ async function init() {
     renderStage();
   }
   if (params.get('keyselftest') === '1') await runKeySelfTest();
+  if (params.get('aiselftest') === '1') await runAiSelfTest();
   if (params.get('shortcuts') === '1') toggleShortcuts(true);
   if (params.get('tab')) activateTab(params.get('tab'));
   if (params.get('plot')) {
@@ -214,6 +215,76 @@ async function runKeySelfTest() {
   document.body.appendChild(box);
   console.log(box.textContent);
   return pass === rows.length;
+}
+
+/* ================================================================== *
+ * 静态版 AI 自检（?aiselftest=1）
+ * 直接 new 一个 static api，验证「浏览器直连模型」这条链路
+ * ================================================================== */
+async function runAiSelfTest() {
+  const rows = [];
+  const ok = (name, cond, extra = '') => rows.push({ name, cond: !!cond, extra });
+  try {
+    await aiSelfTestBody(rows, ok);
+  } catch (e) {
+    rows.push({ name: '自检过程异常：' + e.message, cond: false, extra: String(e.stack || '').slice(0, 200) });
+  }
+  const pass = rows.filter((r) => r.cond).length;
+  const box = document.createElement('div');
+  box.className = 'selftest';
+  box.innerHTML = `<b>静态版 AI 自检：${pass}/${rows.length} 通过</b>` +
+    rows.map((r) => `<div class="${r.cond ? '' : 'no'}">${r.cond ? '✅' : '❌'} ${r.name}${r.extra ? ' — ' + r.extra : ''}</div>`).join('');
+  document.body.appendChild(box);
+  return pass === rows.length;
+}
+
+async function aiSelfTestBody(rows, ok) {
+  const { createStaticApi } = await import('./api-static.js');
+  const sapi = createStaticApi();
+
+  // 指向本地假模型（CORS 开放）
+  state.llm = { protocol: 'openai', baseUrl: 'http://127.0.0.1:7399', apiKey: 'mock-key', model: 'mock-model' };
+  localStorage.setItem(LLM_STORE, JSON.stringify(state.llm));
+
+  const status = await sapi.llmStatus();
+  ok('静态版 llmStatus 认得 Key', status.configured === true && status.staticMode === true);
+
+  try {
+    const t = await sapi.llmTest({ llm: state.llm });
+    ok('llmTest 浏览器直连成功', t.ok === true, t.reply || t.error || '');
+  } catch (e) {
+    ok('llmTest 浏览器直连成功', false, e.message);
+  }
+
+  const plot = '雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋。';
+  let decide = null;
+  try {
+    decide = await sapi.aiDecide({ plot, culture: 'all', ratio: 'auto', candidates: 8, pageWidth: 1600, llm: state.llm });
+    ok('aiDecide 返回 ok', decide.ok === true, decide.error || '');
+    ok('选中模板是合法 id', !decide.decision?.quality?.corrected, decide.decision?.pick || '');
+    ok('生成的计划格数 > 0', (decide.plan?.panels?.length || 0) > 0, `${decide.plan?.panels?.length || 0} 格`);
+    ok('每格都有画面内容', (decide.plan?.panels || []).every((p) => p.content), '');
+  } catch (e) {
+    ok('aiDecide 返回 ok', false, e.message);
+  }
+
+  if (decide?.ok) {
+    try {
+      const p = await sapi.prompts({ plot, templateId: decide.decision.pick, pageWidth: 1600, llm: state.llm });
+      ok('prompts 返回 ok', p.ok === true, p.error || '');
+      ok('优化生效的格数 > 0', (p.applied || 0) > 0, `${p.applied}/${p.total}`);
+      const first = p.plan?.panels?.[0];
+      ok('提示词已被替换为 AI 版', first?.aiOptimized === true, (first?.promptEn || '').slice(0, 46));
+      ok('形状开头词保留在提示词里', !first || !first.shape?.prefixEn || (first.promptEn || '').startsWith(first.shape.prefixEn.slice(0, 12)), (first?.shape?.prefixEn || '').slice(0, 24) || '（该格无形状词）');
+    } catch (e) {
+      ok('prompts 返回 ok', false, e.message);
+    }
+  }
+
+  // 没有 Key 时的表现
+  localStorage.removeItem(LLM_STORE);
+  const noKey = await sapi.aiDecide({ plot, llm: { apiKey: '' } });
+  ok('无 Key 时给出友好提示', noKey.ok === false && (noKey.code === 'NO_LLM_KEY' || !!noKey.hint), noKey.code || '');
 }
 
 /* ================================================================== *
@@ -827,6 +898,7 @@ function bindUI() {
   });
   $('#btnCopyShape').addEventListener('click', copyShapePrefix);
   $('#charSheet').addEventListener('input', debounce(saveLlm, 400));
+  $('#chkKeySession')?.addEventListener('change', () => { saveLlm(); syncLlmStatus(); });
   $('#btnAiPrompts').addEventListener('click', runAiPrompts);
 
   // 快捷键表
@@ -1164,17 +1236,23 @@ function loadLlm() {
   $('#llmKey').value = state.llm.apiKey || '';
   $('#llmModel').value = state.llm.model || '';
   $('#charSheet').value = state.charSheet;
+  if ($('#chkKeySession')) $('#chkKeySession').checked = !!state.llm.sessionOnly;
 }
 
 function saveLlm() {
+  const sessionOnly = !!$('#chkKeySession')?.checked;
   state.llm = {
     protocol: $('#llmProtocol').value,
     baseUrl: $('#llmBase').value.trim(),
     apiKey: $('#llmKey').value.trim(),
     model: $('#llmModel').value.trim(),
+    sessionOnly,
   };
   state.charSheet = $('#charSheet').value.trim();
-  try { localStorage.setItem(LLM_STORE, JSON.stringify(state.llm)); } catch { /* ignore */ }
+  try {
+    // 勾了「仅本次会话」就不把 Key 写进浏览器存储
+    localStorage.setItem(LLM_STORE, JSON.stringify({ ...state.llm, apiKey: sessionOnly ? '' : state.llm.apiKey }));
+  } catch { /* ignore */ }
   try { localStorage.setItem(CHAR_STORE, state.charSheet); } catch { /* ignore */ }
 }
 
@@ -1194,10 +1272,12 @@ async function syncLlmStatus() {
   let server = null;
   try { server = await api.llmStatus(); } catch { /* ignore */ }
   if (server?.staticMode) {
-    el.className = 'llm-status';
-    el.textContent = '静态版（GitHub Pages）没有服务端 → AI 导演不可用；规则路完全可用';
-    badge.textContent = '静态版';
-    badge.style.color = 'var(--dim)';
+    el.className = local ? 'llm-status ok' : 'llm-status';
+    el.textContent = local
+      ? `浏览器直连 · ${state.llm.protocol} · ${state.llm.model || '默认模型'}（Key 只在你这台机器上）`
+      : '静态版也能用 AI：在上面填自己的 Key（只在浏览器里，不上传）。规则路不用 Key，随时可用';
+    badge.textContent = local ? '就绪' : '待填 Key';
+    badge.style.color = local ? 'var(--ok)' : 'var(--dim)';
     return;
   }
   if (local) {
@@ -1479,6 +1559,7 @@ async function runAiPrompts() {
       pageWidth: state.exportWidth,
       characterSheet: state.charSheet,
       llmPanels,
+      llm: state.llm,
     });
     if (!res.ok) {
       toast(`优化失败：${res.code || res.error}`);

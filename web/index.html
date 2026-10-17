@@ -89,9 +89,10 @@
       <label class="field"><span>Base URL</span>
         <input id="llmBase" type="text" spellcheck="false" placeholder="https://api.deepseek.com/v1">
       </label>
-      <label class="field"><span>API Key</span>
+      <label class="field"><span>API Key <b class="key-note" id="keyNote">只存在你浏览器里，不上传</b></span>
         <input id="llmKey" type="password" spellcheck="false" placeholder="sk-…（只在本机使用）">
       </label>
+      <label class="switch" title="勾上后 Key 只在本次打开有效，关掉页面就清空（不写入浏览器存储）"><input type="checkbox" id="chkKeySession"> 仅本次会话</label>
       <div class="row2">
         <button class="btn tiny" id="btnLlmTest">测试连接</button>
         <button class="btn tiny" id="btnLlmClear">清除配置</button>

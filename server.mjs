@@ -593,6 +593,8 @@ const server = http.createServer(async (req, res) => {
   };
 
   let hit = await readStatic(rel);
+  // 前端脚本在 /web 下，但页面是以根路径打开的（./app.js → /app.js）
+  if (!hit && /\.(js|mjs|css|html)$/i.test(rel)) hit = await readStatic('/web' + rel);
   if (!hit && !path.extname(rel)) hit = await readStatic('/web/index.html');
   if (!hit) return send(res, 404, `404 Not Found: ${routePath}`, { 'Content-Type': 'text/plain; charset=utf-8' });
 

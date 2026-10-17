@@ -3,19 +3,48 @@
  *
  * 规则引擎、模板库、SVG 渲染全部是纯 ESM，直接在浏览器里跑，不需要服务器：
  *   - 模板列表 / 匹配 / 分镜表  → 本地计算（毫秒级，离线可用）
- *   - AI 导演                   → 需要服务端（本机 node server.mjs 或 Render/Docker），这里明确报错
+ *   - AI 导演 / AI 优化提示词   → 浏览器直连模型（用访客自己的 Key）
+ *
+ * 直连的前提是服务商允许 CORS。实测：DeepSeek / OpenAI / SiliconFlow 放行；
+ * Anthropic 需要 anthropic-dangerous-direct-browser-access 头（已在 llm-core 里自动加上）。
+ * 想改成「中转」：让用户把 baseUrl 填成你的中转地址即可，逻辑不用动。
  */
 import { TEMPLATES, listTemplates, getTemplate, slim } from './lib/library.mjs';
 import { matchTemplates, planStory, analyzePlot, buildPlan, RULES_VERSION, RULE_STATS } from './lib/matcher.mjs';
 import { INTENTS, ROLES, STYLE_PACKS, COMMON_NEGATIVE, SCENES, TONES, DIRECTIVES } from './lib/taxonomy.mjs';
 import { PAGE_PRESETS } from './lib/geometry.mjs';
+import {
+  aiDecide as aiDecideCore,
+  optimizePrompts as optimizePromptsCore,
+  testLlmWith,
+  llmStatusOf,
+  normalizeCfg,
+} from './lib/llm-core.mjs';
 
-const STATIC_LLM_ERROR = () => ({
+const LLM_STORE = 'pf.llm.v1';
+
+/** 从 localStorage 读访客自己填的配置（和 app.js 用同一个 key） */
+function storedLlm() {
+  try { return JSON.parse(localStorage.getItem(LLM_STORE) || 'null') || {}; } catch { return {}; }
+}
+
+function cfgFrom(passed) {
+  const stored = storedLlm();
+  const merged = { ...stored, ...(passed || {}) };
+  // 请求里没带 key 时，回落到本机保存的那份
+  if (!merged.apiKey) merged.apiKey = stored.apiKey || '';
+  return normalizeCfg(merged);
+}
+
+const llmError = (err, cfg) => ({
   ok: false,
-  code: 'STATIC_NO_LLM',
-  error: '静态版（GitHub Pages）没有服务端',
-  hint: 'AI 导演需要一台能跑 node 的机器：本机执行 node server.mjs，或把仓库部署到 Render / Docker。规则路在这里完全可用。',
-  staticMode: true,
+  mode: 'llm',
+  code: err.code || 'LLM_ERROR',
+  error: String(err.message || err),
+  hint: err.hint || (err.code === 'NO_LLM_KEY'
+    ? '在左边「AI 导演」里填 baseUrl / apiKey / model 就能用（Key 只存在你浏览器里）'
+    : undefined),
+  llm: llmStatusOf(cfg),
 });
 
 export function createStaticApi() {
@@ -52,7 +81,7 @@ export function createStaticApi() {
         tags: [...new Set(TEMPLATES.flatMap((t) => t.tags))].sort(),
         styles: STYLE_PACKS,
         negative: COMMON_NEGATIVE,
-        llm: { configured: false, staticMode: true, keySet: false, source: 'static' },
+        llm: { ...llmStatusOf(cfgFrom()), staticMode: true, direct: true },
       };
     },
 
@@ -100,19 +129,118 @@ export function createStaticApi() {
     },
 
     async llmStatus() {
-      return { configured: false, staticMode: true, keySet: false, source: 'static', model: '', protocol: 'openai' };
+      const cfg = cfgFrom();
+      return { ...llmStatusOf(cfg), staticMode: true, direct: true };
     },
 
-    async llmTest() {
-      return STATIC_LLM_ERROR();
+    async llmTest(body = {}) {
+      const cfg = cfgFrom(body.llm);
+      try {
+        const r = await testLlmWith(cfg);
+        return { ...r, status: llmStatusOf(cfg) };
+      } catch (err) {
+        return llmError(err, cfg);
+      }
     },
 
-    async aiDecide() {
-      return STATIC_LLM_ERROR();
+    /** AI 导演：规则引擎筛候选 → 浏览器直连模型 → 校验 → 生成分镜表 */
+    async aiDecide(body = {}) {
+      const plot = String(body.plot || '').trim();
+      if (!plot) return { ok: false, code: 'BAD_REQUEST', error: '缺少 plot 字段（剧情文本）' };
+
+      const culture = body.culture || 'all';
+      const ratio = body.ratio || 'auto';
+      const pageWidth = clamp(body.pageWidth, 400, 4000, 1600);
+      const candidateCount = clamp(body.candidates, 3, 16, 10);
+
+      // ① 合法候选（模型只能在这里面挑）
+      const m = matchTemplates(plot, { culture, ratio, limit: candidateCount, includeCore: body.includeCore !== false });
+      const cfg = cfgFrom(body.llm);
+
+      let decision;
+      try {
+        decision = await aiDecideCore({
+          plot,
+          analysis: m.analysis,
+          candidates: m.results,
+          cfg,
+          culture,
+          ratio,
+          characterSheet: body.characterSheet ? String(body.characterSheet).slice(0, 600) : '',
+          extraNote: body.note ? String(body.note).slice(0, 500) : undefined,
+        });
+      } catch (err) {
+        return {
+          ...llmError(err, cfg),
+          fallback: {
+            note: '规则引擎结果仍然可用：直接在网页里点「按规则匹配」',
+            top: m.results.slice(0, 3).map((r) => ({ id: r.id, name: r.name, score: r.score })),
+          },
+        };
+      }
+
+      const tpl = getTemplate(decision.pick);
+      const plan = buildPlan(tpl, m.analysis, { pageWidth, llmPanels: decision.panels });
+
+      return {
+        ok: true,
+        mode: 'llm',
+        analysis: m.analysis,
+        filtered: m.filtered,
+        candidates: m.results.map((r) => ({ id: r.id, name: r.name, culture: r.culture, panels: r.panels, ratio: r.ratio, score: r.score, why: r.why })),
+        decision: {
+          pick: decision.pick,
+          pickName: tpl.name,
+          confidence: decision.confidence,
+          reason: decision.reason,
+          alternatives: decision.alternatives,
+          quality: decision.quality,
+        },
+        plan,
+        llm: decision.llm,
+      };
     },
 
-    async prompts() {
-      return STATIC_LLM_ERROR();
+    /** AI 优化提示词：逐格压成高密度生图提示词 */
+    async prompts(body = {}) {
+      const tpl = body.templateId ? getTemplate(body.templateId) : null;
+      if (!tpl) return { ok: false, code: 'BAD_REQUEST', error: '需要 templateId：先选一套版式再优化提示词' };
+
+      const plot = String(body.plot || '');
+      const pageWidth = clamp(body.pageWidth, 400, 4000, 1600);
+      const a = analyzePlot(plot, {});
+      const plan = buildPlan(tpl, a, { pageWidth, llmPanels: body.llmPanels || null });
+      const cfg = cfgFrom(body.llm);
+
+      try {
+        const r = await optimizePromptsCore({
+          plot, plan, cfg,
+          characterSheet: body.characterSheet ? String(body.characterSheet).slice(0, 600) : '',
+          note: body.note ? String(body.note).slice(0, 400) : '',
+        });
+        let applied = 0;
+        for (const p of plan.panels) {
+          const o = r.prompts[p.id];
+          if (!o) continue;
+          p.promptEnRule = p.promptEnRule || p.promptEn;
+          p.promptEn = o.prompt;
+          if (o.negative) p.negative = o.negative;
+          p.aiOptimized = true;
+          applied++;
+        }
+        return {
+          ok: true,
+          mode: 'ai-prompts',
+          applied,
+          total: plan.panels.length,
+          globalNotes: r.globalNotes,
+          quality: r.quality,
+          plan,
+          llm: r.llm,
+        };
+      } catch (err) {
+        return llmError(err, cfg);
+      }
     },
 
     async proxyImage() {
@@ -120,3 +248,4 @@ export function createStaticApi() {
     },
   };
 }
+
