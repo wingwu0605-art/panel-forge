@@ -1457,3 +1457,10 @@ html[data-vt="accent"]::view-transition-new(root){animation:fadeIn .35s var(--ea
 .slot-head .caret{flex:0 0 auto;margin-left:auto;order:9}
 .slot-head .caret svg{transform:rotate(0deg);transition:transform .5s var(--spring)}
 .slot-head .caret.open svg{transform:rotate(180deg)}
+
+/* 气泡面板折叠保底：收起后头部必须还在，高度不许塌成 0 */
+.bubble-dock.collapsed{min-height:46px;overflow:visible}
+.bubble-dock.collapsed > .card-body,
+.bubble-dock.collapsed .bub-grid{max-height:none}
+.bubble-dock.collapsed .bub-head{display:flex}
+.bubble-dock{flex:0 0 auto !important;align-self:flex-end}
