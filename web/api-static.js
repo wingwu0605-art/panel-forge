@@ -256,6 +256,7 @@ export function createStaticApi() {
           cfg,
           prompt: body.prompt,
           size: body.size,
+          refs: body.refs || [],
           model: body.model || cfg.imgModel,
         });
         return { ...r, ok: true };

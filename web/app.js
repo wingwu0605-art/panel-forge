@@ -82,6 +82,8 @@ const state = {
   pages: [],          // 多页：{tplId, images, bubbles, lines}
   pageIdx: 0,
   cands: {},          // slotId -> [href...] 候选图
+  chars: [],          // 角色卡 [{id,name,note,images:[dataURL]}]
+  activeChars: [],    // 本页启用的角色 id
   clipboard: null,    // 内部剪贴板（图片或气泡）
   history: { past: [], future: [] },
 };
@@ -205,6 +207,7 @@ async function init() {
     state.pageIdx = 0;
   }
   renderPageTabs();
+  await loadChars();
 
   // 再尝试恢复草稿：IndexedDB 不可用/被策略拦住时也不能拖死启动
   try {
@@ -220,6 +223,7 @@ async function init() {
       state.images = { ...(pg?.images || {}) };
       state.bubbles = (pg?.bubbles || []).map((b) => ({ ...b }));
       state.lines = { ...(pg?.lines || {}) };
+      if (Array.isArray(pg?.activeChars)) state.activeChars = pg.activeChars;
       state.selectedId = state.tpl?.slots?.[0]?.id || null;
       renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
       toast('已恢复上次的 ' + state.pages.length + ' 页草稿');
@@ -1064,6 +1068,41 @@ function bindUI() {
     toast('已填入本格句子');
   });
   $('#btnAiImage')?.addEventListener('click', generateSlotImage);
+  $('#btnCharPick')?.addEventListener('click', () => $('#charFiles').click());
+  $('#charFiles')?.addEventListener('change', async (ev) => {
+    const files = ev.target.files;
+    if (files && files.length) await addCharCard(files);
+    ev.target.value = '';
+  });
+  $('#charList')?.addEventListener('click', async (ev) => {
+    const item = ev.target.closest('.char-item');
+    if (!item) return;
+    const id = item.dataset.id;
+    const act = ev.target.closest('button')?.dataset.act;
+    if (act === 'toggle') {
+      const i = state.activeChars.indexOf(id);
+      if (i >= 0) state.activeChars.splice(i, 1);
+      else state.activeChars.push(id);
+      renderChars(); queueSave();
+    } else if (act === 'del') {
+      state.chars = state.chars.filter((c) => c.id !== id);
+      state.activeChars = state.activeChars.filter((x) => x !== id);
+      await saveChars(); renderChars(); queueSave();
+    }
+  });
+  $('#btnCharClearAll')?.addEventListener('click', async () => {
+    if (!confirm('清空所有角色卡？参考图会一起删掉。')) return;
+    state.chars = []; state.activeChars = [];
+    await saveChars(); renderChars(); queueSave();
+  });
+  $('#btnResetDraft')?.addEventListener('click', async () => {
+    if (!confirm('清空本机草稿？所有页的图片、气泡和句子都会删掉，不能恢复。')) return;
+    await idbSet('pages', null);
+    state.pages = [{ tplId: state.tpl?.id || 'ref-4band-2col', name: '第 1 页', images: {}, bubbles: [], lines: {} }];
+    state.pageIdx = 0; state.images = {}; state.bubbles = []; state.lines = {}; state.cands = {};
+    resetHistory(); renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
+    toast('草稿已清空');
+  });
   $('#candGrid')?.addEventListener('click', (ev) => {
     const del = ev.target.closest('[data-del]');
     if (del) {
@@ -1816,6 +1855,96 @@ function applyCand(i) {
   }).catch((e) => toast('这张图读不出来：' + e.message));
 }
 
+/* ---------------- 角色参考图 ---------------- */
+async function loadChars() {
+  try {
+    const list = await Promise.race([idbGet('chars'), new Promise((r) => setTimeout(() => r(null), 1200))]);
+    if (Array.isArray(list)) state.chars = list;
+  } catch { /* ignore */ }
+  renderChars();
+}
+
+async function saveChars() {
+  await idbSet('chars', state.chars);
+}
+
+function renderChars() {
+  const box = document.querySelector('#charList');
+  if (!box) return;
+  if (!state.chars.length) {
+    box.innerHTML = '<span class="muted small">还没有角色卡。加一张参考图，以后每次生图都会自动带上。</span>';
+    return;
+  }
+  box.innerHTML = state.chars.map((c) => {
+    const on = state.activeChars.includes(c.id);
+    return `<div class="char-item${on ? ' on' : ''}" data-id="${c.id}">
+      <div class="char-thumbs">${(c.images || []).slice(0, 3).map((h) => `<img src="${escapeHtml(h)}" alt="">`).join('')}</div>
+      <div class="char-meta">
+        <b>${escapeHtml(c.name || '未命名')}</b>
+        <span>${escapeHtml(c.note || '')}</span>
+      </div>
+      <div class="char-acts">
+        <button class="btn tiny" data-act="toggle">${on ? '停用' : '启用'}</button>
+        <button class="btn tiny danger" data-act="del">删</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addCharCard(files) {
+  const nameEl = document.querySelector('#charName');
+  const noteEl = document.querySelector('#charNote');
+  const name = (nameEl?.value || '').trim() || '角色 ' + (state.chars.length + 1);
+  const note = (noteEl?.value || '').trim();
+  const picked = [...files].slice(0, 3);
+  const images = [];
+  for (const f of picked) {
+    try {
+      const href = await shrinkImage(f, 512);
+      images.push(href);
+    } catch { /* 跳过读不出的 */ }
+  }
+  if (!images.length) { toast('这几张图读不出来，换一张试试'); return; }
+  state.chars.push({ id: 'c' + Date.now().toString(36), name, note, images });
+  state.activeChars.push(state.chars[state.chars.length - 1].id);
+  if (nameEl) nameEl.value = '';
+  if (noteEl) noteEl.value = '';
+  await saveChars();
+  renderChars();
+  queueSave();
+  toast('已保存角色「' + name + '」并启用');
+}
+
+/** 参考图统一压到 512px 长边，省空间也够模型认人 */
+function shrinkImage(file, max) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * k));
+      const h = Math.max(1, Math.round(img.height * k));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', 0.86));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('图片读不出来')); };
+    img.src = url;
+  });
+}
+
+/** 当前启用的角色 → { block: 提示词片段, refs: [dataURL] } */
+function activeCharPayload() {
+  const chars = state.chars.filter((c) => state.activeChars.includes(c.id));
+  if (!chars.length) return { block: '', refs: [] };
+  const block = '角色一致性：' + chars.map((c) => `${c.name}${c.note ? '（' + c.note + '）' : ''}`).join('；')
+    + '。外观、发型、服装、年龄必须与参考图完全一致，不要换脸。';
+  const refs = chars.flatMap((c) => c.images || []).slice(0, 3);
+  return { block, refs };
+}
+
 /* ---------------- 多页：IndexedDB 草稿（关掉浏览器也不丢） ---------------- */
 const DB_NAME = 'panelforge';
 const DB_STORE = 'drafts';
@@ -1908,6 +2037,8 @@ function currentPageSnapshot() {
     images: { ...state.images },
     bubbles: state.bubbles.map((b) => ({ ...b })),
     lines: { ...state.lines },
+    cands: state.cands,
+    activeChars: [...state.activeChars],
   };
 }
 
@@ -1936,7 +2067,8 @@ async function switchPage(i) {
   state.bubbles = (pg.bubbles || []).map((b) => ({ ...b }));
   state.lines = { ...(pg.lines || {}) };
   state.selBubble = null;
-  state.cands = {};
+  state.cands = pg.cands || {};
+  if (Array.isArray(pg.activeChars)) state.activeChars = [...pg.activeChars];
   resetHistory();
   renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
   queueSave();
@@ -2018,8 +2150,15 @@ async function generateSlotImage() {
   btn.textContent = '正在生图…（10–60 秒）';
   saveLlm();
   try {
+    const charPayload = activeCharPayload();
+    if (!charPayload.block) {
+      const ok = confirm('还没启用角色参考图，生成的图可能每格长得不一样。\n\n建议先去左边「角色参考图」加一张。\n\n仍然继续生图吗？');
+      if (!ok) { btn.disabled = false; btn.textContent = old; return; }
+    }
+    const fullPrompt = [charPayload.block, promptEn].filter(Boolean).join(' ');
     const res = await api.imageGenerate({
-      prompt: negative ? promptEn + ' | avoid: ' + negative : promptEn,
+      prompt: negative ? fullPrompt + ' | avoid: ' + negative : fullPrompt,
+      refs: charPayload.refs,
       size: panel?.genSize || undefined,
       model: state.llm.imgModel || undefined,
       provider: state.llm.imageProvider || 'openai',

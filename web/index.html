@@ -156,6 +156,26 @@
       <div class="ai-result hidden" id="aiResult"></div>
     </section>
 
+    <section class="card chars" data-collapse="chars">
+      <div class="card-head">
+        <h2>角色参考图</h2>
+        <span class="hint">让同一个人每格都长一样</span>
+      </div>
+      <div class="card-body">
+        <div class="row2">
+          <input id="charName" type="text" placeholder="角色名（沈砚 / 女主 …）">
+          <input id="charNote" type="text" placeholder="外观一句话（黑短发、左眉疤）">
+        </div>
+        <div class="row2">
+          <button class="btn tiny" id="btnCharPick">＋ 选参考图（1–3 张）</button>
+          <button class="btn tiny" id="btnCharClearAll">清空角色</button>
+        </div>
+        <input type="file" id="charFiles" accept="image/*" multiple hidden>
+        <div class="char-list" id="charList"><span class="muted small">还没有角色卡。加一张参考图，以后每次生图都会自动带上。</span></div>
+        <p class="muted small" style="margin:6px 0 0">启用中的角色会在你点「用 AI 生这一格」时自动加进提示词，并把参考图发给支持参考的模型。</p>
+      </div>
+    </section>
+
     <section class="card browse" data-collapse="browse">
       <div class="card-head">
         <h2>分镜模板库</h2>
@@ -231,6 +251,7 @@
       <button class="btn tiny" id="btnAddPage" title="把当前页存下来，再加一页">＋ 加一页</button>
       <span class="pb-sep"></span>
       <button class="btn tiny" id="btnExportAll" title="把每一页都导成 PNG">⇩ 导出全部页</button>
+      <button class="btn tiny danger" id="btnResetDraft" title="删掉本机草稿，回到空白第一页">清空草稿</button>
     </div>
     <div class="stage-foot" id="stageFoot">
       <span id="footMsg">拖图片进画布即可填充（自动裁切到格子形状，斜切格也不会变形）</span>
