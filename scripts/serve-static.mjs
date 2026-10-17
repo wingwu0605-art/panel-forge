@@ -4,7 +4,9 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'site');
+const root = process.env.PF_ROOT
+  ? path.resolve(process.env.PF_ROOT)
+  : path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'site');
 const PORT = Number(process.env.PORT || 7313);
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -16,7 +18,7 @@ const MIME = {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   let rel = decodeURIComponent(url.pathname);
-  if (rel === '/') rel = '/index.html';
+  if (rel.endsWith('/')) rel += 'index.html';   // 目录请求 → index.html（与 GitHub Pages/nginx 一致）
   const file = path.join(root, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
   if (!file.startsWith(root)) { res.writeHead(403); return res.end('forbidden'); }
   try {
