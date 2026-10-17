@@ -26,6 +26,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7311);
 const HOST = process.env.HOST || '127.0.0.1';
 
+/* ---------------- 安全态势 ---------------- *
+ * 默认：只听本机 + CORS 同源（不发给浏览器跨域读）+ 图片代理仅本机可用。
+ * 公网部署（HOST=0.0.0.0）时自动收紧：代理关掉、CORS 不放行，并在启动日志里警告。
+ * 需要跨域给浏览器用时显式开：API_CORS=*
+ * 需要公网用图片代理时显式开：ENABLE_PROXY=1
+ */
+const IS_LOOPBACK = /^(127\.0\.0\.1|localhost|::1|\[::1\])$/i.test(HOST);
+const CORS_STAR = process.env.API_CORS === '*';
+const ENABLE_PROXY = process.env.ENABLE_PROXY === '1' || (process.env.ENABLE_PROXY !== '0' && IS_LOOPBACK);
+const MAX_BODY_MB = Math.max(1, Math.min(64, Number(process.env.MAX_BODY_MB || 16)));
+const MAX_BODY = MAX_BODY_MB * 1024 * 1024;
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -42,32 +54,36 @@ const MIME = {
   '.md': 'text/markdown; charset=utf-8',
 };
 
+// 只有显式 API_CORS=* 才发跨域头；否则浏览器只能同源读取（其他网页读不到响应）
+const corsHeaders = () => (CORS_STAR
+  ? {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'content-type,authorization',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  }
+  : {});
+
 const json = (res, code, obj, extra = {}) => {
   const body = JSON.stringify(obj, null, 2);
   res.writeHead(code, {
     'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
     'Cache-Control': 'no-store',
+    ...corsHeaders(),
     ...extra,
   });
   res.end(body);
 };
 const send = (res, code, body, headers = {}) => {
-  res.writeHead(code, {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'content-type,authorization',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    ...headers,
-  });
+  res.writeHead(code, { ...corsHeaders(), ...headers });
   res.end(body);
 };
 
-async function readBody(req, limit = 40 * 1024 * 1024) {
+async function readBody(req, limit = MAX_BODY) {
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > limit) throw new Error('请求体过大（>40MB）');
+    if (size > limit) throw new Error(`请求体过大（>${MAX_BODY_MB}MB）`);
     chunks.push(chunk);
   }
   const raw = Buffer.concat(chunks).toString('utf8');
@@ -469,8 +485,22 @@ const routes = [
 
   // 远程图片代理：让浏览器导出 PNG 时不吃到跨域污染
   ['GET', /^\/api\/proxy$/, async (req, url) => {
+    if (!ENABLE_PROXY) {
+      return {
+        __status: 403,
+        error: '图片代理已禁用',
+        hint: '默认只在监听 127.0.0.1 时开启。公网部署想用请设 ENABLE_PROXY=1（注意：这等于给你的服务器开了一个出站代理，需自行评估 SSRF 风险）',
+      };
+    }
     const target = url.searchParams.get('url');
     if (!target || !/^https?:\/\//.test(target)) return { __status: 400, error: '需要 url=http(s)://...' };
+    // 公网部署时拒绝指向内网/本机的地址（基础 SSRF 防护）
+    if (!IS_LOOPBACK) {
+      let host = '';
+      try { host = new URL(target).hostname; } catch { return { __status: 400, error: 'url 无法解析' }; }
+      const priv = /^(localhost|127\.|0\.0\.0\.0|169\.254\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\]|::1)/i.test(host);
+      if (priv) return { __status: 403, error: '拒绝访问内网/本机地址', host };
+    }
     const r = await fetch(target, { headers: { 'user-agent': 'panel-forge/1.0' } });
     if (!r.ok) return { __status: 502, error: `上游返回 ${r.status}` };
     const type = r.headers.get('content-type') || 'application/octet-stream';
@@ -563,12 +593,21 @@ server.listen(PORT, HOST, () => {
   const n = TEMPLATES.length;
   const llm = llmStatus();
   console.log(`\n  PanelForge 分镜坊 v2  ·  ${n} 套分镜模板  ·  本地规则引擎 v${RULES_VERSION}（${RULE_STATS.total} 条词条 / ${RULE_STATS.intents} 戏路 / ${RULE_STATS.beats} 节拍）`);
-  console.log(`  网页编辑器   http://${HOST}:${PORT}/`);
-  console.log(`  规则库       http://${HOST}:${PORT}/api/rules`);
+  console.log(`  网页编辑器   http://${HOST === '0.0.0.0' ? '127.0.0.1' : HOST}:${PORT}/`);
+  console.log(`  规则库       http://${HOST === '0.0.0.0' ? '127.0.0.1' : HOST}:${PORT}/api/rules`);
   console.log(`  AI 导演      ${llm.configured ? `已配置 ${llm.protocol} · ${llm.model}` : '未配置（在网页里填 Key，或设 LLM_API_KEY）'}`);
-  console.log(`  API 元信息   http://${HOST}:${PORT}/api/meta`);
-  console.log(`  AI 工具定义  http://${HOST}:${PORT}/api/ai-tools.json`);
-  console.log(`  接触表       http://${HOST}:${PORT}/api/sheet\n`);
+  console.log(`  API 元信息   http://${HOST === '0.0.0.0' ? '127.0.0.1' : HOST}:${PORT}/api/meta`);
+  console.log(`  接触表       http://${HOST === '0.0.0.0' ? '127.0.0.1' : HOST}:${PORT}/api/sheet`);
+  console.log('');
+  console.log(`  安全 posture · 监听 ${IS_LOOPBACK ? HOST + '（仅本机）' : HOST + '（对外）'} · CORS ${CORS_STAR ? '放行任意来源' : '同源'} · 图片代理 ${ENABLE_PROXY ? '开' : '关'} · 请求体上限 ${MAX_BODY_MB}MB · 鉴权 无`);
+  console.log('  隐私 · 图片只在浏览器内处理，服务端不接收、不落盘；只有剧情文字会发给你自己配置的模型');
+  if (!IS_LOOPBACK) {
+    console.log('');
+    console.log('  ⚠ 你正在对外监听：本服务没有登录鉴权。');
+    console.log('     · 不要在这台机器上配置 LLM_API_KEY（任何访问者都能花你的 token）');
+    console.log('     · 图片代理默认已关闭，如要开启请自行承担 SSRF 风险');
+  }
+  console.log('');
 });
 
 /* ------------------------------------------------------------------ *

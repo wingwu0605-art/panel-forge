@@ -108,7 +108,12 @@ const lib = await get('/lib/svg.mjs');
 check('GET /lib/svg.mjs（浏览器复用内核）', lib.status === 200 && lib.ct.includes('javascript'));
 
 const cors = await fetch(base + '/api/health');
-check('CORS 头', cors.headers.get('access-control-allow-origin') === '*');
+const acao = cors.headers.get('access-control-allow-origin');
+check('CORS 策略', acao === null || acao === '*', acao === null ? '默认同源（安全）' : '显式 API_CORS=*');
+
+// 图片代理：本机默认可用（前端"用图片链接"功能依赖它），公网默认关闭
+const proxied = await get('/api/proxy?url=' + encodeURIComponent(base + '/api/health'));
+check('图片代理（本机）', proxied.status === 200 && proxied.body.ok === true, `status=${proxied.status}`);
 
 // 7 规则库（v2）
 const rules = await get('/api/rules');
