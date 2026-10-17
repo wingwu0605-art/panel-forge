@@ -1197,3 +1197,27 @@ html[data-vt="accent"]::view-transition-new(root){animation:fadeIn .35s var(--ea
 .tab-body{display:flex;flex-direction:column;gap:10px}
 .tab-body > #slotPanel{flex:0 0 auto;min-height:0}
 .bubble-dock.collapsed{flex:0 0 auto !important}
+
+/* 折叠动画 v2：display:none 不能动画，改成 max-height + opacity，走主题缓动 */
+.card-body{max-height:4000px;overflow:hidden;
+  transition:max-height .55s var(--ease),opacity .32s var(--ease),grid-template-rows .55s var(--ease)}
+.collapsed > .card-body{max-height:0 !important;opacity:0;grid-template-rows:0fr}
+.card.collapsed{flex:0 0 auto !important;align-self:flex-start;height:auto !important;min-height:0}
+
+#slotPanel{overflow:hidden;max-height:6000px;
+  transition:max-height .55s var(--ease),opacity .3s var(--ease),padding .45s var(--ease)}
+#slotPanel.collapsed{max-height:58px;flex:0 0 auto !important;align-self:flex-start;padding-bottom:0}
+#slotPanel.collapsed > *:not(.slot-head){display:none}
+.slot-head{display:flex;align-items:center;gap:10px}
+.slot-head .caret{order:9;margin-left:auto;margin-right:0}
+.slot-head .caret svg{transform:rotate(0deg);transition:transform .5s var(--spring)}
+.slot-head .caret.open svg{transform:rotate(180deg)}
+
+/* 新增组件统一走主题缓动，别再硬切 */
+.slot-ai-mode button{transition:background .3s var(--ease),color .22s var(--ease),transform .3s var(--spring)}
+.cand{transition:transform .3s var(--spring),border-color .25s var(--ease),box-shadow .3s var(--ease)}
+.pb-tab{transition:transform .32s var(--spring),background .28s var(--ease),color .22s var(--ease),border-color .25s var(--ease)}
+.char-item{transition:border-color .28s var(--ease),transform .32s var(--spring),box-shadow .3s var(--ease)}
+.ks-item{transition:border-color .25s var(--ease),background .25s var(--ease)}
+.ks-panel{animation:sheetIn .42s var(--spring-soft)}
+.keysheet{animation:fadeIn .28s var(--ease)}
