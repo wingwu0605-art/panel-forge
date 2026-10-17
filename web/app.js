@@ -513,6 +513,14 @@ function initCollapsibles() {
         el._animT = setTimeout(() => el.classList.remove('animating'), 600);
       }
       el.classList.toggle('collapsed', !open);
+      // 主题的 grid 0fr 在部分容器里收不干净：再用内联 max-height 兜一层
+      const _body = el.querySelector(':scope > .card-body');
+      if (_body) {
+        _body.style.overflow = 'hidden';
+        _body.style.transition = 'max-height .5s cubic-bezier(.25,.8,.25,1), opacity .3s cubic-bezier(.25,.8,.25,1)';
+        _body.style.maxHeight = open ? 'none' : '0px';
+        _body.style.opacity = open ? '1' : '0';
+      }
       if (save) { saved[key] = open; persist(); }
     };
     apply(initialOpen, false);
@@ -1136,8 +1144,7 @@ function bindUI() {
   });
   $('#btnSlotCollapse')?.addEventListener('click', () => {
     state.slotCollapsed = !state.slotCollapsed;
-    document.querySelector('#slotPanel')?.classList.toggle('collapsed', state.slotCollapsed);
-    $('#btnSlotCollapse')?.classList.toggle('open', !state.slotCollapsed);
+    applySlotCollapse();
   });
   $('#slotAiMode')?.addEventListener('click', (ev) => {
     const b = ev.target.closest('button[data-m]');
@@ -1459,6 +1466,22 @@ function makePlaceholder(slot) {
 /* ================================================================== *
  * 右栏：格子
  * ================================================================== */
+/** 小框折叠：内联样式驱动，保证真的塌下去 */
+function applySlotCollapse() {
+  const panel = document.querySelector('#slotPanel');
+  if (!panel) return;
+  const kids = [...panel.children].filter((c) => !c.classList.contains('slot-head'));
+  for (const k of kids) {
+    k.style.overflow = 'hidden';
+    k.style.transition = 'max-height .45s cubic-bezier(.25,.8,.25,1), opacity .28s, margin .3s';
+    k.style.maxHeight = state.slotCollapsed ? '0px' : 'none';
+    k.style.opacity = state.slotCollapsed ? '0' : '1';
+    k.style.marginTop = state.slotCollapsed ? '0px' : '';
+  }
+  panel.classList.toggle('collapsed', state.slotCollapsed);
+  document.querySelector('#btnSlotCollapse')?.classList.toggle('open', !state.slotCollapsed);
+}
+
 function renderSlotPanel() {
   const has = !!(state.tpl && state.selectedId);
   syncSlotFab(has);
