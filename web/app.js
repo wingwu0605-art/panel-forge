@@ -87,6 +87,7 @@ async function init() {
   bindUI();
   initCollapsibles();
   api = await makeApi();
+  adaptTopLinksForStatic();
   const meta = await api.meta();
   const list = await api.templates();
   state.items = list.items;
@@ -1709,6 +1710,27 @@ function renderExportKv() {
     ['画风', CULTURE_ZH[state.tpl.culture]],
     ['阅读顺序', readOrderText(state.tpl.reading)],
   ].map(([k, v]) => `<b>${k}</b><span>${escapeHtml(v)}</span>`).join('');
+}
+
+/* ================================================================== *
+ * 静态站没有 /api/* 路由：把顶栏那几个只有服务端才有的链接换掉
+ * ================================================================== */
+const REPO = 'https://github.com/wingwu0605-art/panel-forge';
+
+function adaptTopLinksForStatic() {
+  if (!api?.staticMode) return;
+  const sheet = document.querySelector('a[href="/api/sheet"]');
+  if (sheet) { sheet.href = './sheet.html'; sheet.textContent = '全部模板一览'; }
+  const docs = document.querySelector('a[href="/api/docs"]');
+  if (docs) { docs.href = `${REPO}/blob/main/docs/API.md`; docs.textContent = 'API 文档'; }
+  const tools = document.querySelector('a[href="/api/ai-tools.json"]');
+  if (tools) { tools.href = `${REPO}/blob/main/docs/AI-INTEGRATION.md`; tools.textContent = 'AI 接入说明'; }
+  const chip = $('#statApi');
+  if (chip) {
+    chip.textContent = '静态版';
+    chip.title = '没有服务端：规则引擎在你的浏览器里跑，AI 直连你填的模型';
+    chip.style.opacity = '.8';
+  }
 }
 
 /* ================================================================== *
