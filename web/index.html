@@ -161,7 +161,12 @@
         </div>
         <input type="file" id="charFiles" accept="image/*" multiple hidden>
         <div class="char-list" id="charList"><span class="muted small">还没有角色卡。加一张参考图，以后每次生图都会自动带上。</span></div>
-        <p class="muted small" style="margin:6px 0 0">启用中的角色会在你点「用 AI 生这一格」时自动加进提示词，并把参考图发给支持参考的模型。</p>
+        <div class="row2">
+          <button class="btn tiny ic-download" id="btnCharExport" title="把全部角色卡（含参考图）存成一个 JSON，发给团队一起用">导出角色卡</button>
+          <button class="btn tiny ic-plus" id="btnCharImport" title="导入团队给的 角色卡.json">导入角色卡</button>
+        </div>
+        <input type="file" id="charImportFile" accept="application/json,.json" hidden>
+        <p class="muted small" style="margin:6px 0 0">启用的角色会自动进提示词，参考图也会发给支持参考的模型。导出的 JSON 里带着参考图，队友导入就能用同一批人。</p>
       </div>
     </section>
 

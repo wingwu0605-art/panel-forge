@@ -127,6 +127,8 @@ const REPO_URL = 'https://github.com/wingwu0605-art/panel-forge';
 const THEME_KEY = 'pf.theme';
 const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
 const compactMQ = window.matchMedia('(max-width:1024px)');
+/** ?dbg=1：底栏换成一行动调试信息（排查多页 / 面板问题时用） */
+const DBG = new URLSearchParams(location.search).get('dbg') === '1';
 
 const THEME_ICONS = {
   auto: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2Z" fill="currentColor"/></svg>',
@@ -242,13 +244,6 @@ async function init() {
   } catch (e) {
     console.warn('[PanelForge] 草稿恢复失败（不影响使用）', e);
   }
-  if (new URLSearchParams(location.search).get('dbg') === '1') {
-    const f = document.querySelector('#footMsg');
-    if (f) {
-      f.textContent = 'dbg pages=' + state.pages.length + ' idx=' + state.pageIdx
-        + ' tabs=' + document.querySelectorAll('.pb-tab').length + ' tpl=' + state.tpl?.id;
-    }
-  }
   if (params.get('keyselftest') === '1') await runKeySelfTest();
   if (params.get('aiselftest') === '1') await runAiSelfTest();
   if (params.get('shortcuts') === '1') toggleShortcuts(true);
@@ -258,6 +253,23 @@ async function init() {
     $('#plot').value = params.get('plot');
     await runMatch();
   }
+  // 放在最后：匹配 / 恢复草稿都会改写底栏，dbg 要压在这些之后才有意义
+  if (DBG) showDbgLine();
+}
+
+/** 排查多页 / 面板问题用：页数、当前页、页签数、模板、选中格、视图、模块、分镜格数、角色 */
+function showDbgLine() {
+  const f = document.querySelector('#footMsg');
+  if (!f) return;
+  f.textContent = 'dbg pages=' + state.pages.length + ' idx=' + state.pageIdx
+    + ' tabs=' + document.querySelectorAll('.pb-tab').length
+    + ' tpl=' + (state.tpl?.id || '-')
+    + ' sel=' + (state.selectedId || '-')
+    + ' view=' + (document.body.dataset.view || '-')
+    + ' mod=' + (state.editMod || '-')
+    + ' plan=' + ((pagePlan()?.panels || []).length)
+    + ' chars=' + state.chars.length + '/' + state.activeChars.length;
+  f.classList.add('pf-dbg');
 }
 
 /* ================================================================== *
@@ -681,10 +693,15 @@ function renderStage() {
     // 镂空模式要说清楚：图片是故意藏起来，不是丢了
     const foot = $('#footMsg');
     if (foot) {
-      foot.textContent = state.hollow
-        ? '镂空模式：只显示格线，图片被隐藏 —— 关掉「镂空」就能看到图片'
-        : '拖图片进画布即可填充（自动裁切到格子形状，斜切格也不会变形）';
-      $('#stageFoot')?.classList.toggle('warn', state.hollow);
+      if (DBG) {
+        // ?dbg=1：底栏归调试信息，别让入场动画的回调把它冲掉
+        showDbgLine();
+      } else {
+        foot.textContent = state.hollow
+          ? '镂空模式：只显示格线，图片被隐藏 —— 关掉「镂空」就能看到图片'
+          : '拖图片进画布即可填充（自动裁切到格子形状，斜切格也不会变形）';
+        $('#stageFoot')?.classList.toggle('warn', state.hollow);
+      }
     }
   });
 }
@@ -1208,6 +1225,13 @@ function bindUI() {
     state.chars = []; state.activeChars = [];
     await saveChars(); renderChars(); queueSave();
   });
+  $('#btnCharExport')?.addEventListener('click', exportChars);
+  $('#btnCharImport')?.addEventListener('click', () => $('#charImportFile').click());
+  $('#charImportFile')?.addEventListener('change', async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (f) await importChars(f);
+    ev.target.value = '';
+  });
   $('#btnResetDraft')?.addEventListener('click', async () => {
     if (!confirm('清空本机草稿？所有页的图片、气泡和句子都会删掉，不能恢复。')) return;
     await idbSet('pages', null);
@@ -1604,8 +1628,11 @@ function applySlotCollapse() {
   document.querySelector('#btnSlotCollapse')?.classList.toggle('open', !state.slotCollapsed);
 }
 
-/** 把原来「分镜表」里这一格的信息渲染进小框 */
-function renderSlotBoard(panel, slot) {
+/**
+ * 把原来「分镜表」里这一格的信息渲染进小框的「这一格的分镜」段。
+ * 由 renderSlotPanel() 统一调用 —— 换格子、重新匹配、AI 排戏之后都会自动跟着变。
+ */
+function renderSlotBoard(panel) {
   const box = document.querySelector('#slotBoard');
   const pr = document.querySelector('#slotBoardPrompts');
   if (!box) return;
@@ -1616,12 +1643,10 @@ function renderSlotBoard(panel, slot) {
     if (sum) sum.textContent = '待生成';
     return;
   }
+  // 只放「分镜」层面的东西；画幅比 / 导出像素这些归下面的「图片」段，别两处重复
   const rows = [
     ['景别', `${panel.roleZh || ''} ｜ ${panel.shot || ''}`],
     ['节拍', panel.beat || '通用镜头'],
-    ['画幅比', panel.aspectLabel],
-    ['建议出图', panel.genSize],
-    ['整页占比', (panel.areaPct || 0).toFixed(1) + '%'],
     ['画面', panel.content || '（未填，写剧情或让 AI 排戏）'],
     ['台词', panel.dialogue ? '「' + panel.dialogue + '」' : '（无）'],
     ['构图', panel.beatHint || panel.composition || '—'],
@@ -1653,6 +1678,8 @@ function renderSlotPanel() {
   if (!slot) return;
   const img = state.images[slot.id];
   const panel = currentPlanPanel();
+  // 这一格的分镜（景别 / 节拍 / 画面 / 台词 / 构图 + 中英提示词）
+  renderSlotBoard(panel);
 
   const idxEl = $('#slotIndex');
   if (idxEl.dataset.slot !== slot.id) {
@@ -1678,9 +1705,6 @@ function renderSlotPanel() {
     ['整页占比', (slot.area || 0).toFixed(1) + '%'],
     ['导出像素', `${px.w} × ${px.h}`],
     ['建议出图', panel ? panel.genSize : '—'],
-    ...(panel?.content ? [['画面', panel.content]] : []),
-    ...(panel?.dialogue ? [['台词', '「' + panel.dialogue + '」']] : []),
-    ['构图提示', panel ? (panel.beatHint || panel.composition || '—') : '—'],
   ].map(([k, v]) => `<b>${k}</b><span>${escapeHtml(String(v))}</span>`).join('');
 
   {
@@ -2360,6 +2384,78 @@ function activeCharPayload() {
     + '。外观、发型、服装、年龄必须与参考图完全一致，不要换脸。';
   const refs = chars.flatMap((c) => c.images || []).slice(0, 3);
   return { block, refs };
+}
+
+/* ---------------- 角色卡的导出 / 导入（团队共用同一批人） ---------------- */
+const CHARS_MAX = 60;
+/** 去重指纹：名字 + 第一张参考图 */
+const charKey = (c) => `${(c.name || '').trim()}||${(c.images || [])[0] || ''}`;
+
+function exportChars() {
+  if (!state.chars.length) { toast('还没有角色卡可导出'); return; }
+  const payload = {
+    app: 'panel-forge',
+    kind: 'character-cards',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    chars: state.chars.map((c) => ({
+      name: c.name || '',
+      note: c.note || '',
+      active: state.activeChars.includes(c.id),
+      images: (c.images || []).slice(0, 3),
+    })),
+  };
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadText(JSON.stringify(payload, null, 2), `角色卡-${stamp}.json`, 'application/json;charset=utf-8');
+  toast(`已导出 ${payload.chars.length} 张角色卡`);
+}
+
+/** 从 JSON 导入：本机已有的（名字＋参考图都一样）自动跳过，重复导入不会堆一堆 */
+async function importChars(file) {
+  if (file.size > 24 * 1024 * 1024) { toast('这个文件太大了（超过 24MB），拆成两份再导'); return null; }
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    toast('这个文件不是合法的 JSON'); return null;
+  }
+  // 兼容两种：导出时生成的整包，或者干脆是一个角色数组
+  const list = Array.isArray(data) ? data : (Array.isArray(data?.chars) ? data.chars : null);
+  if (!list) { toast('JSON 里没找到角色卡，请用「导出角色卡」生成的那份文件'); return null; }
+
+  const seen = new Set(state.chars.map(charKey));
+  const room = Math.max(0, CHARS_MAX - state.chars.length);
+  const fresh = [];
+  let skipped = 0, noImg = 0;
+  for (const raw of list.slice(0, 200)) {
+    const images = (Array.isArray(raw?.images) ? raw.images : [])
+      .filter((h) => typeof h === 'string' && /^data:image\//i.test(h)).slice(0, 3);
+    if (!images.length) { noImg++; continue; }
+    const card = {
+      id: 'c' + Math.random().toString(36).slice(2, 10),
+      name: String(raw?.name || '').trim().slice(0, 40) || '角色',
+      note: String(raw?.note || '').trim().slice(0, 120),
+      images,
+    };
+    const key = charKey(card);
+    if (seen.has(key) || fresh.length >= room) { skipped++; continue; }
+    seen.add(key);
+    fresh.push({ card, active: raw?.active !== false });
+  }
+  if (!fresh.length) {
+    toast(room <= 0 ? `角色卡最多 ${CHARS_MAX} 张，先删几张再导入`
+      : noImg ? '导入的角色都没有参考图，没法用'
+        : '这些角色卡本机已经有了');
+    return null;
+  }
+  for (const { card } of fresh) state.chars.push(card);
+  for (const { card, active } of fresh) if (active) state.activeChars.push(card.id);
+  await saveChars();
+  renderChars();
+  queueSave();
+  const tail = [skipped ? `${skipped} 张重复` : '', noImg ? `${noImg} 张缺参考图` : ''].filter(Boolean).join('，');
+  toast(`导入 ${fresh.length} 张角色卡${tail ? `（跳过 ${tail}）` : ''}`);
+  return { added: fresh.length, skipped, noImg };
 }
 
 /* ---------------- 多页：IndexedDB 草稿（关掉浏览器也不丢） ---------------- */

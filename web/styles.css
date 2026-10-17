@@ -710,6 +710,8 @@ kbd{
 }
 .stage-foot span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .stage-foot.warn #footMsg{color:var(--orange-ink)}
+/* ?dbg=1：一行状态，等宽字体，方便截图 / 复制给下一个人排查 */
+.stage-foot #footMsg.pf-dbg{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--label-2);white-space:normal}
 
 /* 手机：点格子后出现的「编辑这一格」浮钮 */
 .fab-edit{
