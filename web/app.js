@@ -1373,6 +1373,7 @@ function onCanvasDblClick(ev) {
 }
 
 function activateTab(tab) {
+  if (name === 'script' && !document.querySelector('[data-tab="script"]')) name = 'slot';
   if (!tab) return;
   $$('#tabs button').forEach((x) => {
     const on = x.dataset.tab === tab;
@@ -1601,6 +1602,44 @@ function applySlotCollapse() {
   }
   panel.classList.toggle('collapsed', state.slotCollapsed);
   document.querySelector('#btnSlotCollapse')?.classList.toggle('open', !state.slotCollapsed);
+}
+
+/** 把原来「分镜表」里这一格的信息渲染进小框 */
+function renderSlotBoard(panel, slot) {
+  const box = document.querySelector('#slotBoard');
+  const pr = document.querySelector('#slotBoardPrompts');
+  if (!box) return;
+  if (!panel) {
+    box.innerHTML = '<b>状态</b><span>先在左边写剧情并点「按规则匹配」，或让 AI 导演排一次戏</span>';
+    if (pr) pr.innerHTML = '';
+    const sum = document.querySelector('#secBoardSum');
+    if (sum) sum.textContent = '待生成';
+    return;
+  }
+  const rows = [
+    ['景别', `${panel.roleZh || ''} ｜ ${panel.shot || ''}`],
+    ['节拍', panel.beat || '通用镜头'],
+    ['画幅比', panel.aspectLabel],
+    ['建议出图', panel.genSize],
+    ['整页占比', (panel.areaPct || 0).toFixed(1) + '%'],
+    ['画面', panel.content || '（未填，写剧情或让 AI 排戏）'],
+    ['台词', panel.dialogue ? '「' + panel.dialogue + '」' : '（无）'],
+    ['构图', panel.beatHint || panel.composition || '—'],
+  ];
+  box.innerHTML = rows.map(([k, v]) => `<b>${k}</b><span>${escapeHtml(String(v))}</span>`).join('');
+
+  if (pr) {
+    pr.innerHTML = `
+      <div class="bp-row"><span class="bp-label">英文提示词</span><button class="btn tiny" id="btnBoardCopyEn">复制</button></div>
+      <pre class="bp-pre">${escapeHtml(panel.promptEn || '—')}</pre>
+      <div class="bp-row"><span class="bp-label">中文提示词</span><button class="btn tiny" id="btnBoardCopyZh">复制</button></div>
+      <pre class="bp-pre">${escapeHtml(panel.promptZh || '—')}</pre>
+      <div class="bp-neg"><b>避免</b><span>${escapeHtml(panel.negative || '—')}</span></div>`;
+    document.querySelector('#btnBoardCopyEn')?.addEventListener('click', () => copyText(panel.promptEn, '英文提示词已复制'));
+    document.querySelector('#btnBoardCopyZh')?.addEventListener('click', () => copyText(panel.promptZh, '中文提示词已复制'));
+  }
+  const sum = document.querySelector('#secBoardSum');
+  if (sum) sum.textContent = panel.aiOptimized ? 'AI' : (panel.beat || '规则');
 }
 
 function renderSlotPanel() {

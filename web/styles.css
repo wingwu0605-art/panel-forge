@@ -1464,3 +1464,13 @@ html[data-vt="accent"]::view-transition-new(root){animation:fadeIn .35s var(--ea
 .bubble-dock.collapsed .bub-grid{max-height:none}
 .bubble-dock.collapsed .bub-head{display:flex}
 .bubble-dock{flex:0 0 auto !important;align-self:flex-end}
+
+/* 小框里的分镜信息 */
+.board-prompts{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.bp-row{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--label-2)}
+.bp-label{font-weight:600;color:var(--label)}
+.bp-pre{margin:0;background:var(--fill-2);border:.5px solid var(--sep);border-radius:8px;
+  padding:6px 8px;font:11.5px/1.55 ui-monospace,Consolas,monospace;color:var(--label-2);
+  max-height:104px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.bp-neg{margin-top:4px;font-size:11px;color:var(--label-3);display:flex;gap:6px}
+.bp-neg b{color:var(--label-2);flex:0 0 auto}
