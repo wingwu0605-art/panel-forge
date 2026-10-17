@@ -97,6 +97,9 @@
         <button class="btn tiny" id="btnLlmClear">清除配置</button>
       </div>
       <div class="llm-status" id="llmStatus">未配置 · 规则路仍然可用</div>
+      <label class="field" style="margin-top:8px"><span>角色设定（可选，保证每格同一张脸）</span>
+        <textarea id="charSheet" rows="2" placeholder="例：18岁剑客，黑短发，左眉有疤，深色高领外套，银色长刀"></textarea>
+      </label>
       <button class="btn ai-wide wide" id="btnAiDecide">AI 自动决定并排戏</button>
       <div class="ai-result hidden" id="aiResult"></div>
     </section>
@@ -204,6 +207,15 @@
           <button class="btn tiny" id="btnResetPan">复位位置</button>
         </div>
 
+        <div class="prompt-box shape-box">
+          <div class="prompt-head">
+            <span>形状开头词 · <b id="shapeName">—</b></span>
+            <button class="btn tiny" id="btnCopyShape">复制</button>
+          </div>
+          <pre id="shapePrefix">—</pre>
+          <div class="shape-tip" id="shapeTip">粘到你自己的提示词<b>最前面</b>，构图就会自动适配这个格子的形状。</div>
+        </div>
+
         <div class="prompt-box">
           <div class="prompt-head"><span>本格生图提示词</span><button class="btn tiny" id="btnCopyPrompt">复制</button></div>
           <pre id="slotPrompt">—</pre>
@@ -214,7 +226,10 @@
     <div class="tab-body hidden" id="tabScript">
       <div class="script-head">
         <b>逐格分镜表</b>
-        <button class="btn tiny" id="btnCopyAll">复制全部</button>
+        <span style="display:flex;gap:6px">
+          <button class="btn tiny" id="btnAiPrompts" title="用 AI 把每格压成高密度生图提示词（保留形状开头词）">AI 优化提示词</button>
+          <button class="btn tiny" id="btnCopyAll">复制全部</button>
+        </span>
       </div>
       <div class="decision hidden" id="decisionBox"></div>
       <p class="muted small" id="scriptHint">载入模板后自动生成；在左侧输入剧情可让景别与提示词更贴合。</p>

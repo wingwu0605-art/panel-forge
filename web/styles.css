@@ -245,6 +245,15 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:6px 0 2px}
   margin:0;padding:9px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.6;
   color:#b9c6d6;white-space:pre-wrap;word-break:break-word;max-height:150px;overflow:auto;
 }
+/* 形状开头词 */
+.shape-box{border-color:#3a4a2e;background:#12160f}
+.shape-box .prompt-head{border-bottom-color:#3a4a2e}
+.shape-box .prompt-head b{color:#b7d68a}
+.shape-box pre{color:#cfe3b4;max-height:96px}
+.shape-tip{padding:6px 9px;font-size:10.5px;color:#8a9a76;line-height:1.5;border-top:1px dashed #2e3a26}
+.shape-tip b{color:#b7d68a;font-weight:500}
+.shape-chip{font-size:9.5px;padding:1px 6px;border-radius:99px;background:#2a3a1e;color:#b7d68a;border:1px solid #3a4a2e}
+.sc-card .act{flex-wrap:wrap}
 
 /* 分镜表 */
 .script-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}

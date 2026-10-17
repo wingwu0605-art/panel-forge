@@ -18,7 +18,8 @@ import { matchTemplates, planStory, analyzePlot, buildPlan, RULES_VERSION, RULE_
 import { INTENTS, ROLES, STYLE_PACKS, COMMON_NEGATIVE, SCENES, TONES, DIRECTIVES, NEGATORS, VOCAB_STATS, BEAT_EN } from './lib/taxonomy.mjs';
 import { PAGE_PRESETS } from './lib/geometry.mjs';
 import { aiTools, systemPrompt, openapiSpec } from './lib/aidocs.mjs';
-import { readLlmConfig, llmStatus, testLlm, aiDecide } from './lib/llm.mjs';
+import { readLlmConfig, llmStatus, testLlm, aiDecide, optimizePrompts } from './lib/llm.mjs';
+import { SHAPES, SHAPE_IDS, classifyShape, prefixSnippet, shapeSummary } from './lib/shapes.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7311);
@@ -115,6 +116,7 @@ const routes = [
     directives: Object.entries(DIRECTIVES).map(([id, v]) => ({ id, zh: v.zh, kind: v.kind })),
     ratios: Object.values(PAGE_PRESETS),
     frames: ['ink', 'bold', 'hairline', 'none'],
+    shapes: SHAPE_IDS.map((id) => ({ id, zh: SHAPES[id].zh, when: SHAPES[id].when })),
     tags: [...new Set(TEMPLATES.flatMap((t) => t.tags))].sort(),
     styles: STYLE_PACKS,
     negative: COMMON_NEGATIVE,
@@ -144,6 +146,96 @@ const routes = [
     negators: NEGATORS,
     roles: ROLES,
   })],
+
+  // 形状词库：格子形状 → 构图开头提示词
+  ['GET', /^\/api\/shapes$/, async () => ({
+    note: '把 prefixEn 粘到你自己提示词的最前面（模型对开头 token 权重最高），就能让构图适配异形格。',
+    shapes: SHAPE_IDS.map((id) => ({ id, ...SHAPES[id] })),
+    usage: {
+      paste: 'prefixEn 直接粘在最前面；需要收尾约束再补 suffixEn；negative 抄进负面词。',
+      api: 'POST /api/prefix {shape, role, culture} 直接拿现成片段；GET /api/templates/{id} 里每个 slot 也带 shape。',
+    },
+  })],
+
+  ['POST', /^\/api\/prefix$/, async (req) => {
+    const body = await readBody(req);
+    const shapeId = String(body.shape || 'grid');
+    const def = SHAPES[shapeId];
+    if (!def) return { __status: 400, error: 'unknown shape', valid: SHAPE_IDS };
+    const role = body.role ? ROLES[body.role] : null;
+    const style = body.culture ? STYLE_PACKS[body.culture] : null;
+    return {
+      shape: { id: shapeId, zh: def.zh, when: def.when },
+      snippet: prefixSnippet(shapeId, { rolePrompt: role?.prompt }),
+      parts: {
+        prefix: def.prefixEn,
+        suffix: def.suffixEn,
+        role: role?.prompt || null,
+        style: style?.prompt || null,
+        negative: [def.negative, style?.negative].filter(Boolean).join(', '),
+      },
+      hintZh: def.hintZh,
+    };
+  }],
+
+  // AI 提示词优化：把分镜的每格压成高密度英文提示词（形状开头词保留在最前）
+  ['POST', /^\/api\/ai\/prompts$/, async (req) => {
+    const body = await readBody(req);
+    const tpl = body.templateId ? getTemplate(body.templateId) : null;
+    if (!tpl) return { __status: 400, error: '需要 templateId：先选一套版式再优化提示词' };
+
+    const plot = String(body.plot || '');
+    const pageWidth = clampNum(body.pageWidth, 400, 4000, 1600);
+    const a = analyzePlot(plot, {});
+    const plan = buildPlan(tpl, a, { pageWidth, llmPanels: body.llmPanels || null });
+    const cfg = readLlmConfig(body.llm || {});
+
+    try {
+      const r = await optimizePrompts({
+        plot, plan, cfg,
+        characterSheet: body.characterSheet ? String(body.characterSheet).slice(0, 600) : '',
+        note: body.note ? String(body.note).slice(0, 400) : '',
+      });
+      let applied = 0;
+      for (const p of plan.panels) {
+        const o = r.prompts[p.id];
+        if (!o) continue;
+        p.promptEnRule = p.promptEnRule || p.promptEn;
+        p.promptEn = o.prompt;
+        if (o.negative) p.negative = o.negative;
+        p.aiOptimized = true;
+        applied++;
+      }
+      return {
+        ok: true, mode: 'ai-prompts',
+        applied, total: plan.panels.length,
+        globalNotes: r.globalNotes,
+        quality: r.quality,
+        plan,
+        llm: r.llm,
+      };
+    } catch (err) {
+      return {
+        __status: err.code === 'NO_LLM_KEY' ? 400 : 502,
+        ok: false,
+        error: String(err.message),
+        code: err.code || 'LLM_ERROR',
+        hint: err.hint,
+        fallback: { note: '规则版提示词已经在每格里（promptEn / promptShort），可以直接用' },
+      };
+    }
+  }],
+
+  // 模板的形状分布（哪些格是三角/竖长/小格）
+  ['GET', /^\/api\/templates\/([\w-]+)\/shapes$/, async (req, url, m) => {
+    const t = getTemplate(m[1]);
+    if (!t) return { __status: 404, error: 'template not found' };
+    return {
+      id: t.id, name: t.name,
+      summary: shapeSummary(t.slots),
+      slots: t.slots.map((s) => ({ id: s.id, order: s.order, ...classifyShape(s) })),
+    };
+  }],
 
   // AI 导演：状态 / 连通性测试 / 自动决定
   ['GET', /^\/api\/llm\/status$/, async () => llmStatus()],
@@ -178,6 +270,7 @@ const routes = [
     try {
       decision = await aiDecide({
         plot, analysis: m.analysis, candidates: m.results, cfg, culture, ratio,
+        characterSheet: body.characterSheet ? String(body.characterSheet).slice(0, 600) : '',
         extraNote: body.note ? String(body.note).slice(0, 500) : undefined,
       });
     } catch (err) {
@@ -240,7 +333,7 @@ const routes = [
   ['GET', /^\/api\/templates\/([\w-]+)$/, async (req, url, m) => {
     const t = getTemplate(m[1]);
     if (!t) return { __status: 404, error: 'template not found', id: m[1] };
-    return t;
+    return { ...t, shapeSummary: shapeSummary(t.slots), slots: t.slots.map((s) => ({ ...s, shape: classifyShape(s) })) };
   }],
 
   ['GET', /^\/api\/templates\/([\w-]+)\/svg$/, async (req, url, m) => {

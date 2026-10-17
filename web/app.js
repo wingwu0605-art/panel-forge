@@ -27,6 +27,7 @@ async function makeApi() {
     match: (body) => postJSON('/api/match', body),
     plan: (body) => postJSON('/api/plan', body),
     aiDecide: (body) => postJSON('/api/ai/decide', body),
+    prompts: (body) => postJSON('/api/ai/prompts', body),
     llmStatus: () => getJSON('/api/llm/status'),
     llmTest: (body) => postJSON('/api/llm/test', body),
     async proxyImage(url) {
@@ -52,6 +53,7 @@ const state = {
   aiPlan: null,       // AI 导演给的分镜表（优先）
   aiDecision: null,
   llm: { protocol: 'openai', baseUrl: '', apiKey: '', model: '' },
+  charSheet: '',
   engine: null,
   hollow: false,
   showLabels: true,
@@ -98,6 +100,11 @@ async function init() {
   await selectTemplate(first, { silent: true });
 
   const params = new URLSearchParams(location.search);
+  const wantSlot = params.get('slot');
+  if (wantSlot && state.tpl?.slots?.some((s) => s.id === wantSlot)) {
+    state.selectedId = wantSlot;
+    renderStage(); renderSlotPanel();
+  }
   if (params.get('demo') === '1') await demoFill();
   if (params.get('tab')) activateTab(params.get('tab'));
   if (params.get('plot')) {
@@ -436,6 +443,9 @@ function bindUI() {
     const p = currentPlanPanel();
     if (p) copyText(p.promptEn, '提示词已复制');
   });
+  $('#btnCopyShape').addEventListener('click', copyShapePrefix);
+  $('#charSheet').addEventListener('input', debounce(saveLlm, 400));
+  $('#btnAiPrompts').addEventListener('click', runAiPrompts);
 
   // 分镜表
   $('#btnReloadScript').addEventListener('click', () => refreshScript(true));
@@ -625,7 +635,15 @@ function renderSlotPanel() {
     ['构图提示', panel ? (panel.beatHint || panel.composition || '—') : '—'],
   ].map(([k, v]) => `<b>${k}</b><span>${escapeHtml(String(v))}</span>`).join('');
 
-  $('#slotPrompt').textContent = panel ? panel.promptEn : '（先在左侧输入剧情并点「匹配分镜」，可获得贴合这一格的提示词）';
+  $('#slotPrompt').textContent = panel ? panel.promptEn : '（先在左侧输入剧情并点「按规则匹配」，可获得贴合这一格的提示词）';
+
+  // 形状开头词（不依赖 AI，永远可用）
+  const shape = panel?.shape || slot.shape || null;
+  $('#shapeName').textContent = shape ? shape.zh : '—';
+  $('#shapePrefix').textContent = shape?.prefixEn || '—';
+  $('#shapeTip').innerHTML = shape
+    ? `粘到你自己的提示词<b>最前面</b>，构图就会适配这个形状。${escapeHtml(shape.hintZh || '')}`
+    : '粘到你自己的提示词<b>最前面</b>。';
 
   $('#zoom').value = Math.round((img?.zoom || 1) * 100);
   $('#zoomVal').textContent = Math.round((img?.zoom || 1) * 100) + '%';
@@ -655,16 +673,19 @@ function pagePlan() {
  * AI 导演
  * ================================================================== */
 const LLM_STORE = 'pf.llm.v1';
+const CHAR_STORE = 'pf.char.v1';
 
 function loadLlm() {
   try {
     const saved = JSON.parse(localStorage.getItem(LLM_STORE) || 'null');
     if (saved) state.llm = { ...state.llm, ...saved };
   } catch { /* ignore */ }
+  try { state.charSheet = localStorage.getItem(CHAR_STORE) || ''; } catch { /* ignore */ }
   $('#llmProtocol').value = state.llm.protocol || 'openai';
   $('#llmBase').value = state.llm.baseUrl || '';
   $('#llmKey').value = state.llm.apiKey || '';
   $('#llmModel').value = state.llm.model || '';
+  $('#charSheet').value = state.charSheet;
 }
 
 function saveLlm() {
@@ -674,7 +695,9 @@ function saveLlm() {
     apiKey: $('#llmKey').value.trim(),
     model: $('#llmModel').value.trim(),
   };
+  state.charSheet = $('#charSheet').value.trim();
   try { localStorage.setItem(LLM_STORE, JSON.stringify(state.llm)); } catch { /* ignore */ }
+  try { localStorage.setItem(CHAR_STORE, state.charSheet); } catch { /* ignore */ }
 }
 
 function clearLlm() {
@@ -759,6 +782,7 @@ async function runAiDecide() {
       ratio: $('#ratio').value,
       pageWidth: state.exportWidth,
       candidates: 10,
+      characterSheet: state.charSheet,
       llm: state.llm,
     });
 
@@ -920,6 +944,8 @@ function renderScript() {
       <div class="top">
         <span class="no">${p.order}</span>
         <span class="rl">${escapeHtml(p.roleZh)}</span>
+        ${p.shape ? `<span class="shape-chip">${escapeHtml(p.shape.zh)}</span>` : ''}
+        ${p.aiOptimized ? '<span class="shape-chip" style="background:#1e2a3a;color:#9fc0ff;border-color:#2a3a4a">AI</span>' : ''}
         <span class="bt">${escapeHtml(p.beat || '通用镜头')}</span>
       </div>
       <div class="asp">${p.aspectLabel} · 建议出图 ${p.genSize} · 占页 ${p.areaPct}%</div>
@@ -928,6 +954,7 @@ function renderScript() {
       <div class="pr">${escapeHtml(p.promptEn)}</div>
       <div class="act">
         <button class="btn tiny" data-act="copy">复制提示词</button>
+        <button class="btn tiny" data-act="prefix">复制形状词</button>
         <button class="btn tiny" data-act="fill">填入选中格</button>
       </div>
     </div>`).join('');
@@ -937,10 +964,61 @@ function renderScript() {
     card.addEventListener('click', (ev) => {
       const act = ev.target.closest('button')?.dataset.act;
       if (act === 'copy') copyText(p.promptEn, '该格提示词已复制');
+      else if (act === 'prefix') copyText(p.shape?.prefixEn || '', '形状开头词已复制');
       else if (act === 'fill') { state.selectedId = p.id; renderStage(); renderSlotPanel(); toast('已选中第 ' + p.order + ' 格'); }
       else { state.selectedId = p.id; renderStage(); renderSlotPanel(); }
     });
   });
+}
+
+/* ================================================================== *
+ * AI 提示词优化
+ * ================================================================== */
+function copyShapePrefix() {
+  const p = currentPlanPanel();
+  const slot = state.tpl?.slots?.find((s) => s.id === state.selectedId);
+  const prefix = p?.shape?.prefixEn || slot?.shape?.prefixEn;
+  if (!prefix) { toast('这一格没有形状词'); return; }
+  copyText(prefix, '形状开头词已复制，粘到你提示词最前面');
+}
+
+async function runAiPrompts() {
+  if (!state.tpl) { toast('先选一套版式'); return; }
+  const plot = $('#plot').value.trim();
+  saveLlm();
+  const btn = $('#btnAiPrompts');
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '优化中…';
+  try {
+    const page = pagePlan();
+    const llmPanels = page
+      ? Object.fromEntries(page.panels.map((p) => [p.id, { beat: p.beat, content: p.content, dialogue: p.dialogue }]))
+      : null;
+    const res = await api.prompts({
+      plot,
+      templateId: state.tpl.id,
+      pageWidth: state.exportWidth,
+      characterSheet: state.charSheet,
+      llmPanels,
+    });
+    if (!res.ok) {
+      toast(`优化失败：${res.code || res.error}`);
+      if (res.hint) $('#scriptHint').textContent = `${res.error || ''} · ${res.hint}`;
+      return;
+    }
+    if (state.aiPlan && state.aiPlan.template?.id === state.tpl.id) state.aiPlan = res.plan;
+    else state.plan = { pages: [{ pageIndex: 1, segment: plot, analysis: null, templateScore: null, plan: res.plan }] };
+    renderScript();
+    renderSlotPanel();
+    $('#scriptHint').textContent = `${state.tpl.name} · ${res.applied}/${res.total} 格已 AI 优化${res.globalNotes ? ' · ' + res.globalNotes : ''}`;
+    toast(`AI 优化完成：${res.applied}/${res.total} 格`);
+  } catch (e) {
+    toast('优化失败：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
+  }
 }
 
 function scriptMarkdown() {
@@ -956,17 +1034,19 @@ function scriptMarkdown() {
     `- 阅读顺序：${page.readingOrder}`,
     `- 格数：${page.panels.length}`,
     '',
-    '| 格 | 景别 | 叙事节拍 | 画幅 | 建议出图 |',
-    '| --- | --- | --- | --- | --- |',
-    ...page.panels.map((p) => `| ${p.order} | ${p.roleZh} | ${p.beat || '通用镜头'} | ${p.aspectLabel} | ${p.genSize} |`),
+    '| 格 | 景别 | 形状 | 叙事节拍 | 画幅 | 建议出图 |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...page.panels.map((p) => `| ${p.order} | ${p.roleZh} | ${p.shape?.zh || '常规格'} | ${p.beat || '通用镜头'} | ${p.aspectLabel} | ${p.genSize} |`),
     '',
     '## 逐格分镜',
     ...page.panels.map((p) => [
       '',
-      `### ${p.order}. ${p.roleZh} · ${p.beat || '通用镜头'}`,
+      `### ${p.order}. ${p.roleZh} · ${p.shape?.zh || '常规格'} · ${p.beat || '通用镜头'}`,
       p.content ? `- 画面：${p.content}` : `- 构图：${p.beatHint}`,
       `- 台词：${p.dialogue ? '「' + p.dialogue + '」' : '无'}`,
+      `- 形状开头词：\`${p.shape?.prefixEn || ''}\``,
       `- 提示词：\`${p.promptEn}\``,
+      `- 精简版：\`${p.promptShort || ''}\``,
       `- 负面词：\`${p.negative}\``,
     ].join('\n')),
     '',

@@ -438,6 +438,86 @@ OpenAPI 3.0.3，9 个 path，可直接丢进 Postman / Apifox / 任何代码生�
 
 ---
 
+## 形状词库（异形格适配）
+
+### GET /api/shapes
+
+10 类格子形状 + 对应的构图开头词。
+
+```json
+{
+  "note": "把 prefixEn 粘到你自己提示词的最前面…",
+  "shapes": [{
+    "id": "triangle", "zh": "三角格", "when": "只有 3 个顶点",
+    "prefixEn": "diagonal triangular composition, subject anchored to the lower corner, large empty diagonal wedge",
+    "suffixEn": "crop to a triangle, one strong diagonal edge",
+    "negative": "symmetric composition, centered subject, full frame evenly filled",
+    "hintZh": "三角格：主体压在角上，另一角留大面积空白。画满就浪费了这个形状。"
+  }]
+}
+```
+
+### POST /api/prefix
+
+拿一段可直接粘贴的片段（可选拼上景别与画风包）。
+
+```json
+{ "shape": "tall", "role": "face", "culture": "jp" }
+```
+
+```json
+{
+  "shape": { "id": "tall", "zh": "竖长格", "when": "宽高比 < 0.72" },
+  "snippet": "vertical extreme framing, tall narrow crop, subject standing full height with headroom and footroom, face close-up, …",
+  "parts": { "prefix": "…", "suffix": "vertical 9:16 crop", "role": "…", "style": "…", "negative": "…" },
+  "hintZh": "竖长格：只放一个人或一条街景，别塞两个人的全身。"
+}
+```
+
+### GET /api/templates/{id}/shapes
+
+```json
+{
+  "id": "jp-triangle-impact",
+  "summary": [{ "id": "triangle", "zh": "三角格", "count": 2 }, { "id": "wide", "zh": "横长全景格", "count": 1 }],
+  "slots": [{ "id": "t2", "order": 2, "id_shape": "triangle", "zh": "三角格", "prefixEn": "…", "aspect": 1.95 }]
+}
+```
+
+`GET /api/templates/{id}` 里每个 slot 也多了一个 `shape` 字段（同结构）；`GET /api/plan` 里每个 panel 同样带 `shape`。
+
+### POST /api/ai/prompts
+
+用模型把每格压成**高密度英文提示词**（形状开头词原样保留在最前）。
+
+```json
+{
+  "plot": "雨夜屋顶，他拔刀…",
+  "templateId": "jp-triangle-impact",
+  "characterSheet": "18岁剑客，黑短发，左眉有疤",
+  "pageWidth": 1600,
+  "llm": { "baseUrl": "https://api.deepseek.com/v1", "apiKey": "sk-…", "model": "deepseek-chat" }
+}
+```
+
+```json
+{
+  "ok": true, "mode": "ai-prompts", "applied": 6, "total": 6,
+  "globalNotes": "整页保持冷色调与同一位主角",
+  "plan": { "panels": [{
+    "id": "t2", "promptEn": "diagonal triangular composition, …, single panel, no text",
+    "promptEnRule": "（规则版原文，便于对比/回滚）",
+    "promptShort": "…", "negative": "…", "shape": { "id": "triangle", "zh": "三角格" }
+  }] },
+  "llm": { "model": "deepseek-chat", "latencyMs": 5200, "usage": { "total_tokens": 900 } }
+}
+```
+
+模型要是漏了某格或给了不存在的 slotId：`quality.missing` / `quality.dropped` 会列出来，
+漏掉的格子保留规则版提示词，不会变空。
+
+---
+
 ## 数据模型
 
 ### 模板 Template

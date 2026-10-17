@@ -129,9 +129,32 @@ const neg = await post('/api/analyze', { plot: '这段没有打斗，也没有�
 check('否定词生效', neg.body.primary !== 'action' && neg.body.primary !== 'horror' && neg.body.negated.length > 0,
   `primary=${neg.body.primary} negated=${neg.body.negated.map((n) => n.kw).join(',')}`);
 
-// 10 AI 导演：没配 Key 时应给出明确错误 + 规则兜底
-const llmStatus = await get('/api/llm/status');
-check('GET /api/llm/status', llmStatus.status === 200 && 'configured' in llmStatus.body && !('apiKey' in llmStatus.body));
+// 11 形状词库（异形格 → 构图开头词）
+const shapes = await get('/api/shapes');
+check('GET /api/shapes', shapes.status === 200 && shapes.body.shapes.length >= 10,
+  `${shapes.body.shapes.map((s) => s.zh).join('/')}`);
+
+const pref = await post('/api/prefix', { shape: 'triangle', role: 'impact', culture: 'jp' });
+check('POST /api/prefix', pref.status === 200 && pref.body.snippet.startsWith('diagonal triangular'), pref.body.snippet.slice(0, 48) + '…');
+
+const tplShapes = await get('/api/templates/jp-triangle-impact/shapes');
+check('GET /api/templates/:id/shapes', tplShapes.status === 200 && tplShapes.body.summary.some((x) => x.id === 'triangle'),
+  JSON.stringify(tplShapes.body.summary));
+
+const tri = await get('/api/templates/jp-triangle-impact');
+check('模板每格带 shape', tri.status === 200 && tri.body.slots.every((s) => s.shape && s.shape.prefixEn));
+
+const triPlan = await post('/api/plan', { plot, templateId: 'jp-triangle-impact' });
+const triPanels = triPlan.body.pages[0].plan.panels;
+check('提示词以形状开头词起手', triPanels.every((p) => p.promptEn.startsWith(p.shape.prefixEn)));
+check('提示词含精简版与去重负面词', triPanels.every((p) => p.promptShort && p.negative)
+  && new Set(triPanels[0].negative.split(',').map((s) => s.trim().toLowerCase())).size === triPanels[0].negative.split(',').length);
+
+const aiNoKey = await post('/api/ai/prompts', { plot, templateId: 'jp-triangle-impact' });
+check('无 Key 时 /api/ai/prompts 返回 400', aiNoKey.status === 400 && aiNoKey.body.code === 'NO_LLM_KEY');
+
+// 12 AI 导演状态
+const llmStatus = await get('/api/llm/status');check('GET /api/llm/status', llmStatus.status === 200 && 'configured' in llmStatus.body && !('apiKey' in llmStatus.body));
 
 if (!llmStatus.body.configured) {
   const noKey = await post('/api/ai/decide', { plot });

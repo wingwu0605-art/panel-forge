@@ -111,6 +111,10 @@ export function createStaticApi() {
       return STATIC_LLM_ERROR();
     },
 
+    async prompts() {
+      return STATIC_LLM_ERROR();
+    },
+
     async proxyImage() {
       throw new Error('静态版没有图片代理：跨域图片无法栅格化导出，请改用本地上传');
     },
