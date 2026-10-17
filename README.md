@@ -331,15 +331,28 @@ curl -s http://127.0.0.1:7311/api/ai/decide -H "content-type: application/json" 
 
 ### ① 推到 GitHub（备份 / 分享 / 做 Pages 的前置）
 
-仓库已经初始化好并做过首个提交，你只需要建个空仓库、加 remote、推上去：
+仓库已经初始化好并做过提交。推送需要**你的 GitHub 登录**，所以这一步只能由你完成（脚本会调起浏览器登录）：
 
 ```bat
-cd /d "D:\harness workspace\新建文件夹\panel-forge"
+:: 1. 打开 https://github.com/new 建一个空仓库
+::    不要勾 Add README / .gitignore / license
+:: 2. 双击本目录的「推送到GitHub.bat」，粘贴仓库 URL，浏览器登录
+```
+
+脚本会做四件事：设置 remote → 问你要不要用你自己的名字（替换占位身份 `PanelForge`，
+可选把已有提交的作者一起改掉）→ `git push -u origin main` → 打印 Pages / Render 的下一步。
+只想自检不推送：`推送到GitHub.bat --check`。
+
+手动等价命令：
+
+```bat
+cd /d "<项目目录>"
 git remote add origin https://github.com/<你的用户名>/<仓库名>.git
+git config user.name "你的名字"
+git config user.email "你的邮箱"
 git push -u origin main
 ```
 
-建仓库时**不要**勾选「Add a README / .gitignore / license」（避免冲突）。
 推送前建议把作者改成你自己（首个提交用的是中性身份）：
 
 ```bat
