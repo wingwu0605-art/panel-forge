@@ -82,6 +82,7 @@ init().catch((e) => {
 
 async function init() {
   bindUI();
+  initCollapsibles();
   api = await makeApi();
   const meta = await api.meta();
   const list = await api.templates();
@@ -121,6 +122,64 @@ async function init() {
   if (params.get('plot')) {
     $('#plot').value = params.get('plot');
     await runMatch();
+  }
+}
+
+/* ================================================================== *
+ * 可折叠面板：收起只留标题行，状态记在本机
+ * ================================================================== */
+const UI_STORE = 'pf.ui.v1';
+
+function initCollapsibles() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(UI_STORE) || '{}') || {}; } catch { /* ignore */ }
+  const persist = () => { try { localStorage.setItem(UI_STORE, JSON.stringify(saved)); } catch { /* ignore */ } };
+  // ?collapse=ai,browse 可指定初始收起（分享"专注模式"链接用，不影响记住的状态）
+  const force = (new URLSearchParams(location.search).get('collapse') || '').split(',').filter(Boolean);
+
+  for (const el of $$('[data-collapse]')) {
+    const key = el.dataset.collapse;
+    const initialOpen = saved[key] !== false && !force.includes(key);
+
+    // 原生 <details>（「怎么用」）
+    if (el.tagName === 'DETAILS') {
+      el.open = initialOpen;
+      el.addEventListener('toggle', () => { saved[key] = el.open; persist(); });
+      continue;
+    }
+
+    const head = el.querySelector(':scope > .card-head, :scope > .bub-head');
+    if (!head) continue;
+
+    // 头部之后的兄弟节点统一包进 .card-body
+    let body = el.querySelector(':scope > .card-body');
+    if (!body) {
+      body = document.createElement('div');
+      body.className = 'card-body';
+      [...el.children].filter((c) => c !== head).forEach((c) => body.appendChild(c));
+      el.appendChild(body);
+    }
+
+    const caret = document.createElement('button');
+    caret.type = 'button';
+    caret.className = 'caret';
+    caret.title = '展开 / 收起';
+    caret.setAttribute('aria-label', '展开或收起');
+    caret.innerHTML = '<svg viewBox="0 0 12 12" width="10" height="10"><path d="M2 4.2 6 8l4-3.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    head.appendChild(caret);
+
+    const apply = (open, save = true) => {
+      el.classList.toggle('collapsed', !open);
+      if (save) { saved[key] = open; persist(); }
+    };
+    apply(initialOpen, false);
+
+    // 点标题行任意处都能折叠；但标题里的按钮/输入框不触发
+    head.addEventListener('click', (ev) => {
+      const hit = ev.target.closest('button, input, select, textarea, a');
+      if (hit && !hit.classList.contains('caret')) return;
+      apply(el.classList.contains('collapsed'));
+    });
   }
 }
 

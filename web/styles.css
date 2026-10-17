@@ -56,11 +56,28 @@ body{
   display:grid;grid-template-columns:312px minmax(0,1fr) 352px;
 }
 .rail{overflow-y:auto;overscroll-behavior:contain;padding:12px;display:flex;flex-direction:column;gap:10px}
+/* 左栏卡片一律不许被压扁：压扁会让模板网格溢出、盖住下面的「怎么用」 */
+.rail.left > *{flex:0 0 auto}
 .rail.left{border-right:1px solid var(--line);background:var(--bg-soft)}
 .rail.right{border-left:1px solid var(--line);background:var(--bg-soft);gap:0;padding:0;display:flex;flex-direction:column;overflow:hidden}
 
 /* ---------------------------------------------------------------- 卡片 */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:11px}
+
+/* 可折叠面板：收起只留标题行 */
+.card.collapsed > .card-body{display:none}
+.card.collapsed{padding-bottom:9px}
+.card-body{min-width:0}
+.caret{
+  width:22px;height:22px;flex:0 0 auto;margin-left:2px;border:1px solid var(--line-2);
+  background:transparent;border-radius:6px;color:var(--muted);display:grid;place-items:center;
+  cursor:pointer;padding:0;transition:.14s;
+}
+.caret:hover{color:var(--text);border-color:#4a5265;background:#20242e}
+.caret svg{transition:transform .16s}
+.card.collapsed .caret svg,.bubble-dock.collapsed .caret svg{transform:rotate(-90deg)}
+.card-head,.bub-head{cursor:pointer;user-select:none}
+.card-head .hint{margin-left:auto}
 .card-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:9px}
 .card-head h2{margin:0;font-size:12.5px;letter-spacing:.3px;font-weight:600}
 .card-head .hint{font-size:10.5px;color:var(--dim)}
@@ -130,7 +147,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:6px 0 2px}
 .seg button.on{background:var(--panel-2);color:var(--text);box-shadow:0 1px 0 rgba(255,255,255,.04)}
 
 /* 模板网格 */
-.browse{display:flex;flex-direction:column;min-height:0}
+.browse{display:block}
 .tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:2px}
 .tpl{
   position:relative;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;

@@ -35,7 +35,7 @@
 
   <!-- ============================== 左栏：匹配 + 模板库 ============================== -->
   <aside class="rail left">
-    <section class="card match">
+    <section class="card match" data-collapse="match">
       <div class="card-head">
         <h2>剧情 → 分镜</h2>
         <span class="hint" id="analyzeHint">本地规则引擎</span>
@@ -69,7 +69,7 @@
       <div class="results hidden" id="matchResults"></div>
     </section>
 
-    <section class="card ai">
+    <section class="card ai" data-collapse="ai">
       <div class="card-head">
         <h2>AI 导演 <span class="tag-opt">可选</span></h2>
         <span class="hint" id="llmBadge">未配置</span>
@@ -104,7 +104,7 @@
       <div class="ai-result hidden" id="aiResult"></div>
     </section>
 
-    <section class="card browse">
+    <section class="card browse" data-collapse="browse">
       <div class="card-head">
         <h2>分镜模板库</h2>
         <span class="hint" id="listCount"></span>
@@ -120,7 +120,7 @@
       <div class="tpl-grid" id="tplGrid"></div>
     </section>
 
-    <details class="help card">
+    <details class="help card" data-collapse="help">
       <summary>怎么用（30 秒）</summary>
       <ol>
         <li>左侧选一套分镜（或先「匹配分镜」让 AI 选）。</li>
@@ -265,7 +265,7 @@
     </div>
 
     <!-- 气泡素材库：常驻底部，随时取用 -->
-    <div class="bubble-dock" id="bubbleDock">
+    <div class="bubble-dock" id="bubbleDock" data-collapse="bubbles">
       <div class="bub-head">
         <b>气泡</b>
         <div class="seg tiny-seg" id="bubTabs">
