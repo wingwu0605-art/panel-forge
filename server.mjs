@@ -492,14 +492,28 @@ const routes = [
         hint: '默认只在监听 127.0.0.1 时开启。公网部署想用请设 ENABLE_PROXY=1（注意：这等于给你的服务器开了一个出站代理，需自行评估 SSRF 风险）',
       };
     }
+    // 必须带自定义请求头：这会让浏览器先发 CORS 预检，别的网站的脚本就发不出来了
+    // （没有这一道，恶意页面可以用"简单 GET"盲发请求，把你机器当跳板去摸内网）
+    if (req.headers['x-pf-client'] !== '1') {
+      return { __status: 403, error: '缺少 x-pf-client 头（仅网页编辑器自用）' };
+    }
+    const origin = req.headers.origin;
+    if (origin) {
+      let ok = false;
+      try { ok = new URL(origin).host === req.headers.host; } catch { ok = false; }
+      if (!ok) return { __status: 403, error: '拒绝外部来源调用代理', origin };
+    }
     const target = url.searchParams.get('url');
     if (!target || !/^https?:\/\//.test(target)) return { __status: 400, error: '需要 url=http(s)://...' };
-    // 公网部署时拒绝指向内网/本机的地址（基础 SSRF 防护）
-    if (!IS_LOOPBACK) {
+    // 拒绝指向内网/本机/云元数据的地址（基础 SSRF 防护，任何模式都生效）
+    {
       let host = '';
-      try { host = new URL(target).hostname; } catch { return { __status: 400, error: 'url 无法解析' }; }
-      const priv = /^(localhost|127\.|0\.0\.0\.0|169\.254\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\]|::1)/i.test(host);
-      if (priv) return { __status: 403, error: '拒绝访问内网/本机地址', host };
+      try { host = new URL(target).hostname.toLowerCase(); } catch { return { __status: 400, error: 'url 无法解析' }; }
+      const isLocalName = /^(localhost|localhost\.local|.*\.local|.*\.internal)$/.test(host);
+      const isPrivIp = /^(127\.|0\.0\.0\.0|169\.254\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1|\[::1\])/.test(host);
+      if (isLocalName || isPrivIp) {
+        return { __status: 403, error: '拒绝访问内网/本机地址', host, hint: '要贴内网图片请在浏览器里直接上传本地文件' };
+      }
     }
     const r = await fetch(target, { headers: { 'user-agent': 'panel-forge/1.0' } });
     if (!r.ok) return { __status: 502, error: `上游返回 ${r.status}` };

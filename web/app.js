@@ -32,7 +32,8 @@ async function makeApi() {
     llmStatus: () => getJSON('/api/llm/status'),
     llmTest: (body) => postJSON('/api/llm/test', body),
     async proxyImage(url) {
-      const r = await fetch('/api/proxy?url=' + encodeURIComponent(url));
+      // 带自定义头：强制走 CORS 预检，别的网站的脚本没法盲调这个代理
+      const r = await fetch('/api/proxy?url=' + encodeURIComponent(url), { headers: { 'x-pf-client': '1' } });
       if (!r.ok) throw new Error('代理拉取失败 ' + r.status);
       return await r.blob();
     },
