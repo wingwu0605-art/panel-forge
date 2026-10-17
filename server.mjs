@@ -525,23 +525,38 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ---- 静态文件 ----
+  // 容错 1：中文标点被粘进地址栏（复制链接时把「）。」一起带走 → 404）
+  let decoded;
+  try { decoded = decodeURIComponent(routePath); } catch { decoded = routePath; }
+  const cleaned = decoded.replace(/[。，、！？；：）〕】》」』”’…·\s]+$/u, '') || '/';
+  if (cleaned !== decoded) {
+    return send(res, 302, '', { Location: encodeURI(cleaned) + (url.search || '') });
+  }
+
+  // 容错 2：不带扩展名的未知路径 → 回落首页（单页应用习惯）
   let rel = routePath === '/' ? '/web/index.html' : routePath;
   if (rel === '/app.js') rel = '/web/app.js';
   if (rel === '/styles.css') rel = '/web/styles.css';
-  const file = path.join(__dirname, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
-  if (!file.startsWith(__dirname)) return send(res, 403, 'forbidden');
-  try {
-    const st = await stat(file);
-    if (!st.isFile()) throw new Error('not a file');
-    const buf = await readFile(file);
-    const ext = path.extname(file).toLowerCase();
-    return send(res, 200, buf, {
-      'Content-Type': MIME[ext] || 'application/octet-stream',
-      'Cache-Control': ext === '.mjs' || ext === '.js' || ext === '.css' || ext === '.html' ? 'no-cache' : 'public, max-age=3600',
-    });
-  } catch {
-    return send(res, 404, `404 Not Found: ${routePath}`, { 'Content-Type': 'text/plain; charset=utf-8' });
-  }
+
+  const readStatic = async (p) => {
+    const file = path.join(__dirname, path.normalize(p).replace(/^(\.\.[/\\])+/, ''));
+    if (!file.startsWith(__dirname)) return null;
+    try {
+      const st = await stat(file);
+      if (!st.isFile()) return null;
+      return { file, buf: await readFile(file) };
+    } catch { return null; }
+  };
+
+  let hit = await readStatic(rel);
+  if (!hit && !path.extname(rel)) hit = await readStatic('/web/index.html');
+  if (!hit) return send(res, 404, `404 Not Found: ${routePath}`, { 'Content-Type': 'text/plain; charset=utf-8' });
+
+  const ext = path.extname(hit.file).toLowerCase();
+  return send(res, 200, hit.buf, {
+    'Content-Type': MIME[ext] || 'application/octet-stream',
+    'Cache-Control': ext === '.mjs' || ext === '.js' || ext === '.css' || ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+  });
 });
 
 server.listen(PORT, HOST, () => {
