@@ -23,3 +23,5 @@ out/*.svg
 Thumbs.db
 desktop.ini
 *.log
+
+out/dom*.html
