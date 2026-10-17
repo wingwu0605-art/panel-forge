@@ -207,6 +207,7 @@ async function init() {
     state.pageIdx = 0;
   }
   renderPageTabs();
+  loadKeyStore();
   await loadChars();
 
   // 再尝试恢复草稿：IndexedDB 不可用/被策略拦住时也不能拖死启动
@@ -241,6 +242,7 @@ async function init() {
   if (params.get('keyselftest') === '1') await runKeySelfTest();
   if (params.get('aiselftest') === '1') await runAiSelfTest();
   if (params.get('shortcuts') === '1') toggleShortcuts(true);
+  if (params.get('keys') === '1') openKeySheet();
   if (params.get('tab')) activateTab(params.get('tab'));
   if (params.get('plot')) {
     $('#plot').value = params.get('plot');
@@ -1067,6 +1069,69 @@ function bindUI() {
     el.dispatchEvent(new Event('input', { bubbles: true }));
     toast('已填入本格句子');
   });
+  $('#btnKeyMgr')?.addEventListener('click', openKeySheet);
+  $('#btnKeySheetClose')?.addEventListener('click', closeKeySheet);
+  $('#keySheet')?.addEventListener('click', (ev) => { if (ev.target.id === 'keySheet') closeKeySheet(); });
+  $('#ksPreset')?.addEventListener('change', (ev) => {
+    const p = KEY_PRESETS[ev.target.value];
+    if (!p) return;
+    $('#ksProtocol').value = p.protocol;
+    $('#ksBase').value = p.baseUrl;
+    $('#ksModel').value = p.model;
+    if (p.imgModel) $('#ksImgModel').value = p.imgModel;
+  });
+  $('#ksList')?.addEventListener('click', (ev) => {
+    const item = ev.target.closest('.ks-item');
+    if (!item) return;
+    const id = item.dataset.id;
+    const entry = state.keys.entries.find((e) => e.id === id);
+    const act = ev.target.closest('button')?.dataset.act;
+    if (act === 'use') {
+      state.keys.activeId = id; saveKeyStore();
+      applyKeyEntry(entry); renderKeyStatus(); renderKeySheet();
+      toast('已切换到 ' + entry.name);
+    } else if (act === 'edit') {
+      state._editingKeyId = id;
+      fillKeyForm(entry);
+      $('#ksMsg').textContent = '正在编辑「' + entry.name + '」，改完点保存';
+    } else if (act === 'del') {
+      if (!confirm('删掉「' + entry.name + '」的 Key？')) return;
+      state.keys.entries = state.keys.entries.filter((e) => e.id !== id);
+      if (state.keys.activeId === id) state.keys.activeId = state.keys.entries[0]?.id || null;
+      saveKeyStore();
+      const next = activeKeyEntry();
+      if (next) applyKeyEntry(next); else { state.llm = { protocol: 'openai', baseUrl: '', apiKey: '', model: '' }; syncLlmStatus(); }
+      renderKeyStatus(); renderKeySheet();
+    }
+  });
+  $('#ksTest')?.addEventListener('click', async () => {
+    const btn = $('#ksTest'); const old = btn.textContent;
+    btn.disabled = true; btn.textContent = '测试中…';
+    $('#ksMsg').textContent = '正在请求模型…';
+    try {
+      const r = await api.llmTest({ llm: formEntry() });
+      if (r?.ok) {
+        $('#ksMsg').textContent = '✅ 连接成功 · ' + (r.model || '') + ' · ' + (r.latencyMs || '?') + 'ms';
+        state._lastTestOk = true;
+      } else {
+        $('#ksMsg').textContent = '❌ ' + (r?.error || '失败') + (r?.hint ? ' · ' + r.hint : '');
+        state._lastTestOk = false;
+      }
+    } catch (e) {
+      $('#ksMsg').textContent = '❌ ' + e.message;
+      state._lastTestOk = false;
+    } finally { btn.disabled = false; btn.textContent = old; }
+  });
+  $('#ksSave')?.addEventListener('click', () => {
+    const e = formEntry();
+    if (!e.apiKey) { $('#ksMsg').textContent = '请先填 API Key'; return; }
+    if (!e.baseUrl) { $('#ksMsg').textContent = '请先填 Base URL'; return; }
+    if (state._lastTestOk) e.verifiedAt = Date.now();
+    upsertKey(e);
+    state._editingKeyId = null;
+    $('#ksMsg').textContent = e.verifiedAt ? '已保存并验证，可以开始用了' : '已保存（未验证，建议先点测试连接）';
+    toast('已保存 Key：' + e.name);
+  });
   $('#btnAiImage')?.addEventListener('click', generateSlotImage);
   $('#btnCharPick')?.addEventListener('click', () => $('#charFiles').click());
   $('#charFiles')?.addEventListener('change', async (ev) => {
@@ -1853,6 +1918,154 @@ function applyCand(i) {
     renderStage(); renderSlotPanel(); refreshScript();
     toast('已换成候选 ' + (i + 1));
   }).catch((e) => toast('这张图读不出来：' + e.message));
+}
+
+/* ---------------- 多服务商 Key 管理 ---------------- */
+const KEYS_STORE = 'pf.keys.v1';
+
+const KEY_PRESETS = {
+  deepseek: { name: 'DeepSeek', protocol: 'openai', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', imgModel: '' },
+  openai: { name: 'OpenAI', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', imgModel: 'gpt-image-1' },
+  siliconflow: { name: '硅基流动', protocol: 'openai', baseUrl: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-72B-Instruct', imgModel: 'Kwai-Kolors/Kolors' },
+  anthropic: { name: 'Anthropic', protocol: 'anthropic', baseUrl: 'https://api.anthropic.com', model: 'claude-3-5-sonnet-latest', imgModel: '' },
+  moonshot: { name: 'Moonshot', protocol: 'openai', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', imgModel: '' },
+  custom: { name: '自定义', protocol: 'openai', baseUrl: '', model: '', imgModel: '' },
+};
+
+function loadKeyStore() {
+  let store = { entries: [], activeId: null };
+  try {
+    const raw = JSON.parse(localStorage.getItem(KEYS_STORE) || 'null');
+    if (raw && Array.isArray(raw.entries)) store = raw;
+  } catch { /* ignore */ }
+  // 从旧单条配置迁移
+  try {
+    const old = JSON.parse(localStorage.getItem(LLM_STORE) || 'null');
+    if (old && old.apiKey && !store.entries.length) {
+      store.entries.push({
+        id: 'k' + Date.now().toString(36), name: '我的服务商', protocol: old.protocol || 'openai',
+        baseUrl: old.baseUrl || '', model: old.model || '', apiKey: old.apiKey,
+        imgProvider: old.imageProvider || 'openai', imgModel: old.imgModel || '',
+        verifiedAt: 0,
+      });
+      store.activeId = store.entries[0].id;
+    }
+  } catch { /* ignore */ }
+  state.keys = store;
+  const active = store.entries.find((e) => e.id === store.activeId) || store.entries[0] || null;
+  if (active) applyKeyEntry(active);
+  renderKeyStatus();
+}
+
+function saveKeyStore() {
+  try { localStorage.setItem(KEYS_STORE, JSON.stringify(state.keys)); } catch { /* ignore */ }
+}
+
+function activeKeyEntry() {
+  return state.keys.entries.find((e) => e.id === state.keys.activeId) || null;
+}
+
+function applyKeyEntry(e) {
+  state.llm = {
+    protocol: e.protocol || 'openai',
+    baseUrl: e.baseUrl || '',
+    model: e.model || '',
+    apiKey: e.apiKey || '',
+    imageProvider: e.imgProvider || 'openai',
+    imgModel: e.imgModel || '',
+    sessionOnly: false,
+  };
+  $('#llmProtocol').value = state.llm.protocol;
+  $('#llmBase').value = state.llm.baseUrl;
+  $('#llmModel').value = state.llm.model;
+  $('#llmKey').value = state.llm.apiKey;
+  if ($('#imgProvider')) $('#imgProvider').value = state.llm.imageProvider;
+  if ($('#imgModel')) $('#imgModel').value = state.llm.imgModel;
+  syncLlmStatus();
+}
+
+function renderKeyStatus() {
+  const cur = activeKeyEntry();
+  const nameEl = $('#aiCurName');
+  const metaEl = $('#aiCurMeta');
+  const btn = $('#btnKeyMgr');
+  if (!nameEl) return;
+  if (cur) {
+    nameEl.textContent = cur.name || '已配置';
+    metaEl.textContent = `${cur.model || '默认模型'} · ${cur.verifiedAt ? '已验证' : '未验证'} · ${state.keys.entries.length} 个 Key`;
+    btn.textContent = cur.verifiedAt ? '管理 Key' : '输入 Key';
+  } else {
+    nameEl.textContent = '未配置 Key';
+    metaEl.textContent = '规则路照常可用，AI 是可选加速';
+    btn.textContent = '输入 Key';
+  }
+}
+
+function renderKeySheet() {
+  const list = $('#ksList');
+  if (!list) return;
+  if (!state.keys.entries.length) {
+    list.innerHTML = '<div class="muted small" style="padding:8px 2px">还没有保存的 Key。在右边填一个，点「保存并使用」。</div>';
+    return;
+  }
+  list.innerHTML = state.keys.entries.map((e) => {
+    const on = e.id === state.keys.activeId;
+    return `<div class="ks-item${on ? ' on' : ''}" data-id="${e.id}">
+      <span class="ks-radio">${on ? '●' : '○'}</span>
+      <div class="ks-info">
+        <b>${escapeHtml(e.name || '未命名')}</b>
+        <span>${escapeHtml(e.model || '默认模型')} · ${escapeHtml(e.baseUrl || '')}</span>
+        <span class="ks-key">${e.apiKey ? 'sk-••••' + String(e.apiKey).slice(-4) : '无 Key'}${e.verifiedAt ? ' · 已验证' : ''}</span>
+      </div>
+      <div class="ks-acts">
+        <button class="btn tiny" data-act="use">${on ? '当前' : '使用'}</button>
+        <button class="btn tiny" data-act="edit">编辑</button>
+        <button class="btn tiny danger" data-act="del">删</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openKeySheet() {
+  renderKeySheet();
+  $('#keySheet').classList.remove('hidden');
+}
+
+function closeKeySheet() { $('#keySheet').classList.add('hidden'); }
+
+function fillKeyForm(e) {
+  if (!e) return;
+  $('#ksProtocol').value = e.protocol || 'openai';
+  $('#ksBase').value = e.baseUrl || '';
+  $('#ksModel').value = e.model || '';
+  $('#ksKey').value = e.apiKey || '';
+  $('#ksImgProvider').value = e.imgProvider || 'openai';
+  $('#ksImgModel').value = e.imgModel || '';
+}
+
+function formEntry() {
+  return {
+    id: state._editingKeyId || 'k' + Date.now().toString(36),
+    name: ($('#ksPreset').selectedOptions[0]?.textContent || '服务商').trim(),
+    protocol: $('#ksProtocol').value,
+    baseUrl: $('#ksBase').value.trim(),
+    model: $('#ksModel').value.trim(),
+    apiKey: $('#ksKey').value.trim(),
+    imgProvider: $('#ksImgProvider').value,
+    imgModel: $('#ksImgModel').value.trim(),
+    verifiedAt: 0,
+  };
+}
+
+function upsertKey(entry) {
+  const i = state.keys.entries.findIndex((x) => x.id === entry.id);
+  if (i >= 0) state.keys.entries[i] = { ...state.keys.entries[i], ...entry };
+  else state.keys.entries.push(entry);
+  state.keys.activeId = entry.id;
+  saveKeyStore();
+  applyKeyEntry(state.keys.entries.find((x) => x.id === entry.id));
+  renderKeyStatus();
+  renderKeySheet();
 }
 
 /* ---------------- 角色参考图 ---------------- */

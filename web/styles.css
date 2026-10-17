@@ -374,6 +374,31 @@ input[type=range]::-moz-range-thumb{
 .char-meta span{font-size:10.5px;color:var(--label-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .char-acts{display:flex;gap:4px;flex:0 0 auto}
 
+
+/* AI 二级面板 */
+.ai-status-row{display:flex;align-items:center;gap:10px;margin:8px 0 6px;padding:8px 10px;border:.5px solid var(--sep);border-radius:10px;background:var(--fill-2)}
+.ai-status-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.ai-status-main b{font-size:12.5px;color:var(--label)}
+.ai-status-main span{font-size:10.5px;color:var(--label-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.keysheet{position:fixed;inset:0;z-index:210;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(6px);animation:fadeIn .2s var(--ease)}
+.ks-panel{width:100%;background:var(--panel,#1b1c1f);max-width:780px;max-height:86vh;overflow:auto;background:var(--bar);border:.5px solid var(--sep-strong);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.5);animation:sheetIn .35s var(--ease)}
+.ks-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:.5px solid var(--sep);position:sticky;top:0;background:var(--bar);z-index:2}
+.ks-head b{font-size:13.5px}
+.ks-head .muted{flex:1}
+.ks-body{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px}
+.ks-list{display:flex;flex-direction:column;gap:6px;max-height:56vh;overflow:auto}
+.ks-item{display:flex;gap:8px;align-items:center;padding:8px;border:.5px solid var(--sep);border-radius:10px;background:var(--fill-2)}
+.ks-item.on{border-color:var(--tint);box-shadow:0 0 0 1px rgba(0,122,255,.2) inset}
+.ks-radio{color:var(--tint);font-size:13px}
+.ks-info{flex:1;min-width:0;display:flex;flex-direction:column}
+.ks-info b{font-size:12px}
+.ks-info span{font-size:10.5px;color:var(--label-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ks-key{font-family:ui-monospace,monospace}
+.ks-acts{display:flex;gap:4px}
+.ks-form{border-left:.5px solid var(--sep);padding-left:14px;display:flex;flex-direction:column;gap:6px}
+.ks-form-head{font-size:11.5px;color:var(--label-2);margin-bottom:2px}
+.ks-msg{font-size:11.5px;color:var(--label-2);min-height:18px}
+
 /* 建议句 */
 .suggest-box{border-color:rgba(255,214,10,.28)}
 .suggest-text{font-size:12.5px;line-height:1.65;color:var(--label);padding:2px 1px 1px}

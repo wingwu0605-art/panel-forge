@@ -116,39 +116,28 @@
         <span class="hint" id="llmBadge">未配置</span>
       </div>
       <p class="muted small">填你自己的模型 API：AI 会在规则筛出的合法版式里<strong>自己挑一套并逐格排戏</strong>（画面内容＋台词）。Key 只存在本机浏览器与本地服务之间，不写盘、不外传。</p>
-      <div class="row2">
-        <label class="field"><span>协议</span>
-          <select id="llmProtocol">
-            <option value="openai">OpenAI 兼容</option>
-            <option value="anthropic">Anthropic</option>
-          </select>
-        </label>
-        <label class="field"><span>模型</span>
-          <input id="llmModel" type="text" spellcheck="false" placeholder="deepseek-chat">
-        </label>
-        <label class="field"><span>生图服务商</span>
-          <select id="imgProvider">
-            <option value="openai">OpenAI / DALL·E / gpt-image</option>
-            <option value="siliconflow">硅基流动 SiliconFlow</option>
-            <option value="stability">Stability (SD3)</option>
-          </select>
-        </label>
-        <label class="field"><span>生图模型（可选）</span>
-          <input id="imgModel" type="text" spellcheck="false" placeholder="gpt-image-1 / dall-e-3 / Kwai-Kolors/Kolors / sd3.5-large">
-        </label>
-      </div>
-      <label class="field"><span>Base URL</span>
-        <input id="llmBase" type="text" spellcheck="false" placeholder="https://api.deepseek.com/v1">
-      </label>
-      <label class="field"><span>API Key <b class="key-note">只存在你浏览器里，不上传</b></span>
-        <input id="llmKey" type="password" spellcheck="false" placeholder="sk-…（只在本机使用）">
-      </label>
-      <label class="switch" title="勾上后 Key 只在本次打开有效，关掉页面就清空（不写入浏览器存储）"><input type="checkbox" id="chkKeySession"> 仅本次会话</label>
-      <div class="row2">
-        <button class="btn tiny" id="btnLlmTest">测试连接</button>
-        <button class="btn tiny" id="btnLlmClear">清除配置</button>
+      <div class="ai-status-row">
+        <div class="ai-status-main">
+          <b id="aiCurName">未配置 Key</b>
+          <span id="aiCurMeta">规则路照常可用，AI 是可选加速</span>
+        </div>
+        <button class="btn tiny" id="btnKeyMgr">输入 Key</button>
       </div>
       <div class="llm-status" id="llmStatus">未配置 · 规则路仍然可用</div>
+      <!-- 低频配置收进二级面板，这些隐藏字段保留给原有逻辑读写 -->
+      <div class="hidden">
+        <select id="llmProtocol"><option value="openai">OpenAI 兼容</option><option value="anthropic">Anthropic</option></select>
+        <input id="llmModel" type="text">
+        <input id="llmBase" type="text">
+        <input id="llmKey" type="password">
+        <select id="imgProvider"><option value="openai">OpenAI</option><option value="siliconflow">硅基流动</option><option value="stability">Stability</option></select>
+        <input id="imgModel" type="text">
+        <label class="switch"><input type="checkbox" id="chkKeySession"> 仅本次会话</label>
+        <div class="row2">
+          <button class="btn tiny" id="btnLlmTest">测试连接</button>
+          <button class="btn tiny" id="btnLlmClear">清除配置</button>
+        </div>
+      </div>
       <label class="field" style="margin-top:8px"><span>角色设定（可选，保证每格同一张脸）</span>
         <textarea id="charSheet" rows="2" placeholder="例：18岁剑客，黑短发，左眉有疤，深色高领外套，银色长刀"></textarea>
       </label>
@@ -436,6 +425,67 @@
 </nav>
 
 <input type="file" id="filePick" accept="image/*" multiple hidden>
+
+<div class="keysheet hidden" id="keySheet">
+  <div class="ks-panel">
+    <div class="ks-head">
+      <b>API Key 管理</b>
+      <span class="muted small">打勾的那个就是当前用的服务商 · 可以存多家随时切</span>
+      <button class="btn tiny" id="btnKeySheetClose">关闭</button>
+    </div>
+    <div class="ks-body">
+      <div class="ks-list" id="ksList"></div>
+
+      <div class="ks-form">
+        <div class="ks-form-head">添加 / 编辑</div>
+        <div class="row2">
+          <label class="field"><span>服务商</span>
+            <select id="ksPreset">
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai">OpenAI</option>
+              <option value="siliconflow">硅基流动 SiliconFlow</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="moonshot">Moonshot</option>
+              <option value="custom">自定义 / 中转</option>
+            </select>
+          </label>
+          <label class="field"><span>协议</span>
+            <select id="ksProtocol">
+              <option value="openai">OpenAI 兼容</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </label>
+        </div>
+        <label class="field"><span>Base URL</span>
+          <input id="ksBase" type="text" spellcheck="false" placeholder="https://api.deepseek.com/v1">
+        </label>
+        <label class="field"><span>对话模型</span>
+          <input id="ksModel" type="text" spellcheck="false" placeholder="deepseek-chat">
+        </label>
+        <label class="field"><span>API Key <b class="key-note">只存在你浏览器</b></span>
+          <input id="ksKey" type="password" spellcheck="false" placeholder="sk-…">
+        </label>
+        <div class="row2">
+          <label class="field"><span>生图服务商</span>
+            <select id="ksImgProvider">
+              <option value="openai">OpenAI</option>
+              <option value="siliconflow">硅基流动</option>
+              <option value="stability">Stability</option>
+            </select>
+          </label>
+          <label class="field"><span>生图模型</span>
+            <input id="ksImgModel" type="text" spellcheck="false" placeholder="gpt-image-1 / Kwai-Kolors/Kolors">
+          </label>
+        </div>
+        <div class="row2">
+          <button class="btn tiny" id="ksTest">测试连接</button>
+          <button class="btn tiny primary" id="ksSave">保存并使用</button>
+        </div>
+        <div class="ks-msg" id="ksMsg"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="shortcuts hidden" id="shortcuts">
   <div class="sc-panel">
