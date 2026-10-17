@@ -16,7 +16,10 @@ out/contact-*.html
 out/sheet-*.png
 out/crop-*.png
 out/dbg*.png
+out/dbg*.js
 out/*.svg
+# 目视检查（scripts/visual-check.mjs）的截图，每次重跑都会变
+out/shots/
 
 # 系统
 .DS_Store
