@@ -1,0 +1,22 @@
+# Render 一键部署（免费套餐即可）：https://render.com → New → Blueprint → 选你的仓库
+services:
+  - type: web
+    name: panel-forge
+    runtime: node
+    plan: free
+    buildCommand: echo "zero dependencies - nothing to build"
+    startCommand: node server.mjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      # ↓ AI 导演是可选的。不要在仓库里写 Key，部署后在 Render 面板里填。
+      # 注意：公开部署时若配了 Key，任何访问者都能消耗你的 token。
+      - key: LLM_PROTOCOL
+        sync: false
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false

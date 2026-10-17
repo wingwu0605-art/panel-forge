@@ -1,0 +1,25 @@
+# 零依赖（只用 node 标准库），不需要 node_modules
+node_modules/
+
+# 本地/私钥，绝对不要提交
+.env
+.env.*
+*.pem
+*.key
+secret*
+
+# 构建产物（GitHub Actions 会重新生成）
+site/
+
+# 生成物：接触表/截图（hero 图要保留，README 在用）
+out/contact-*.html
+out/sheet-*.png
+out/crop-*.png
+out/dbg*.png
+out/*.svg
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log

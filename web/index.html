@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PanelForge 分镜坊 · 中·日·韩 漫画分镜模板库</title>
+<link rel="stylesheet" href="./styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23101116'/%3E%3Crect x='4' y='4' width='24' height='10' fill='none' stroke='%23e2503c' stroke-width='2'/%3E%3Crect x='4' y='18' width='11' height='10' fill='none' stroke='%23e2503c' stroke-width='2'/%3E%3Crect x='19' y='18' width='9' height='10' fill='none' stroke='%23e2503c' stroke-width='2'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="3" y="3" width="26" height="11" fill="none" stroke="currentColor" stroke-width="2"/>
+      <rect x="3" y="18" width="12" height="11" fill="none" stroke="currentColor" stroke-width="2"/>
+      <rect x="19" y="18" width="10" height="11" fill="none" stroke="currentColor" stroke-width="2"/>
+    </svg>
+    <span class="name">PanelForge</span>
+    <span class="sub">分镜坊</span>
+  </div>
+  <div class="top-mid">
+    <span class="pill" id="statTpl">载入中…</span>
+    <span class="pill ok" id="statApi">API</span>
+    <span class="pill dim mono" id="statPort"></span>
+  </div>
+  <nav class="top-actions">
+    <a class="btn ghost sm" href="/api/docs" target="_blank" rel="noreferrer">API 文档</a>
+    <a class="btn ghost sm" href="/api/sheet" target="_blank" rel="noreferrer">全部模板接触表</a>
+    <a class="btn ghost sm" href="/api/ai-tools.json" target="_blank" rel="noreferrer">AI 工具定义</a>
+  </nav>
+</header>
+
+<main class="layout">
+
+  <!-- ============================== 左栏：匹配 + 模板库 ============================== -->
+  <aside class="rail left">
+    <section class="card match">
+      <div class="card-head">
+        <h2>剧情 → 分镜</h2>
+        <span class="hint" id="analyzeHint">本地规则引擎</span>
+      </div>
+      <textarea id="plot" rows="5" placeholder="粘贴一段剧情，越具体越准。例如：雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋，两人在积水里僵持。"></textarea>
+      <div class="row2">
+        <label class="field"><span>画风体系</span>
+          <select id="culture">
+            <option value="all">不限（自动判断）</option>
+            <option value="jp">日式页漫（右→左）</option>
+            <option value="cn">中式漫画（条漫/国风）</option>
+            <option value="kr">韩式条漫（竖屏 webtoon）</option>
+          </select>
+        </label>
+        <label class="field"><span>画幅</span>
+          <select id="ratio">
+            <option value="auto">自动</option>
+            <option value="page">页漫（A4/B5）</option>
+            <option value="scroll">条漫（竖屏滚动）</option>
+            <option value="wide">横版 / 跨页</option>
+            <option value="square">方形</option>
+          </select>
+        </label>
+      </div>
+      <button class="btn primary wide" id="btnMatch">
+        <span>按规则匹配</span>
+        <kbd>⌘⏎</kbd>
+      </button>
+      <p class="engine-note" id="engineNote">本地规则引擎：—</p>
+      <div class="chips" id="intentChips"></div>
+      <div class="results hidden" id="matchResults"></div>
+    </section>
+
+    <section class="card ai">
+      <div class="card-head">
+        <h2>AI 导演 <span class="tag-opt">可选</span></h2>
+        <span class="hint" id="llmBadge">未配置</span>
+      </div>
+      <p class="muted small">填你自己的模型 API：AI 会在规则筛出的合法版式里<strong>自己挑一套并逐格排戏</strong>（画面内容＋台词）。Key 只存在本机浏览器与本地服务之间，不写盘、不外传。</p>
+      <div class="row2">
+        <label class="field"><span>协议</span>
+          <select id="llmProtocol">
+            <option value="openai">OpenAI 兼容</option>
+            <option value="anthropic">Anthropic</option>
+          </select>
+        </label>
+        <label class="field"><span>模型</span>
+          <input id="llmModel" type="text" spellcheck="false" placeholder="deepseek-chat">
+        </label>
+      </div>
+      <label class="field"><span>Base URL</span>
+        <input id="llmBase" type="text" spellcheck="false" placeholder="https://api.deepseek.com/v1">
+      </label>
+      <label class="field"><span>API Key</span>
+        <input id="llmKey" type="password" spellcheck="false" placeholder="sk-…（只在本机使用）">
+      </label>
+      <div class="row2">
+        <button class="btn tiny" id="btnLlmTest">测试连接</button>
+        <button class="btn tiny" id="btnLlmClear">清除配置</button>
+      </div>
+      <div class="llm-status" id="llmStatus">未配置 · 规则路仍然可用</div>
+      <button class="btn ai-wide wide" id="btnAiDecide">AI 自动决定并排戏</button>
+      <div class="ai-result hidden" id="aiResult"></div>
+    </section>
+
+    <section class="card browse">
+      <div class="card-head">
+        <h2>分镜模板库</h2>
+        <span class="hint" id="listCount"></span>
+      </div>
+      <div class="seg" id="cultureTabs">
+        <button data-c="all" class="on">全部</button>
+        <button data-c="jp">日</button>
+        <button data-c="cn">中</button>
+        <button data-c="kr">韩</button>
+        <button data-c="core">通</button>
+      </div>
+      <input id="search" class="search" type="search" placeholder="搜索：斜切 / 少女 / 九格 / 动作 / 留白">
+      <div class="tpl-grid" id="tplGrid"></div>
+    </section>
+
+    <details class="help card">
+      <summary>怎么用（30 秒）</summary>
+      <ol>
+        <li>左侧选一套分镜（或先「匹配分镜」让 AI 选）。</li>
+        <li>点格子 → 选图；或把一批图<b>直接拖进画布</b>，按阅读顺序自动填。</li>
+        <li>拖图可调位置，Alt+滚轮缩放；Ctrl+V 粘贴到选中格。</li>
+        <li>右侧「分镜表」拿每格景别＋生图提示词；「导出」出 PNG/SVG。</li>
+        <li>换模板时图片会按阅读顺序跟着搬家，方便横向对比版式。</li>
+      </ol>
+    </details>
+  </aside>
+
+  <!-- ============================== 中间：画布 ============================== -->
+  <section class="stage-wrap">
+    <div class="stage-bar">
+      <div class="tpl-title">
+        <b id="tplName">选择一套分镜</b>
+        <span id="tplMeta" class="muted"></span>
+      </div>
+      <div class="stage-tools">
+        <button class="btn tiny" id="btnFill" title="导入多张图片，按阅读顺序填充空格">按顺序填充</button>
+        <button class="btn tiny" id="btnDemo" title="用占位图预览填充效果">示例</button>
+        <button class="btn tiny" id="btnClear" title="移除全部图片">清空图片</button>
+        <label class="switch"><input type="checkbox" id="chkHollow"> 镂空</label>
+        <label class="switch"><input type="checkbox" id="chkLabels" checked> 格号</label>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="stage-empty" id="stageEmpty">
+        <div class="empty-art">
+          <svg viewBox="0 0 120 96" aria-hidden="true">
+            <rect x="6" y="6" width="108" height="38" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 5"/>
+            <rect x="6" y="52" width="52" height="38" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 5"/>
+            <rect x="66" y="52" width="48" height="38" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 5"/>
+          </svg>
+        </div>
+        <p>从左侧选一套分镜，或先做一次 <b>剧情匹配</b></p>
+        <p class="muted">点击格子选图 · 拖图到格子 · 批量拖入自动按顺序填充 · Ctrl+V 粘贴</p>
+      </div>
+      <div class="canvas" id="canvas"></div>
+    </div>
+
+    <div class="stage-foot">
+      <span id="footMsg">拖图片进画布即可填充（自动裁切到格子形状，斜切格也不会变形）</span>
+      <span class="muted" id="footOrder"></span>
+    </div>
+  </section>
+
+  <!-- ============================== 右栏：格子 / 分镜表 / 导出 ============================== -->
+  <aside class="rail right">
+    <div class="tabs" id="tabs" role="tablist">
+      <button data-tab="slot" class="on" role="tab" aria-selected="true">格子</button>
+      <button data-tab="script" role="tab" aria-selected="false">分镜表</button>
+      <button data-tab="export" role="tab" aria-selected="false">导出</button>
+    </div>
+
+    <div class="tab-body" id="tabSlot">
+      <div id="slotEmpty" class="empty-note">
+        <p>还没有选中格子。</p>
+        <p class="muted">点画布里的任意一格开始；也可以直接在画布上拖入图片。</p>
+      </div>
+      <div id="slotPanel" class="hidden">
+        <div class="slot-head">
+          <span class="slot-index" id="slotIndex">1</span>
+          <div>
+            <b id="slotRole">—</b>
+            <div class="muted small" id="slotShot">—</div>
+          </div>
+        </div>
+        <div class="slot-thumb" id="slotThumb"><span class="muted small">空格子</span></div>
+        <div class="kv" id="slotKv"></div>
+
+        <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
+        <div class="row2">
+          <button class="btn tiny" id="btnUrl">用图片链接</button>
+          <button class="btn tiny danger" id="btnRemoveImage">移除图片</button>
+        </div>
+
+        <label class="field"><span>缩放 <b id="zoomVal">100%</b></span>
+          <input type="range" id="zoom" min="50" max="400" value="100">
+        </label>
+        <div class="row2">
+          <button class="btn tiny" id="btnFitMode">填满 / 完整</button>
+          <button class="btn tiny" id="btnResetPan">复位位置</button>
+        </div>
+
+        <div class="prompt-box">
+          <div class="prompt-head"><span>本格生图提示词</span><button class="btn tiny" id="btnCopyPrompt">复制</button></div>
+          <pre id="slotPrompt">—</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-body hidden" id="tabScript">
+      <div class="script-head">
+        <b>逐格分镜表</b>
+        <button class="btn tiny" id="btnCopyAll">复制全部</button>
+      </div>
+      <div class="decision hidden" id="decisionBox"></div>
+      <p class="muted small" id="scriptHint">载入模板后自动生成；在左侧输入剧情可让景别与提示词更贴合。</p>
+      <div id="scriptList" class="script-list"></div>
+      <div class="row2">
+        <button class="btn tiny" id="btnDownloadScript">下载分镜表 .md</button>
+        <button class="btn tiny" id="btnReloadScript">重新生成</button>
+      </div>
+    </div>
+
+    <div class="tab-body hidden" id="tabExport">
+      <label class="field"><span>导出宽度 <b id="wVal">1600px</b></span>
+        <input type="range" id="exportW" min="600" max="4000" step="100" value="1600">
+      </label>
+      <label class="switch block"><input type="checkbox" id="chkOutlineExport" checked> 无框模板保留虚线轮廓</label>
+      <div class="export-actions">
+        <button class="btn primary wide" id="btnPng">导出 PNG（整页）</button>
+        <button class="btn wide" id="btnSvg">导出 SVG（矢量）</button>
+        <button class="btn wide" id="btnJson">导出 JSON（模板＋图位）</button>
+        <button class="btn wide ghost" id="btnTemplateSvg">导出空模板（镂空 SVG）</button>
+      </div>
+      <div class="kv" id="exportKv"></div>
+      <p class="muted small">PNG 由浏览器本地栅格化，图片以原始分辨率嵌入；导出前建议把「镂空」关掉。</p>
+    </div>
+  </aside>
+</main>
+
+<input type="file" id="filePick" accept="image/*" multiple hidden>
+<div class="toast" id="toast"></div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
