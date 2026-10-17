@@ -518,6 +518,57 @@ OpenAPI 3.0.3，9 个 path，可直接丢进 Postman / Apifox / 任何代码生�
 
 ---
 
+## 气泡素材库
+
+### GET /api/bubbles
+
+`?role=impact&beat=爆发` — `role` / `beat` 决定推荐顺序。
+
+```json
+{
+  "recommended": ["burst-explode", "manga-inverse", "burst-spike", "talk-ellipse"],
+  "families": { "talk": "对话", "thought": "内心", "shout": "喊叫", "narration": "旁白", "note": "注释" },
+  "all": [{
+    "id": "talk-ellipse", "zh": "椭圆对话泡", "family": "talk",
+    "defaultW": 330, "defaultH": 150, "tail": "bl",
+    "hintZh": "最常用。适合普通对话，一行到两行字。"
+  }]
+}
+```
+
+14 种：`talk-ellipse` `talk-round` `talk-double` `thought-cloud` `thought-dashed` `burst-spike`
+`burst-explode` `shout-heavy` `narration-box` `caption-tab` `manga-inverse` `whisper-wavy` `small-caps` `arrow-callout`
+
+### POST /api/bubbles/new
+
+```json
+{ "type": "thought-cloud", "templateId": "jp-shonen-3tier", "text": "他真的会来吗", "at": { "x": 500, "y": 300 } }
+```
+
+```json
+{ "ok": true, "bubble": { "id": "b7f3k2", "type": "thought-cloud", "x": 330, "y": 215, "w": 340, "h": 170, "rot": 0, "opacity": 0.92, "text": "他真的会来吗", "tail": "none" } }
+```
+
+### 气泡叠加到成品页
+
+`POST /api/compose` 接受 `overlays`（与 `bubbles/new` 返回的结构一致）：
+
+```json
+{
+  "templateId": "jp-shonen-3tier",
+  "images": ["https://…/1.png"],
+  "overlays": [
+    { "type": "talk-ellipse", "x": 560, "y": 120, "w": 330, "h": 150, "opacity": 0.85, "text": "雨停了吗？" },
+    { "type": "narration-box", "x": 40, "y": 30, "w": 380, "h": 100, "opacity": 1, "text": "三天后 · 旧城区" }
+  ]
+}
+```
+
+气泡会画在图片之上、进到 SVG 里，所以导出的 PNG 直接带气泡文字；
+`opacity` 是 0.05–1 的浮点数，文字自动换行（中文按字断、英文按词断）。
+
+---
+
 ## 数据模型
 
 ### 模板 Template

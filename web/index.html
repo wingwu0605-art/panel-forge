@@ -207,6 +207,14 @@
           <button class="btn tiny" id="btnResetPan">复位位置</button>
         </div>
 
+        <div class="line-box">
+          <div class="prompt-head">
+            <span>本格句子 · <b id="lineBeat">—</b></span>
+            <button class="btn tiny" id="btnBubbleFromLine" title="用这句话新建一个对话气泡">放进气泡</button>
+          </div>
+          <textarea id="slotLine" rows="2" placeholder="这一格要说什么：台词 / 旁白 / 内心独白（会自动存到本机）"></textarea>
+        </div>
+
         <div class="prompt-box shape-box">
           <div class="prompt-head">
             <span>形状开头词 · <b id="shapeName">—</b></span>
@@ -253,6 +261,41 @@
       </div>
       <div class="kv" id="exportKv"></div>
       <p class="muted small">PNG 由浏览器本地栅格化，图片以原始分辨率嵌入；导出前建议把「镂空」关掉。</p>
+    </div>
+
+    <!-- 气泡素材库：常驻底部，随时取用 -->
+    <div class="bubble-dock" id="bubbleDock">
+      <div class="bub-head">
+        <b>气泡</b>
+        <div class="seg tiny-seg" id="bubTabs">
+          <button data-g="rec" class="on">推荐</button>
+          <button data-g="fav">常用</button>
+        </div>
+        <button class="btn tiny" id="bubClear" title="移除本页所有气泡">清空</button>
+      </div>
+      <div class="bub-grid" id="bubGrid"></div>
+      <div class="bub-inspect hidden" id="bubInspect">
+        <div class="row2">
+          <label class="field"><span>透明度 <b id="opVal">92%</b></span>
+            <input type="range" id="bubOpacity" min="10" max="100" step="2" value="92">
+          </label>
+          <label class="field"><span>大小 <b id="sizeVal">100%</b></span>
+            <input type="range" id="bubSize" min="40" max="220" step="5" value="100">
+          </label>
+        </div>
+        <label class="field"><span>文字</span>
+          <input type="text" id="bubText" placeholder="气泡里的话">
+        </label>
+        <div class="row2">
+          <label class="field"><span>旋转 <b id="rotVal">0°</b></span>
+            <input type="range" id="bubRot" min="-30" max="30" step="1" value="0">
+          </label>
+          <div class="bub-acts">
+            <button class="btn tiny" id="bubDup">复制</button>
+            <button class="btn tiny danger" id="bubDel">删除</button>
+          </div>
+        </div>
+      </div>
     </div>
   </aside>
 </main>

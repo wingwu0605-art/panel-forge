@@ -4,6 +4,7 @@
  */
 import { renderTemplateSVG } from './lib/svg.mjs';
 import { pointInPoly } from './lib/geometry.mjs';
+import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble, bubbleThumb } from './lib/bubbles.mjs';
 
 /**
  * 双模式 API：
@@ -54,6 +55,11 @@ const state = {
   aiDecision: null,
   llm: { protocol: 'openai', baseUrl: '', apiKey: '', model: '' },
   charSheet: '',
+  bubbles: [],        // 气泡实例（画在页面上，导出时一起走）
+  selBubble: null,
+  lines: {},          // slotId -> 这一格的句子（台词/旁白）
+  bubTab: 'rec',      // rec | fav
+  bubUse: {},         // 气泡使用次数（常用排序）
   engine: null,
   hollow: false,
   showLabels: true,
@@ -172,6 +178,9 @@ async function selectTemplate(id, opts = {}) {
   }
   state.tpl = tpl;
   if (state.aiPlan && state.aiPlan.template?.id !== tpl.id) { state.aiPlan = null; state.aiDecision = null; }
+  state.bubbles = [];
+  state.selBubble = null;
+  loadLines(tpl.id);
   state.selectedId = tpl.slots[0]?.id || null;
   state.plan = null;
   location.hash = 'tpl=' + tpl.id;
@@ -184,6 +193,7 @@ async function selectTemplate(id, opts = {}) {
   renderStage();
   renderSlotPanel();
   renderExportKv();
+  renderBubbles();
   $$('.tpl').forEach((el) => el.classList.toggle('on', el.dataset.id === tpl.id));
   refreshScript();
 }
@@ -211,6 +221,8 @@ function renderStage() {
       showNumbers: state.showLabels,
       showRoles: state.showLabels,
       slotOutline: true,
+      overlays: state.bubbles,
+      selectedBubbleId: state.selBubble,
     });
     const holder = $('#canvas');
     holder.innerHTML = svg;
@@ -247,8 +259,17 @@ function bindUI() {
 
   canvas.addEventListener('pointerdown', (ev) => {
     if (!state.tpl) return;
-    if (state.hollow) { toast('镂空预览模式下不能填图，先关掉「镂空」'); return; }
     const pt = pagePoint(ev);
+    const bub = bubbleAt(pt);
+    if (bub) {
+      state.selBubble = bub.id;
+      drag = { bubble: bub, moved: false, x0: ev.clientX, y0: ev.clientY };
+      renderStage();
+      renderBubbleInspector();
+      canvas.setPointerCapture?.(ev.pointerId);
+      return;
+    }
+    if (state.hollow) { toast('镂空预览模式下不能填图，先关掉「镂空」'); return; }
     const slot = slotAt(pt);
     drag = { slot, moved: false, x0: ev.clientX, y0: ev.clientY, start: pt };
     if (slot) canvas.setPointerCapture?.(ev.pointerId);
@@ -265,6 +286,18 @@ function bindUI() {
     }
     const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
     if (!drag.moved && Math.hypot(dx, dy) > 4) drag.moved = true;
+    if (drag.moved && drag.bubble) {
+      const svg = $('#canvas svg');
+      const r = svg.getBoundingClientRect();
+      const k = state.tpl.page.w / r.width;
+      const b = drag.bubble;
+      b.x = clamp(b.x + dx * k, -b.w * 0.5, state.tpl.page.w - b.w * 0.5);
+      b.y = clamp(b.y + dy * k, -b.h * 0.5, state.tpl.page.h - b.h * 0.5);
+      drag.x0 = ev.clientX;
+      drag.y0 = ev.clientY;
+      renderStage();
+      return;
+    }
     if (drag.moved && drag.slot && state.images[drag.slot.id]) {
       const svg = $('#canvas svg');
       const r = svg.getBoundingClientRect();
@@ -280,9 +313,14 @@ function bindUI() {
 
   const endDrag = (ev) => {
     if (!drag) return;
+    if (drag.bubble) {
+      if (!drag.moved) renderBubbleInspector();
+      drag = null;
+      return;
+    }
     if (!drag.moved) {
-      if (drag.slot) { state.selectedId = drag.slot.id; renderStage(); renderSlotPanel(); }
-      else { state.selectedId = null; renderStage(); renderSlotPanel(); }
+      if (drag.slot) { state.selectedId = drag.slot.id; state.selBubble = null; renderStage(); renderSlotPanel(); renderBubbles(); }
+      else { state.selectedId = null; state.selBubble = null; renderStage(); renderSlotPanel(); }
     } else if (drag.slot) {
       renderSlotPanel();
     }
@@ -447,6 +485,68 @@ function bindUI() {
   $('#charSheet').addEventListener('input', debounce(saveLlm, 400));
   $('#btnAiPrompts').addEventListener('click', runAiPrompts);
 
+  // 气泡素材库
+  $('#bubTabs').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    state.bubTab = b.dataset.g;
+    $$('#bubTabs button').forEach((x) => x.classList.toggle('on', x === b));
+    renderBubbles();
+  });
+  $('#bubOpacity').addEventListener('input', (ev) => {
+    const b = selectedBubble();
+    if (!b) return;
+    b.opacity = Number(ev.target.value) / 100;
+    $('#opVal').textContent = ev.target.value + '%';
+    renderStage();
+  });
+  $('#bubSize').addEventListener('input', (ev) => {
+    const b = selectedBubble();
+    if (!b) return;
+    const k = Number(ev.target.value) / 100;
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    b.w = Math.round((b.baseW || b.w) * k);
+    b.h = Math.round((b.baseH || b.h) * k);
+    b.x = Math.round(cx - b.w / 2);
+    b.y = Math.round(cy - b.h / 2);
+    $('#sizeVal').textContent = ev.target.value + '%';
+    renderStage();
+  });
+  $('#bubRot').addEventListener('input', (ev) => {
+    const b = selectedBubble();
+    if (!b) return;
+    b.rot = Number(ev.target.value);
+    $('#rotVal').textContent = ev.target.value + '°';
+    renderStage();
+  });
+  $('#bubText').addEventListener('input', (ev) => {
+    const b = selectedBubble();
+    if (!b) return;
+    b.text = ev.target.value;
+    renderStage();
+  });
+  $('#bubDup').addEventListener('click', duplicateBubble);
+  $('#bubDel').addEventListener('click', deleteBubble);
+  $('#bubClear').addEventListener('click', () => {
+    if (!state.bubbles.length) return;
+    state.bubbles = [];
+    state.selBubble = null;
+    renderStage(); renderBubbles();
+    toast('已清空本页气泡');
+  });
+
+  // 本格句子
+  $('#slotLine').addEventListener('input', (ev) => {
+    if (!state.selectedId) return;
+    state.lines[state.selectedId] = ev.target.value;
+    saveLines();
+  });
+  $('#btnBubbleFromLine').addEventListener('click', () => {
+    const text = currentLine().trim();
+    addBubble(text ? 'talk-ellipse' : 'narration-box', { text });
+    if (!text) toast('已加一个空气泡，用上面的「文字」填内容');
+  });
+
   // 分镜表
   $('#btnReloadScript').addEventListener('click', () => refreshScript(true));
   $('#btnCopyAll').addEventListener('click', () => copyText(scriptMarkdown(), '整页分镜表已复制'));
@@ -570,6 +670,17 @@ async function demoFill() {
       zoom: 1, panX: 0, panY: 0, mode: 'cover', name: 'demo',
     };
   }
+  // 顺手放两个示例气泡，让人一眼看懂气泡怎么用
+  if (!state.bubbles.length) {
+    const s0 = state.tpl.slots[0];
+    const sBig = state.tpl.slots.reduce((a, b) => (b.area > a.area ? b : a), state.tpl.slots[0]);
+    const nb = addBubble('narration-box', { text: '三天后 · 旧城区' });
+    nb.x = s0.x + 10; nb.y = s0.y + 10;
+    const tb = addBubble('talk-ellipse', { text: '雨停了吗？' });
+    tb.x = sBig.x + sBig.w * 0.5 - tb.w / 2;
+    tb.y = sBig.y + sBig.h * 0.14;
+    state.selBubble = null;
+  }
   renderStage(); renderSlotPanel(); refreshScript();
   toast('已用占位图预览填充效果');
 }
@@ -648,6 +759,16 @@ function renderSlotPanel() {
   $('#zoom').value = Math.round((img?.zoom || 1) * 100);
   $('#zoomVal').textContent = Math.round((img?.zoom || 1) * 100) + '%';
   $('#btnFitMode').textContent = img?.mode === 'contain' ? '当前：完整显示' : '当前：填满裁切';
+
+  // 本格句子（这一格要说什么）
+  $('#lineBeat').textContent = panel ? (panel.beat || panel.roleZh) : (slot.role || '—');
+  const saved = state.lines[slot.id];
+  $('#slotLine').value = saved != null ? saved : (panel?.dialogue || '');
+  $('#slotLine').placeholder = panel?.content
+    ? `这一格：${panel.content.slice(0, 40)}…  ← 在这里写台词`
+    : '这一格要说什么：台词 / 旁白 / 内心独白（会自动存到本机）';
+
+  renderBubbles();
 }
 
 function syncZoomSlider() {
@@ -1043,14 +1164,17 @@ function scriptMarkdown() {
       '',
       `### ${p.order}. ${p.roleZh} · ${p.shape?.zh || '常规格'} · ${p.beat || '通用镜头'}`,
       p.content ? `- 画面：${p.content}` : `- 构图：${p.beatHint}`,
-      `- 台词：${p.dialogue ? '「' + p.dialogue + '」' : '无'}`,
+      `- 台词：${(state.lines[p.id] ?? p.dialogue) ? '「' + (state.lines[p.id] ?? p.dialogue) + '」' : '无'}`,
       `- 形状开头词：\`${p.shape?.prefixEn || ''}\``,
       `- 提示词：\`${p.promptEn}\``,
       `- 精简版：\`${p.promptShort || ''}\``,
       `- 负面词：\`${p.negative}\``,
     ].join('\n')),
     '',
-  ];
+    state.bubbles.length ? `## 气泡（${state.bubbles.length} 个）` : '',
+    ...state.bubbles.map((b) => `- ${BUBBLES[b.type]?.zh || b.type}｜${b.text ? '「' + b.text + '」' : '（空）'}｜不透明度 ${Math.round((b.opacity ?? 1) * 100)}%`),
+    '',
+  ].filter((x) => x !== undefined);
   return lines.join('\n');
 }
 
@@ -1061,11 +1185,13 @@ function stageSVG({ withImages = true, numbers = false } = {}) {
   return renderTemplateSVG(state.tpl, {
     width: state.exportWidth,
     images: withImages ? state.images : {},
+    overlays: state.bubbles,
     showNumbers: numbers,
     showRoles: false,
     slotOutline: state.outlineExport,
     selectedId: null,
     hoverId: null,
+    selectedBubbleId: null,
   });
 }
 
@@ -1125,6 +1251,8 @@ function exportJSON() {
     images: Object.fromEntries(Object.entries(state.images).map(([k, v]) => [k, {
       name: v.name, iw: v.iw, ih: v.ih, zoom: v.zoom, panX: v.panX, panY: v.panY, mode: v.mode,
     }])),
+    lines: state.lines,
+    bubbles: state.bubbles,
     plan: state.plan?.pages?.[0] || null,
     exportedAt: new Date().toISOString(),
   };
@@ -1143,6 +1271,121 @@ function renderExportKv() {
     ['画风', CULTURE_ZH[state.tpl.culture]],
     ['阅读顺序', readOrderText(state.tpl.reading)],
   ].map(([k, v]) => `<b>${k}</b><span>${escapeHtml(v)}</span>`).join('');
+}
+
+/* ================================================================== *
+ * 气泡：素材库 + 画布交互 +  inspectors
+ * ================================================================== */
+function bubbleAt(pt) {
+  if (!pt || !state.bubbles.length) return null;
+  for (let i = state.bubbles.length - 1; i >= 0; i--) {
+    const b = state.bubbles[i];
+    if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) return b;
+  }
+  return null;
+}
+
+function selectedBubble() {
+  return state.bubbles.find((b) => b.id === state.selBubble) || null;
+}
+
+function renderBubbles() {
+  const grid = $('#bubGrid');
+  if (!grid) return;
+  if (!state.tpl) { grid.innerHTML = '<span class="muted small">先选一套版式</span>'; return; }
+
+  const panel = currentPlanPanel();
+  const slot = state.tpl.slots?.find((s) => s.id === state.selectedId);
+  const role = panel?.role || slot?.role;
+  const beat = panel?.beat || '';
+
+  let ids;
+  if (state.bubTab === 'rec') {
+    ids = recommendBubbles({ role, beat, n: 8 });
+  } else {
+    const used = Object.entries(state.bubUse).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+    ids = [...new Set([...used, 'talk-ellipse', 'narration-box', 'burst-spike', 'thought-cloud', 'caption-tab'])].slice(0, 8);
+  }
+
+  grid.innerHTML = ids.map((id) => `
+    <div class="bub-item" data-id="${id}" title="${escapeHtml(BUBBLES[id]?.hintZh || '')}">
+      ${bubbleThumb(id, 92)}
+      <span>${escapeHtml(BUBBLES[id]?.zh || id)}</span>
+    </div>`).join('');
+
+  grid.querySelectorAll('.bub-item').forEach((el) => {
+    el.addEventListener('click', () => addBubble(el.dataset.id));
+  });
+
+  renderBubbleInspector();
+}
+
+function renderBubbleInspector() {
+  const box = $('#bubInspect');
+  const b = selectedBubble();
+  box.classList.toggle('hidden', !b);
+  if (!b) return;
+  $('#opVal').textContent = Math.round((b.opacity ?? 1) * 100) + '%';
+  $('#bubOpacity').value = Math.round((b.opacity ?? 1) * 100);
+  const sc = Math.round(((b.w / (b.baseW || b.w)) || 1) * 100);
+  $('#sizeVal').textContent = sc + '%';
+  $('#bubSize').value = clamp(sc, 40, 220);
+  $('#rotVal').textContent = (b.rot || 0) + '°';
+  $('#bubRot').value = b.rot || 0;
+  $('#bubText').value = b.text || '';
+}
+
+function addBubble(type, opts = {}) {
+  if (!state.tpl) { toast('先选一套版式'); return null; }
+  const slot = state.tpl.slots?.find((s) => s.id === state.selectedId);
+  const at = opts.at || (slot ? { x: slot.x + slot.w * 0.5, y: slot.y + Math.max(30, slot.h * 0.28) } : undefined);
+  const b = makeBubble(type, { page: state.tpl.page, at, text: opts.text ?? '' });
+  b.baseW = b.w; b.baseH = b.h;
+  state.bubbles.push(b);
+  state.selBubble = b.id;
+  state.bubUse[type] = (state.bubUse[type] || 0) + 1;
+  try { localStorage.setItem('pf.bub.use', JSON.stringify(state.bubUse)); } catch { /* ignore */ }
+  renderStage();
+  renderBubbles();
+  toast(`已加入「${BUBBLES[type]?.zh || type}」`);
+  return b;
+}
+
+function deleteBubble() {
+  const b = selectedBubble();
+  if (!b) return;
+  state.bubbles = state.bubbles.filter((x) => x.id !== b.id);
+  state.selBubble = null;
+  renderStage();
+  renderBubbles();
+}
+
+function duplicateBubble() {
+  const b = selectedBubble();
+  if (!b) return;
+  const copy = { ...b, id: 'b' + Math.random().toString(36).slice(2, 8), x: b.x + 24, y: b.y + 24 };
+  state.bubbles.push(copy);
+  state.selBubble = copy.id;
+  renderStage();
+  renderBubbles();
+}
+
+/* ---------- 本格句子 ---------- */
+const LINES_KEY = (id) => 'pf.lines.' + id;
+
+function loadLines(tplId) {
+  try { state.lines = JSON.parse(localStorage.getItem(LINES_KEY(tplId)) || '{}') || {}; } catch { state.lines = {}; }
+}
+
+function saveLines() {
+  if (!state.tpl) return;
+  try { localStorage.setItem(LINES_KEY(state.tpl.id), JSON.stringify(state.lines)); } catch { /* ignore */ }
+}
+
+function currentLine() {
+  const manual = state.lines[state.selectedId];
+  if (manual != null) return manual;
+  return currentPlanPanel()?.dialogue || '';
 }
 
 /* ================================================================== *

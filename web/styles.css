@@ -57,7 +57,7 @@ body{
 }
 .rail{overflow-y:auto;overscroll-behavior:contain;padding:12px;display:flex;flex-direction:column;gap:10px}
 .rail.left{border-right:1px solid var(--line);background:var(--bg-soft)}
-.rail.right{border-left:1px solid var(--line);background:var(--bg-soft);gap:0;padding:0}
+.rail.right{border-left:1px solid var(--line);background:var(--bg-soft);gap:0;padding:0;display:flex;flex-direction:column;overflow:hidden}
 
 /* ---------------------------------------------------------------- 卡片 */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:11px}
@@ -146,6 +146,36 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:6px 0 2px}
   padding:1px 5px;border-radius:99px;backdrop-filter:blur(2px)}
 .tpl .cul{position:absolute;top:4px;left:4px;font-size:9px;font-weight:700;color:#fff;
   width:16px;height:16px;display:grid;place-items:center;border-radius:4px;background:rgba(0,0,0,.5)}
+
+/* 本格句子 */
+.line-box{border:1px solid #3a3320;background:#16140f;border-radius:8px;margin-top:10px;overflow:hidden}
+.line-box .prompt-head{border-bottom-color:#3a3320}
+.line-box .prompt-head b{color:var(--accent-2)}
+.line-box textarea{
+  width:100%;border:0;border-radius:0;background:transparent;color:#f0e4c8;
+  font-size:12.5px;line-height:1.6;padding:8px 9px;resize:vertical;min-height:46px;
+}
+.line-box textarea:focus{box-shadow:none}
+
+/* 气泡素材库（常驻右侧底部） */
+.bubble-dock{flex:0 0 auto;border-top:1px solid var(--line);background:#101319;padding:8px 10px 10px}
+.bub-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.bub-head b{font-size:12px;letter-spacing:.3px}
+.bub-head #bubClear{margin-left:auto}
+.tiny-seg{flex:0 0 auto;padding:1px}
+.tiny-seg button{height:22px;font-size:11px;padding:0 10px;flex:0 0 auto}
+.bub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-height:118px;overflow-y:auto}
+.bub-item{
+  background:#fff;border:1px solid var(--line-2);border-radius:6px;padding:3px 2px 2px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:1px;transition:.12s;
+}
+.bub-item:hover{border-color:var(--accent);transform:translateY(-1px)}
+.bub-item svg{width:100%;height:auto;display:block}
+.bub-item span{font-size:9px;color:#3a3a36;line-height:1.2;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.bub-inspect{margin-top:8px;border-top:1px dashed var(--line-2);padding-top:8px}
+.bub-inspect .field>span{font-size:10px}
+.bub-inspect input[type=text]{height:28px;font-size:12px;padding:0 8px}
+.bub-acts{display:flex;gap:6px;align-items:center;justify-content:flex-end}
 
 /* 帮助 */
 .help summary{cursor:pointer;font-size:12px;color:var(--muted);outline:none}

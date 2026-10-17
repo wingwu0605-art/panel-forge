@@ -153,7 +153,23 @@ check('提示词含精简版与去重负面词', triPanels.every((p) => p.prompt
 const aiNoKey = await post('/api/ai/prompts', { plot, templateId: 'jp-triangle-impact' });
 check('无 Key 时 /api/ai/prompts 返回 400', aiNoKey.status === 400 && aiNoKey.body.code === 'NO_LLM_KEY');
 
-// 12 AI 导演状态
+// 12 气泡素材库
+const bub = await get('/api/bubbles?role=impact&beat=爆发');
+check('GET /api/bubbles', bub.status === 200 && bub.body.all.length >= 14 && bub.body.recommended.length > 0,
+  `${bub.body.all.length} 种 · 推荐 ${bub.body.recommended.slice(0, 3).join('/')}`);
+
+const bubNew = await post('/api/bubbles/new', { type: 'thought-cloud', templateId: 'jp-shonen-3tier', text: '测试' });
+check('POST /api/bubbles/new', bubNew.status === 200 && bubNew.body.bubble.id && bubNew.body.bubble.w > 0,
+  `${bubNew.body.bubble.w}×${bubNew.body.bubble.h}`);
+
+const withBubble = await post('/api/compose?format=json', {
+  templateId: 'jp-shonen-3tier',
+  images: [],
+  overlays: [{ type: 'talk-ellipse', x: 100, y: 100, w: 300, h: 140, opacity: 0.7, text: '气泡测试' }],
+});
+check('compose 支持气泡叠加', withBubble.status === 200 && withBubble.body.svg.includes('气泡测试') && withBubble.body.svg.includes('opacity="0.7"'));
+
+// 13 AI 导演状态
 const llmStatus = await get('/api/llm/status');check('GET /api/llm/status', llmStatus.status === 200 && 'configured' in llmStatus.body && !('apiKey' in llmStatus.body));
 
 if (!llmStatus.body.configured) {

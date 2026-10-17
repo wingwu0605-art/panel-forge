@@ -20,6 +20,7 @@ import { PAGE_PRESETS } from './lib/geometry.mjs';
 import { aiTools, systemPrompt, openapiSpec } from './lib/aidocs.mjs';
 import { readLlmConfig, llmStatus, testLlm, aiDecide, optimizePrompts } from './lib/llm.mjs';
 import { SHAPES, SHAPE_IDS, classifyShape, prefixSnippet, shapeSummary } from './lib/shapes.mjs';
+import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble } from './lib/bubbles.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 7311);
@@ -237,6 +238,30 @@ const routes = [
     };
   }],
 
+  // 气泡素材库：推荐（按格子角色/节拍） + 全部
+  ['GET', /^\/api\/bubbles$/, async (req, url) => {
+    const role = url.searchParams.get('role') || '';
+    const beat = url.searchParams.get('beat') || '';
+    const list = BUBBLE_IDS.map((id) => {
+      const d = BUBBLES[id];
+      return { id, zh: d.zh, family: d.family, defaultW: d.w, defaultH: d.h, hintZh: d.hintZh, tail: d.tail || 'none' };
+    });
+    return {
+      recommended: recommendBubbles({ role, beat, n: 6 }),
+      families: { talk: '对话', thought: '内心', shout: '喊叫', narration: '旁白', note: '注释' },
+      all: list,
+      usage: 'POST /api/compose {overlays:[{type,x,y,w,h,opacity,text}]} 直接画进页面；网页里点一下就能加到画布。',
+    };
+  }],
+
+  // 生成一个气泡实例（含默认位置尺寸，按目标页面比例换算）
+  ['POST', /^\/api\/bubbles\/new$/, async (req) => {
+    const body = await readBody(req);
+    const tpl = body.templateId ? getTemplate(body.templateId) : null;
+    const page = tpl?.page || { w: 1000, h: 1414 };
+    return { ok: true, bubble: makeBubble(String(body.type || 'talk-ellipse'), { page, at: body.at, text: body.text }) };
+  }],
+
   // AI 导演：状态 / 连通性测试 / 自动决定
   ['GET', /^\/api\/llm\/status$/, async () => llmStatus()],
 
@@ -409,6 +434,7 @@ const routes = [
       width: clampNum(body.width, 200, 4000, 1600),
       frame: body.frame || undefined,
       images,
+      overlays: Array.isArray(body.overlays) ? body.overlays : [],
       showNumbers: !!body.showNumbers,
       showRoles: !!body.showRoles,
       slotOutline: body.outline !== false,
