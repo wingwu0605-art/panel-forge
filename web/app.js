@@ -76,6 +76,28 @@ const CULTURE_LABEL = { jp: '日', cn: '中', kr: '韩', core: '通' };
 const CULTURE_ZH = { jp: '日式页漫', cn: '中式漫画', kr: '韩式条漫', core: '通用/跨界' };
 
 /* 外观层常量（init() 在顶层就跑，所以必须放在这里，不能放文件末尾） */
+const ACCENTS = [
+  { id: 'blue', zh: '蓝色', l: '#007aff', d: '#0a84ff' },
+  { id: 'indigo', zh: '靛蓝', l: '#5856d6', d: '#5e5ce6' },
+  { id: 'purple', zh: '紫色', l: '#af52de', d: '#bf5af2' },
+  { id: 'pink', zh: '粉色', l: '#ff2d55', d: '#ff375f' },
+  { id: 'red', zh: '红色', l: '#ff3b30', d: '#ff453a' },
+  { id: 'orange', zh: '橙色', l: '#f56300', d: '#ff9f0a' },
+  { id: 'yellow', zh: '黄色', l: '#e0a800', d: '#ffd60a' },
+  { id: 'green', zh: '绿色', l: '#28a745', d: '#30d158' },
+  { id: 'teal', zh: '青色', l: '#0a9fb5', d: '#40c8e0' },
+  { id: 'graphite', zh: '石墨', l: '#636366', d: '#98989d' },
+];
+const ACCENT_KEY = 'pf.accent';
+const MOTION_KEY = 'pf.motion';
+const sysDarkMQ = window.matchMedia('(prefers-color-scheme: dark)');
+const sysReduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* ignore */ } },
+};
+
 const REPO_URL = 'https://github.com/wingwu0605-art/panel-forge';
 const THEME_KEY = 'pf.theme';
 const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
@@ -108,7 +130,7 @@ async function init() {
   state.filtered = list.items;
   state.engine = meta.engine || null;
   $('#statTpl').textContent = `${meta.templates} 套模板 · ${meta.roles.length} 种格型`;
-  $('#statPort').textContent = window.PF_STATIC ? '静态版 · 离线可用' : location.host;
+  $('#statPort').textContent = window.PF_STATIC ? '离线可用' : location.host;
   $('#analyzeHint').textContent = '本地规则引擎';
   if (meta.engine) {
     const e = meta.engine;
@@ -396,7 +418,10 @@ function initCollapsibles() {
     if (!body) {
       body = document.createElement('div');
       body.className = 'card-body';
-      [...el.children].filter((c) => c !== head).forEach((c) => body.appendChild(c));
+      const inner = document.createElement('div');
+      inner.className = 'card-body-inner';
+      [...el.children].filter((c) => c !== head).forEach((c) => inner.appendChild(c));
+      body.appendChild(inner);
       el.appendChild(body);
     }
 
@@ -409,6 +434,12 @@ function initCollapsibles() {
     head.appendChild(caret);
 
     const apply = (open, save = true) => {
+      if (save) {
+        // 展开/收起过程中先裁切，动画结束再放开（否则阴影、焦点环会被一直裁掉）
+        el.classList.add('animating');
+        clearTimeout(el._animT);
+        el._animT = setTimeout(() => el.classList.remove('animating'), 600);
+      }
       el.classList.toggle('collapsed', !open);
       if (save) { saved[key] = open; persist(); }
     };
@@ -454,6 +485,7 @@ function renderList() {
     frag.appendChild(el);
   }
   const grid = $('#tplGrid');
+  [...frag.children].forEach((el, i) => el.style.setProperty('--i', Math.min(i, 14)));
   grid.innerHTML = '';
   grid.appendChild(frag);
 }
@@ -481,6 +513,7 @@ async function selectTemplate(id, opts = {}) {
     }
   }
   state.tpl = tpl;
+  state.pageEnter = true;
   if (state.aiPlan && state.aiPlan.template?.id !== tpl.id) { state.aiPlan = null; state.aiDecision = null; }
   state.bubbles = [];
   state.selBubble = null;
@@ -530,7 +563,7 @@ function renderStage() {
         slotOutline: true,
         overlays: state.bubbles,
         selectedBubbleId: state.selBubble,
-        uiAccent: '#007aff',
+        uiAccent: currentTint(),
       });
     } catch (err) {
       // 以前这里一抛错整块画布就空白/半渲染，看不出原因；现在直接把错误说出来
@@ -555,6 +588,7 @@ function renderStage() {
     }
     const holder = $('#canvas');
     holder.innerHTML = svg;
+    if (state.pageEnter) { state.pageEnter = false; replay(holder, 'page-enter'); }
     const el = holder.querySelector('svg');
     if (el) el.addEventListener('dblclick', onCanvasDblClick);
     // 镂空模式要说清楚：图片是故意藏起来，不是丢了
@@ -1202,7 +1236,13 @@ function renderSlotPanel() {
   const img = state.images[slot.id];
   const panel = currentPlanPanel();
 
-  $('#slotIndex').textContent = slot.order;
+  const idxEl = $('#slotIndex');
+  if (idxEl.dataset.slot !== slot.id) {
+    const first = !idxEl.dataset.slot;
+    idxEl.dataset.slot = slot.id;
+    if (!first) { replay(idxEl, 'pop'); replay($('#slotPanel'), 'swap'); }
+  }
+  idxEl.textContent = slot.order;
   $('#slotRole').textContent = panel ? `${panel.roleZh}` : slot.role;
   $('#slotShot').textContent = panel ? `${panel.shot} · ${panel.beat || '通用'}` : '';
 
@@ -1499,6 +1539,7 @@ function renderMatchResults(results) {
       </div>
       <div class="sc">${r.score.toFixed(1)}</div>
     </div>`).join('');
+  stagger(box, '.res');
   box.querySelectorAll('.res').forEach((el) => {
     el.addEventListener('click', () => { selectTemplate(el.dataset.id, { keepImages: true }); goCanvasOnCompact(); });
   });
@@ -1566,6 +1607,7 @@ function renderScript() {
         <button class="btn tiny" data-act="fill">填入选中格</button>
       </div>
     </div>`).join('');
+  stagger($('#scriptList'), '.sc-card', 10);
 
   $('#scriptList').querySelectorAll('.sc-card').forEach((card) => {
     const p = panels.find((x) => x.id === card.dataset.id);
@@ -1912,6 +1954,7 @@ function renderBubbles() {
       <span>${escapeHtml(BUBBLES[id]?.zh || id)}</span>
     </div>`).join('');
 
+  stagger(grid, '.bub-item');
   grid.querySelectorAll('.bub-item').forEach((el) => {
     el.addEventListener('click', () => addBubble(el.dataset.id));
   });
@@ -2036,6 +2079,7 @@ function debounce(fn, ms) {
 
 function initChrome() {
   initTheme();
+  initSegIndicators();
   initRanges();
   initPlatformKeys();
   initMoreMenu();
@@ -2043,31 +2087,160 @@ function initChrome() {
   initStaticLinks();
 }
 
+function motionOK() {
+  return !sysReduceMQ.matches && document.documentElement.dataset.motion !== 'reduced';
+}
+
+/** 用 View Transitions 包一层；不支持或用户要求减弱动效时直接执行 */
+function withTransition(kind, fn) {
+  if (!document.startViewTransition || !motionOK()) { fn(); return null; }
+  const root = document.documentElement;
+  root.dataset.vt = kind;
+  const t = document.startViewTransition(fn);
+  t.finished.finally(() => { if (root.dataset.vt === kind) delete root.dataset.vt; });
+  return t;
+}
+
+/** 当前强调色（画布里的选中框 / 格号跟着变） */
+function currentTint() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--tint').trim();
+  return /^#|^rgb|^hsl|^color/.test(v) ? v : '#007aff';
+}
+
 function initTheme() {
   const btn = $('#btnTheme');
-  if (!btn) return;
-  let mode = 'auto';
-  try { mode = localStorage.getItem(THEME_KEY) || 'auto'; } catch { /* ignore */ }
-  const apply = (m, announce) => {
-    mode = m;
-    if (m === 'auto') delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = m;
-    btn.innerHTML = THEME_ICONS[m];
-    btn.title = '外观：' + THEME_NAME[m] + '（点击切换）';
-    // 状态栏 / 浏览器顶部颜色跟着走
+  const pop = $('#appearancePop');
+  if (!btn || !pop) return;
+  const root = document.documentElement;
+  let mode = store.get(THEME_KEY) || 'auto';
+  let accent = store.get(ACCENT_KEY) || 'blue';
+
+  const syncMeta = () => {
+    const dark = mode === 'auto' ? sysDarkMQ.matches : mode === 'dark';
     for (const meta of $$('meta[name="theme-color"]')) {
-      const sysDark = meta.media.includes('dark');
-      const dark = m === 'auto' ? sysDark : m === 'dark';
-      meta.content = dark ? '#000000' : '#f2f2f7';
+      meta.content = mode === 'auto' ? (meta.media.includes('dark') ? '#000000' : '#f2f2f7') : (dark ? '#000000' : '#f2f2f7');
     }
-    try { if (m === 'auto') localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, m); } catch { /* ignore */ }
-    if (announce) toast('外观：' + THEME_NAME[m]);
   };
-  apply(mode, false);
-  btn.addEventListener('click', () => {
-    const order = ['auto', 'light', 'dark'];
-    apply(order[(order.indexOf(mode) + 1) % order.length], true);
+  const setMode = (m) => {
+    mode = m;
+    if (m === 'auto') delete root.dataset.theme; else root.dataset.theme = m;
+    btn.innerHTML = THEME_ICONS[m];
+    $$('#modeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
+    store.set(THEME_KEY, m === 'auto' ? null : m);
+    syncMeta();
+    renderStage();
+  };
+  const setAccent = (a) => {
+    accent = a;
+    if (a === 'blue') delete root.dataset.accent; else root.dataset.accent = a;
+    const info = ACCENTS.find((x) => x.id === a) || ACCENTS[0];
+    $('#accentName').textContent = info.zh;
+    $$('#swatches .swatch').forEach((sw) => {
+      const on = sw.dataset.a === a;
+      sw.classList.toggle('on', on);
+      sw.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    store.set(ACCENT_KEY, a === 'blue' ? null : a);
+    renderStage();
+  };
+
+  // 色板
+  const check = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.4 2.9 2.9 6-6.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  $('#swatches').innerHTML = ACCENTS.map((a) =>
+    `<button type="button" class="swatch" role="radio" data-a="${a.id}" title="${a.zh}" aria-label="${a.zh}" style="--sw-l:${a.l};--sw-d:${a.d}">${check}</button>`).join('');
+  $('#swatches').setAttribute('role', 'radiogroup');
+  $$('#swatches .swatch').forEach((sw) => sw.addEventListener('click', () => {
+    if (sw.dataset.a === accent) return;
+    withTransition('accent', () => setAccent(sw.dataset.a));
+  }));
+
+  // 主题：从点击位置圆形扩散
+  $$('#modeSeg button').forEach((b) => b.addEventListener('click', (ev) => {
+    const m = b.dataset.mode;
+    if (m === mode) return;
+    const wasDark = root.dataset.theme === 'dark' || (!root.dataset.theme && sysDarkMQ.matches);
+    const willDark = m === 'dark' || (m === 'auto' && sysDarkMQ.matches);
+    if (wasDark === willDark) { setMode(m); return; }  // 看起来没变（比如 自动→浅色），不做扩散
+    const t = withTransition('theme', () => setMode(m));
+    if (!t) return;
+    const x = ev.clientX || innerWidth - 40, y = ev.clientY || 30;
+    const r = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    t.ready.then(() => {
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
+        { duration: 650, easing: 'cubic-bezier(.32,.72,0,1)', pseudoElement: '::view-transition-new(root)' },
+      );
+    }).catch(() => {});
+  }));
+
+  // 减弱动态效果
+  const chk = $('#chkReduceMotion');
+  chk.checked = root.dataset.motion === 'reduced';
+  chk.addEventListener('change', () => {
+    if (chk.checked) root.dataset.motion = 'reduced'; else delete root.dataset.motion;
+    store.set(MOTION_KEY, chk.checked ? 'reduced' : null);
   });
+
+  // 开关面板
+  const open = (on) => {
+    pop.classList.toggle('open', on);
+    btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+  };
+  btn.addEventListener('click', (ev) => { ev.stopPropagation(); open(!pop.classList.contains('open')); });
+  document.addEventListener('click', (ev) => { if (!pop.contains(ev.target) && ev.target !== btn) open(false); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && pop.classList.contains('open')) open(false); }, true);
+
+  sysDarkMQ.addEventListener?.('change', () => { syncMeta(); renderStage(); });
+  setMode(mode);
+  setAccent(accent);
+}
+
+/* ================================================================== *
+ * 动效辅助
+ * ================================================================== */
+/** 分段控件 / 右栏标签：加一块会滑动的选中底 */
+function initSegIndicators() {
+  const groups = $$('.seg, #tabs');
+  const ro = window.ResizeObserver ? new ResizeObserver((es) => es.forEach((e) => placeInd(e.target))) : null;
+  for (const g of groups) {
+    if (g.querySelector(':scope > .seg-ind')) continue;
+    const ind = document.createElement('span');
+    ind.className = 'seg-ind';
+    ind.setAttribute('aria-hidden', 'true');
+    g.prepend(ind);
+    g.classList.add('has-ind');
+    placeInd(g);
+    requestAnimationFrame(() => requestAnimationFrame(() => g.classList.add('ready')));
+    // .on 由各自的点击逻辑切换，这里只负责跟着挪
+    new MutationObserver(() => placeInd(g)).observe(g, { subtree: true, attributes: true, attributeFilter: ['class', 'aria-selected'] });
+    g.addEventListener('pointerdown', (ev) => { if (ev.target.closest('button')) g.classList.add('pressing'); });
+    const up = () => g.classList.remove('pressing');
+    g.addEventListener('pointerup', up); g.addEventListener('pointerleave', up); g.addEventListener('pointercancel', up);
+    ro?.observe(g);
+  }
+}
+function placeInd(g) {
+  const ind = g.querySelector(':scope > .seg-ind');
+  const on = g.querySelector(':scope > button.on, :scope > button[aria-selected="true"]');
+  if (!ind) return;
+  if (!on || !on.offsetWidth) { ind.style.opacity = on ? '' : '0'; return; }
+  ind.style.opacity = '';
+  ind.style.setProperty('--x', on.offsetLeft + 'px');
+  ind.style.setProperty('--w', on.offsetWidth + 'px');
+}
+
+/** 列表依次浮现：给每个子元素一个序号 */
+function stagger(container, sel, cap = 14) {
+  if (!container) return;
+  container.querySelectorAll(sel).forEach((el, i) => el.style.setProperty('--i', Math.min(i, cap)));
+}
+
+/** 重新触发一个 CSS 动画类 */
+function replay(el, cls) {
+  if (!el || !motionOK()) return;
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
 }
 
 /** 滑块左侧填充：用 --p 画出 iOS 那种「已选部分是蓝色」的轨道 */
@@ -2117,8 +2290,16 @@ function initMoreMenu() {
 }
 
 /** 手机 / 平板竖屏：底部标签栏切换「模板库 / 剧情匹配 / 画布 / 格子与导出」 */
-function setView(view) {
+const VIEW_ORDER = ['library', 'story', 'canvas', 'inspect'];
+function setView(view, opts = {}) {
   if (!view) return;
+  const prev = document.body.dataset.view;
+  if (opts.animate && prev && prev !== view && compactMQ.matches) {
+    const dir = VIEW_ORDER.indexOf(view) > VIEW_ORDER.indexOf(prev) ? 'view-fwd' : 'view-back';
+    withTransition(dir, () => setView(view));
+    replay($(`#tabbar button[data-view="${view}"]`), 'bounce');
+    return;
+  }
   document.body.dataset.view = view;
   $$('#tabbar button').forEach((b) => {
     const on = b.dataset.view === view;
@@ -2127,11 +2308,11 @@ function setView(view) {
   });
   if (view === 'canvas') renderStage();
 }
-function goCanvasOnCompact() { if (compactMQ.matches) setView('canvas'); }
+function goCanvasOnCompact() { if (compactMQ.matches) setView('canvas', { animate: true }); }
 
 function initViews() {
-  $$('#tabbar button').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
-  $('#btnEditSlot')?.addEventListener('click', () => { setView('inspect'); activateTab('slot'); });
+  $$('#tabbar button').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view, { animate: true })));
+  $('#btnEditSlot')?.addEventListener('click', () => { activateTab('slot'); setView('inspect', { animate: true }); });
   const want = new URLSearchParams(location.search).get('view');
   setView(['library', 'story', 'canvas', 'inspect'].includes(want) ? want : 'canvas');
 }

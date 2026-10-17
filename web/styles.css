@@ -33,9 +33,13 @@
   --sep-strong:rgba(60,60,67,.24);
 
   /* 系统色 */
-  --tint:#007aff;
-  --tint-hover:#0068da;
-  --tint-soft:rgba(0,122,255,.11);
+  /* 强调色：每种颜色给亮/暗两个值，html[data-accent] 切换 */
+  --tint-l:#007aff;
+  --tint-d:#0a84ff;
+  --on-tint:#ffffff;
+  --tint:var(--tint-l);
+  --tint-hover:color-mix(in srgb,var(--tint) 86%,#000);
+  --tint-soft:color-mix(in srgb,var(--tint) 12%,transparent);
   --indigo:#5856d6;
   --purple:#af52de;
   --pink:#ff2d55;
@@ -64,6 +68,9 @@
   --r-sm:8px;
 
   --ease:cubic-bezier(.32,.72,0,1);
+  /* 弹簧曲线：不支持 linear() 的浏览器退回带一点回弹的贝塞尔 */
+  --spring:cubic-bezier(.34,1.3,.64,1);
+  --spring-soft:cubic-bezier(.22,1.08,.36,1);
 
   /* 兼容 app.js 里直接引用的旧变量名 */
   --text:var(--label);
@@ -101,9 +108,9 @@
     --label-4:rgba(235,235,245,.2);
     --sep:rgba(84,84,88,.5);
     --sep-strong:rgba(84,84,88,.8);
-    --tint:#0a84ff;
-    --tint-hover:#409cff;
-    --tint-soft:rgba(10,132,255,.18);
+    --tint:var(--tint-d);
+    --tint-hover:color-mix(in srgb,var(--tint) 80%,#fff);
+    --tint-soft:color-mix(in srgb,var(--tint) 20%,transparent);
     --indigo:#5e5ce6;
     --purple:#bf5af2;
     --pink:#ff375f;
@@ -142,9 +149,9 @@
   --label-4:rgba(235,235,245,.2);
   --sep:rgba(84,84,88,.5);
   --sep-strong:rgba(84,84,88,.8);
-  --tint:#0a84ff;
-  --tint-hover:#409cff;
-  --tint-soft:rgba(10,132,255,.18);
+  --tint:var(--tint-d);
+  --tint-hover:color-mix(in srgb,var(--tint) 80%,#fff);
+  --tint-soft:color-mix(in srgb,var(--tint) 20%,transparent);
   --indigo:#5e5ce6;
   --purple:#bf5af2;
   --pink:#ff375f;
@@ -238,17 +245,22 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.tpl:focus-visible{
   background:var(--surface);border-radius:var(--r-lg);padding:14px;
   box-shadow:var(--shadow-1),inset 0 0 0 .5px var(--card-border);
 }
-.card.collapsed > .card-body{display:none}
+.card-body{min-width:0;display:grid;grid-template-rows:1fr;opacity:1;
+  transition:grid-template-rows .55s var(--ease),opacity .35s var(--ease)}
+.card-body-inner{min-width:0;min-height:0}
+.collapsed > .card-body{grid-template-rows:0fr;opacity:0}
+.collapsed > .card-body > .card-body-inner,.animating > .card-body > .card-body-inner{overflow:hidden}
+.card{transition:padding .45s var(--ease),box-shadow .3s var(--ease)}
 .card.collapsed{padding-bottom:12px}
-.card.collapsed .card-head{margin-bottom:0}
-.card-body{min-width:0}
+.card-head{transition:margin .45s var(--ease)}
+.card.collapsed .card-head,.bubble-dock.collapsed .bub-head{margin-bottom:0}
 .caret{
   width:24px;height:24px;flex:0 0 auto;margin-left:2px;border:0;
   background:var(--fill-2);border-radius:99px;color:var(--label-2);display:grid;place-items:center;
   cursor:pointer;padding:0;transition:background .2s var(--ease),color .2s;
 }
 .caret:hover{color:var(--label);background:var(--fill)}
-.caret svg{transition:transform .3s var(--ease)}
+.caret svg{transition:transform .55s var(--spring)}
 .card.collapsed .caret svg,.bubble-dock.collapsed .caret svg{transform:rotate(-90deg)}
 .card-head,.bub-head{cursor:pointer;user-select:none;-webkit-user-select:none}
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
@@ -339,7 +351,7 @@ input[type=range]::-moz-range-thumb{
 }
 .btn:hover{background:var(--fill-hover)}
 .btn:active{transform:scale(.97)}
-.btn.primary{background:var(--tint);color:#fff;font-weight:600}
+.btn.primary{background:var(--tint);color:var(--on-tint);font-weight:600}
 .btn.primary:hover{background:var(--tint-hover)}
 .btn.ghost{background:transparent;color:var(--tint)}
 .btn.ghost:hover{background:var(--tint-soft)}
@@ -376,7 +388,7 @@ input[type=range]::-moz-range-thumb{
   font-size:11px;font-weight:600;color:var(--label-2);text-align:center;width:22px;height:22px;line-height:22px;
   border-radius:99px;background:var(--fill-2);font-variant-numeric:tabular-nums;
 }
-.res:first-child .rank{background:var(--tint);color:#fff}
+.res:first-child .rank{background:var(--tint);color:var(--on-tint)}
 .res .nm{font-size:13px;line-height:1.35;font-weight:500}
 .res .wh{font-size:11.5px;color:var(--label-3);margin-top:2px;line-height:1.4}
 .res .sc{font-size:13px;font-weight:600;color:var(--tint);font-variant-numeric:tabular-nums}
@@ -600,9 +612,7 @@ kbd{
   max-width:100%;max-height:100%;width:auto;height:auto;
   background:#fff;box-shadow:var(--page-shadow);
   border-radius:3px;cursor:crosshair;touch-action:none;
-  animation:pageIn .5s var(--ease);
 }
-@keyframes pageIn{from{opacity:.4;transform:scale(.985)}to{opacity:1;transform:none}}
 .canvas.dragover svg{outline:2.5px dashed var(--tint);outline-offset:8px}
 .stage-foot{
   flex:0 0 auto;height:34px;display:flex;align-items:center;gap:10px;justify-content:space-between;
@@ -651,7 +661,7 @@ kbd{
 .slot-head{display:flex;align-items:center;gap:12px;margin:6px 0 4px}
 .slot-index{
   width:36px;height:36px;flex:0 0 auto;display:grid;place-items:center;border-radius:10px;
-  background:var(--tint);color:#fff;font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;
+  background:var(--tint);color:var(--on-tint);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;
   box-shadow:0 4px 12px color-mix(in srgb,var(--tint) 35%,transparent);
 }
 .slot-head b{font-size:17px;letter-spacing:-.02em}
@@ -875,4 +885,207 @@ kbd{
   .topbar,.rail,.stage-bar,.stage-foot,.tabbar,.toast,.fab-edit{display:none !important}
   .stage{padding:0;background:none}
   .canvas svg{box-shadow:none}
+}
+
+/* =====================================================================
+ * 强调色（10 种，取自 Apple 系统色；亮/暗各一档）
+ * ===================================================================== */
+:root[data-accent="indigo"]  {--tint-l:#5856d6;--tint-d:#5e5ce6}
+:root[data-accent="purple"]  {--tint-l:#af52de;--tint-d:#bf5af2}
+:root[data-accent="pink"]    {--tint-l:#ff2d55;--tint-d:#ff375f}
+:root[data-accent="red"]     {--tint-l:#ff3b30;--tint-d:#ff453a}
+:root[data-accent="orange"]  {--tint-l:#f56300;--tint-d:#ff9f0a}
+:root[data-accent="yellow"]  {--tint-l:#e0a800;--tint-d:#ffd60a;--on-tint:#1d1d1f}
+:root[data-accent="green"]   {--tint-l:#28a745;--tint-d:#30d158}
+:root[data-accent="teal"]    {--tint-l:#0a9fb5;--tint-d:#40c8e0}
+:root[data-accent="graphite"]{--tint-l:#636366;--tint-d:#98989d}
+/* 暗色下黄/橙/青/绿底色偏亮，按钮字改黑更清楚 */
+:root[data-theme="dark"][data-accent="orange"],:root[data-theme="dark"][data-accent="green"],:root[data-theme="dark"][data-accent="teal"]{--on-tint:#1d1d1f}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"])[data-accent="orange"],
+  :root:not([data-theme="light"])[data-accent="green"],
+  :root:not([data-theme="light"])[data-accent="teal"]{--on-tint:#1d1d1f}
+}
+/* 强调色为绿色时，开关换回系统绿以外的颜色会很怪 —— 开关始终用系统绿，这里不动 */
+
+/* =====================================================================
+ * 动效系统
+ * 原则：位移用弹簧、颜色/透明度用缓出；只在状态真正变化时动；尊重「减弱动态效果」
+ * ===================================================================== */
+@supports (transition-timing-function:linear(0,1)){
+  :root{
+    /* 阻尼比 0.68：约 5% 回弹，像 iOS 的默认弹簧 */
+    --spring:linear(0, 0.0182, 0.0664, 0.1357, 0.2186, 0.3091, 0.4022, 0.4939, 0.5815, 0.6628, 0.7365, 0.8019, 0.8586, 0.9067, 0.9467, 0.979, 1.0043, 1.0234, 1.0372, 1.0464, 1.0518, 1.0541, 1.0539, 1.0519, 1.0486, 1.0444, 1.0396, 1.0346, 1.0296, 1.0247, 1.0201, 1.0159, 1.0122, 1.0089, 1.0061, 1.0038, 1.0018, 1.0003, 0.9991, 0.9983, 0.9977, 0.9973, 0.9971, 0.9971, 0.9971, 0.9973, 0.9975, 0.9977, 1);
+    /* 阻尼比 0.85：几乎不回弹，用在大面积移动 */
+    --spring-soft:linear(0, 0.0128, 0.0467, 0.0955, 0.1544, 0.2194, 0.2874, 0.3559, 0.4232, 0.488, 0.5491, 0.6062, 0.6587, 0.7065, 0.7497, 0.7882, 0.8224, 0.8524, 0.8786, 0.9013, 0.9207, 0.9373, 0.9512, 0.9629, 0.9726, 0.9806, 0.987, 0.9922, 0.9963, 0.9994, 1.0018, 1.0036, 1.0048, 1.0056, 1.0061, 1.0063, 1.0063, 1.0061, 1.0058, 1.0055, 1.0051, 1.0047, 1.0043, 1.0038, 1.0034, 1.003, 1.0026, 1.0023, 1);
+  }
+}
+
+/* ---- 颜色切换时整体平滑过渡（强调色 / 主题不靠闪变） ---- */
+.btn,.chip,.res .rank,.slot-index,.tabbar button,.switch input[type=checkbox],.tpl,.swatch{
+  transition-property:background-color,color,box-shadow,transform,opacity,filter;
+}
+
+/* ---- 分段控件：滑动的选中块 ---- */
+.has-ind{position:relative;isolation:isolate}
+.has-ind > button{position:relative;z-index:1;box-shadow:none !important}
+.has-ind > button.on,.has-ind > button[aria-selected="true"]{background:transparent !important}
+.seg-ind{
+  position:absolute;top:2px;bottom:2px;left:0;width:0;z-index:0;border-radius:7px;pointer-events:none;
+  background:var(--bg-elev);
+  box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04),0 0 0 .5px rgba(0,0,0,.04);
+  transform:translateX(var(--x,0));width:var(--w,0);
+}
+.has-ind.ready > .seg-ind{transition:transform .6s var(--spring),width .6s var(--spring)}
+.has-ind.pressing > .seg-ind{scale:.96;transition:transform .6s var(--spring),width .6s var(--spring),scale .25s var(--ease)}
+:root[data-theme="dark"] .seg-ind{background:#636366}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg-ind{background:#636366}}
+
+/* ---- 按压反馈：按下收一点，松手弹回 ---- */
+.btn{transition:background-color .2s var(--ease),color .2s,box-shadow .3s var(--ease),transform .5s var(--spring),opacity .2s,filter .2s}
+.btn:active{transform:scale(.96);transition-duration:.12s}
+.btn.primary:hover{box-shadow:0 6px 18px color-mix(in srgb,var(--tint) 32%,transparent)}
+.icon-btn{transition:background .2s var(--ease),color .2s,transform .5s var(--spring)}
+.icon-btn:active{transform:scale(.88);transition-duration:.12s}
+
+/* ---- 忙碌状态：按钮上扫过一道光 ---- */
+.btn:disabled{cursor:progress;position:relative;overflow:hidden}
+.btn:disabled::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent 25%,rgba(255,255,255,.38) 50%,transparent 75%);
+  transform:translateX(-100%);animation:shimmer 1.3s var(--ease) infinite;
+}
+@keyframes shimmer{to{transform:translateX(100%)}}
+
+/* ---- AI 卡：描边是一圈旋转的彩虹光，悬停时转，调用模型时加速并发光 ---- */
+@property --ai-ang{syntax:"<angle>";initial-value:0deg;inherits:false}
+.card.ai{
+  background:
+    linear-gradient(var(--surface),var(--surface)) padding-box,
+    conic-gradient(from var(--ai-ang),#0a84ff,#5e5ce6,#bf5af2,#ff375f,#ff9f0a,#30d158,#0a84ff) border-box;
+  animation:aiSpin 9s linear infinite paused;
+}
+.card.ai:hover,.card.ai:focus-within{animation-play-state:running}
+.card.ai:has(#btnAiDecide:disabled){
+  animation-duration:2.2s;animation-play-state:running;
+  box-shadow:0 0 0 4px color-mix(in srgb,#bf5af2 14%,transparent),0 10px 36px color-mix(in srgb,#5e5ce6 30%,transparent);
+}
+@keyframes aiSpin{to{--ai-ang:360deg}}
+
+/* ---- 列表依次浮现（模板库 / 匹配结果 / 分镜表 / 气泡） ---- */
+@keyframes rise{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.tpl-grid > .tpl{animation:rise .6s var(--spring) backwards;animation-delay:calc(var(--i,0) * 24ms)}
+.results > .res{animation:rise .55s var(--spring) backwards;animation-delay:calc(var(--i,0) * 45ms)}
+.script-list > .sc-card{animation:rise .6s var(--spring) backwards;animation-delay:calc(var(--i,0) * 40ms)}
+.bub-grid > .bub-item{animation:rise .5s var(--spring) backwards;animation-delay:calc(var(--i,0) * 26ms)}
+.chips > .chip{animation:rise .45s var(--spring) backwards}
+.ai-result,.decision{animation:rise .5s var(--spring) backwards}
+
+/* ---- 模板卡：悬停时缩略图轻微放大 ---- */
+.tpl{transition:transform .55s var(--spring),box-shadow .35s var(--ease)}
+.tpl .th svg{transition:transform .7s var(--spring-soft)}
+.tpl:hover .th svg{transform:scale(1.05)}
+.tpl.on{animation:none}
+
+/* ---- 换模板：页面从景深里浮上来 ---- */
+@keyframes pageIn{
+  from{opacity:0;transform:translateY(14px) scale(.965);filter:blur(6px)}
+  60%{filter:blur(0)}
+  to{opacity:1;transform:none;filter:none}
+}
+.canvas.page-enter svg{animation:pageIn .75s var(--spring-soft) both}
+
+/* ---- 选中格号徽章：换格子时弹一下 ---- */
+@keyframes pop{0%{transform:scale(.6);opacity:.4}100%{transform:scale(1);opacity:1}}
+.slot-index.pop{animation:pop .55s var(--spring)}
+#slotPanel.swap > *{animation:rise .45s var(--spring-soft) backwards}
+#slotPanel.swap > *:nth-child(2){animation-delay:30ms}
+#slotPanel.swap > *:nth-child(3){animation-delay:60ms}
+#slotPanel.swap > *:nth-child(4){animation-delay:90ms}
+
+/* ---- 拨动开关：按住时圆钮被「压扁」拉长 ---- */
+.switch input[type=checkbox]::before{transition:transform .5s var(--spring),width .25s var(--ease)}
+.switch input[type=checkbox]:active::before{width:24px}
+.switch input[type=checkbox]:checked:active::before{transform:translateX(10px)}
+.switch.block input[type=checkbox]:active::before{width:30px}
+.switch.block input[type=checkbox]:checked:active::before{transform:translateX(12px)}
+
+/* ---- 滑块圆钮 ---- */
+input[type=range]::-webkit-slider-thumb{transition:transform .45s var(--spring)}
+input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
+
+/* ---- Toast / 弹层 / 菜单：弹簧进场 ---- */
+.toast{transition:opacity .3s var(--ease),transform .6s var(--spring)}
+.sc-panel{animation:sheetIn .6s var(--spring)}
+@keyframes sheetIn{from{opacity:0;transform:translateY(26px) scale(.96)}to{opacity:1;transform:none}}
+.shortcuts{animation:fadeIn .3s var(--ease)}
+.top-actions{transition:opacity .2s var(--ease),transform .5s var(--spring)}
+@keyframes fabIn{from{opacity:0;transform:translateX(-50%) translateY(12px) scale(.85)}to{opacity:1;transform:translateX(-50%)}}
+body.has-slot .fab-edit{animation:fabIn .55s var(--spring)}
+.fab-edit:active{transform:translateX(-50%) scale(.95)}
+
+/* ---- 标签栏图标：点中时跳一下 ---- */
+@keyframes tabBounce{0%{transform:scale(1)}30%{transform:scale(.82)}65%{transform:scale(1.12)}100%{transform:scale(1)}}
+.tabbar button.bounce svg{animation:tabBounce .55s var(--spring-soft)}
+
+/* =====================================================================
+ * 外观面板（主题 + 强调色 + 动态效果）
+ * ===================================================================== */
+.appearance-pop{
+  position:fixed;z-index:60;right:12px;top:calc(var(--topbar-h) + env(safe-area-inset-top) + 8px);width:300px;max-width:calc(100vw - 24px);
+  padding:14px;border-radius:var(--r-xl);
+  background:var(--material-thick);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+  box-shadow:var(--shadow-3),inset 0 0 0 .5px var(--sep);
+  transform-origin:calc(100% - 70px) 0;
+  opacity:0;transform:scale(.9) translateY(-6px);pointer-events:none;visibility:hidden;
+  transition:opacity .2s var(--ease),transform .55s var(--spring),visibility 0s .2s;
+}
+.appearance-pop.open{opacity:1;transform:none;pointer-events:auto;visibility:visible;transition:opacity .2s var(--ease),transform .55s var(--spring),visibility 0s}
+.pop-title{font-size:15px;font-weight:600;letter-spacing:-.015em;margin:0 2px 12px}
+.pop-label{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--label-2);font-weight:500;margin:16px 2px 9px}
+.pop-label b{color:var(--label);font-weight:600}
+.mode-seg button{display:flex;align-items:center;justify-content:center;gap:5px}
+.mode-seg button svg{width:14px;height:14px}
+.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;justify-items:center}
+.swatch{
+  --sw:var(--sw-l);
+  width:34px;height:34px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;
+  background:var(--sw);display:grid;place-items:center;color:#fff;
+  box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12);
+  transition:transform .5s var(--spring),box-shadow .3s var(--ease);
+}
+.swatch:hover{transform:scale(1.1)}
+.swatch:active{transform:scale(.9);transition-duration:.1s}
+.swatch svg{width:14px;height:14px;opacity:0;transform:scale(.4);transition:opacity .2s,transform .5s var(--spring)}
+.swatch.on{box-shadow:0 0 0 2.5px var(--material-thick),0 0 0 4.5px var(--sw)}
+.swatch.on svg{opacity:1;transform:none}
+.swatch[data-a="yellow"]{color:#1d1d1f}
+:root[data-theme="dark"] .swatch{--sw:var(--sw-d)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .swatch{--sw:var(--sw-d)}}
+.pop-row{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:.5px solid var(--sep)}
+.pop-row .switch{font-size:13.5px;color:var(--label);flex-direction:row-reverse;justify-content:space-between;width:100%}
+
+/* =====================================================================
+ * 视图过渡（View Transitions API；不支持的浏览器直接切换）
+ * ===================================================================== */
+html[data-vt^="view"] .topbar{view-transition-name:topbar}
+html[data-vt^="view"] .tabbar{view-transition-name:tabbar}
+::view-transition-group(topbar),::view-transition-group(tabbar){animation:none}
+@keyframes vtOutL{to{opacity:0;transform:translateX(-28px) scale(.985)}}
+@keyframes vtInR{from{opacity:0;transform:translateX(36px) scale(.985)}}
+@keyframes vtOutR{to{opacity:0;transform:translateX(28px) scale(.985)}}
+@keyframes vtInL{from{opacity:0;transform:translateX(-36px) scale(.985)}}
+html[data-vt="view-fwd"]::view-transition-old(root){animation:vtOutL .25s var(--ease) both}
+html[data-vt="view-fwd"]::view-transition-new(root){animation:vtInR .55s var(--spring-soft) both}
+html[data-vt="view-back"]::view-transition-old(root){animation:vtOutR .25s var(--ease) both}
+html[data-vt="view-back"]::view-transition-new(root){animation:vtInL .55s var(--spring-soft) both}
+/* 切主题：从按钮处圆形扩散（动画由 app.js 驱动） */
+html[data-vt="theme"]::view-transition-old(root),html[data-vt="theme"]::view-transition-new(root){animation:none;mix-blend-mode:normal}
+html[data-vt="accent"]::view-transition-old(root){animation:fadeOut .35s var(--ease) both}
+html[data-vt="accent"]::view-transition-new(root){animation:fadeIn .35s var(--ease) both}
+@keyframes fadeOut{to{opacity:0}}
+
+/* ---- 手动「减弱动态效果」 ---- */
+:root[data-motion="reduced"] *,:root[data-motion="reduced"] *::before,:root[data-motion="reduced"] *::after{
+  animation:none !important;transition-duration:.01ms !important;
 }
