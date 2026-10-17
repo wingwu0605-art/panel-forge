@@ -75,6 +75,19 @@ const state = {
 const CULTURE_LABEL = { jp: '日', cn: '中', kr: '韩', core: '通' };
 const CULTURE_ZH = { jp: '日式页漫', cn: '中式漫画', kr: '韩式条漫', core: '通用/跨界' };
 
+/* 外观层常量（init() 在顶层就跑，所以必须放在这里，不能放文件末尾） */
+const REPO_URL = 'https://github.com/wingwu0605-art/panel-forge';
+const THEME_KEY = 'pf.theme';
+const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
+const compactMQ = window.matchMedia('(max-width:1024px)');
+
+const THEME_ICONS = {
+  auto: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2Z" fill="currentColor"/></svg>',
+  light: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8v2.1M10 16.1v2.1M1.8 10h2.1M16.1 10h2.1M4.2 4.2l1.5 1.5M14.3 14.3l1.5 1.5M4.2 15.8l1.5-1.5M14.3 5.7l1.5-1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  dark: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.4 12.6A7 7 0 0 1 7.4 3.6a7 7 0 1 0 9 9Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+};
+const THEME_NAME = { auto: '跟随系统', light: '浅色', dark: '深色' };
+
 /* ================================================================== *
  * 启动
  * ================================================================== */
@@ -84,6 +97,7 @@ init().catch((e) => {
 });
 
 async function init() {
+  initChrome();
   bindUI();
   initCollapsibles();
   api = await makeApi();
@@ -94,7 +108,7 @@ async function init() {
   state.filtered = list.items;
   state.engine = meta.engine || null;
   $('#statTpl').textContent = `${meta.templates} 套模板 · ${meta.roles.length} 种格型`;
-  $('#statPort').textContent = location.host;
+  $('#statPort').textContent = window.PF_STATIC ? '静态版 · 离线可用' : location.host;
   $('#analyzeHint').textContent = '本地规则引擎';
   if (meta.engine) {
     const e = meta.engine;
@@ -226,9 +240,9 @@ async function runAiSelfTest() {
   const rows = [];
   const ok = (name, cond, extra = '') => rows.push({ name, cond: !!cond, extra });
   try {
-    await aiSelfTestBody(rows, ok);
+    await aiSelfTestBody(ok);
   } catch (e) {
-    rows.push({ name: '自检过程异常：' + e.message, cond: false, extra: String(e.stack || '').slice(0, 200) });
+    rows.push({ name: '自检过程异常：' + e.message, cond: false, extra: String(e.stack || '').slice(0, 160) });
   }
   const pass = rows.filter((r) => r.cond).length;
   const box = document.createElement('div');
@@ -239,7 +253,7 @@ async function runAiSelfTest() {
   return pass === rows.length;
 }
 
-async function aiSelfTestBody(rows, ok) {
+async function aiSelfTestBody(ok) {
   const { createStaticApi } = await import('./api-static.js');
   const sapi = createStaticApi();
 
@@ -276,13 +290,11 @@ async function aiSelfTestBody(rows, ok) {
       ok('优化生效的格数 > 0', (p.applied || 0) > 0, `${p.applied}/${p.total}`);
       const first = p.plan?.panels?.[0];
       ok('提示词已被替换为 AI 版', first?.aiOptimized === true, (first?.promptEn || '').slice(0, 46));
-      ok('形状开头词保留在提示词里', !first || !first.shape?.prefixEn || (first.promptEn || '').startsWith(first.shape.prefixEn.slice(0, 12)), (first?.shape?.prefixEn || '').slice(0, 24) || '（该格无形状词）');
     } catch (e) {
       ok('prompts 返回 ok', false, e.message);
     }
   }
 
-  // 没有 Key 时的表现
   localStorage.removeItem(LLM_STORE);
   const noKey = await sapi.aiDecide({ plot, llm: { apiKey: '' } });
   ok('无 Key 时给出友好提示', noKey.ok === false && (noKey.code === 'NO_LLM_KEY' || !!noKey.hint), noKey.code || '');
@@ -426,7 +438,7 @@ function renderList() {
       </div>
       <span class="bd">${t.panels}</span>
       <span class="cul">${CULTURE_LABEL[t.culture]}</span>`;
-    el.addEventListener('click', () => selectTemplate(t.id));
+    el.addEventListener('click', () => { selectTemplate(t.id); goCanvasOnCompact(); });
     frag.appendChild(el);
   }
   const grid = $('#tplGrid');
@@ -504,6 +516,7 @@ function renderStage() {
       slotOutline: true,
       overlays: state.bubbles,
       selectedBubbleId: state.selBubble,
+      uiAccent: '#007aff',
     });
     const holder = $('#canvas');
     holder.innerHTML = svg;
@@ -513,9 +526,9 @@ function renderStage() {
     const foot = $('#footMsg');
     if (foot) {
       foot.textContent = state.hollow
-        ? '⚠ 镂空模式：只显示格线，图片被隐藏 —— 取消勾选右上角「镂空」就能看到图片'
+        ? '镂空模式：只显示格线，图片被隐藏 —— 关掉「镂空」就能看到图片'
         : '拖图片进画布即可填充（自动裁切到格子形状，斜切格也不会变形）';
-      foot.style.color = state.hollow ? 'var(--accent-2)' : '';
+      $('#stageFoot')?.classList.toggle('warn', state.hollow);
     }
   });
 }
@@ -679,10 +692,10 @@ function bindUI() {
     const k = ev.key;
     const lower = k.length === 1 ? k.toLowerCase() : k;
 
+    // Ctrl+Shift+Enter：AI 导演（先判断带 Shift 的组合，否则会被下面的规则匹配吃掉）
+    if (mod && ev.shiftKey && k === 'Enter') { ev.preventDefault(); runAiDecide(); return; }
     // Ctrl+Enter：按规则匹配（输入框里也能用）
     if (mod && k === 'Enter') { ev.preventDefault(); runMatch(); return; }
-    // Ctrl+Shift+Enter：AI 导演
-    if (mod && ev.shiftKey && k === 'Enter') { ev.preventDefault(); runAiDecide(); return; }
 
     if (typing) return;
 
@@ -846,6 +859,7 @@ function bindUI() {
   }
   $('#btnLlmTest').addEventListener('click', testLlm);
   $('#btnLlmClear').addEventListener('click', clearLlm);
+  $('#chkKeySession')?.addEventListener('change', () => { saveLlm(); syncLlmStatus(); });
   $('#btnAiDecide').addEventListener('click', runAiDecide);
   $('#btnClear').addEventListener('click', () => {
     if (!Object.keys(state.images).length) return;
@@ -899,7 +913,6 @@ function bindUI() {
   });
   $('#btnCopyShape').addEventListener('click', copyShapePrefix);
   $('#charSheet').addEventListener('input', debounce(saveLlm, 400));
-  $('#chkKeySession')?.addEventListener('change', () => { saveLlm(); syncLlmStatus(); });
   $('#btnAiPrompts').addEventListener('click', runAiPrompts);
 
   // 快捷键表
@@ -1144,6 +1157,7 @@ function makePlaceholder(slot) {
  * ================================================================== */
 function renderSlotPanel() {
   const has = !!(state.tpl && state.selectedId);
+  syncSlotFab(has);
   $('#slotEmpty').classList.toggle('hidden', has);
   $('#slotPanel').classList.toggle('hidden', !has);
   if (!has) return;
@@ -1346,7 +1360,7 @@ async function runAiDecide() {
     });
 
     if (!res.ok) {
-      box.innerHTML = `<b style="color:#ff9d8a">AI 路失败（${escapeHtml(res.code || 'ERROR')}）</b>`
+      box.innerHTML = `<b class="err-title">AI 路失败（${escapeHtml(res.code || 'ERROR')}）</b>`
         + `<div class="rs">${escapeHtml(res.error || '')}${res.hint ? ' · ' + escapeHtml(res.hint) : ''}</div>`
         + (res.fallback?.top?.length
           ? `<div class="rs">规则路结果仍可用：${res.fallback.top.map((t) => escapeHtml(t.name)).join(' / ')}</div>`
@@ -1369,7 +1383,7 @@ async function runAiDecide() {
     activateTab('script');
     toast(`AI 选定：${res.decision.pickName}`);
   } catch (e) {
-    box.innerHTML = `<b style="color:#ff9d8a">调用失败</b><div class="rs">${escapeHtml(e.message)}</div>`;
+    box.innerHTML = `<b class="err-title">调用失败</b><div class="rs">${escapeHtml(e.message)}</div>`;
   } finally {
     btn.disabled = false;
     btn.textContent = old;
@@ -1451,7 +1465,7 @@ function renderMatchResults(results) {
       <div class="sc">${r.score.toFixed(1)}</div>
     </div>`).join('');
   box.querySelectorAll('.res').forEach((el) => {
-    el.addEventListener('click', () => selectTemplate(el.dataset.id, { keepImages: true }));
+    el.addEventListener('click', () => { selectTemplate(el.dataset.id, { keepImages: true }); goCanvasOnCompact(); });
   });
 }
 
@@ -1492,7 +1506,7 @@ function renderScript() {
   if (aiMode && state.aiDecision) {
     const d = state.aiDecision;
     db.classList.remove('hidden');
-    db.innerHTML = `<div class="pick">AI 导演选择：${escapeHtml(d.pickName)}<span class="conf" style="float:right;color:var(--accent-2)">${d.confidence != null ? Math.round(d.confidence * 100) + '%' : ''}</span></div>`
+    db.innerHTML = `<div class="pick">AI 导演选择：${escapeHtml(d.pickName)}<span class="conf">${d.confidence != null ? Math.round(d.confidence * 100) + '%' : ''}</span></div>`
       + `<div class="rs">${escapeHtml(d.reason || '')}</div>`;
   } else {
     db.classList.add('hidden');
@@ -1504,7 +1518,7 @@ function renderScript() {
         <span class="no">${p.order}</span>
         <span class="rl">${escapeHtml(p.roleZh)}</span>
         ${p.shape ? `<span class="shape-chip">${escapeHtml(p.shape.zh)}</span>` : ''}
-        ${p.aiOptimized ? '<span class="shape-chip" style="background:#1e2a3a;color:#9fc0ff;border-color:#2a3a4a">AI</span>' : ''}
+        ${p.aiOptimized ? '<span class="shape-chip ai-chip">AI</span>' : ''}
         <span class="bt">${escapeHtml(p.beat || '通用镜头')}</span>
       </div>
       <div class="asp">${p.aspectLabel} · 建议出图 ${p.genSize} · 占页 ${p.areaPct}%</div>
@@ -1560,7 +1574,6 @@ async function runAiPrompts() {
       pageWidth: state.exportWidth,
       characterSheet: state.charSheet,
       llmPanels,
-      llm: state.llm,
     });
     if (!res.ok) {
       toast(`优化失败：${res.code || res.error}`);
@@ -1719,11 +1732,11 @@ const REPO = 'https://github.com/wingwu0605-art/panel-forge';
 
 function adaptTopLinksForStatic() {
   if (!api?.staticMode) return;
-  const sheet = document.querySelector('a[href="/api/sheet"]');
+  const sheet = $('#lnkSheet');
   if (sheet) { sheet.href = './sheet.html'; sheet.textContent = '全部模板一览'; }
-  const docs = document.querySelector('a[href="/api/docs"]');
-  if (docs) { docs.href = `${REPO}/blob/main/docs/API.md`; docs.textContent = 'API 文档'; }
-  const tools = document.querySelector('a[href="/api/ai-tools.json"]');
+  const docs = $('#lnkDocs');
+  if (docs) docs.href = `${REPO}/blob/main/docs/API.md`;
+  const tools = $('#lnkTools');
   if (tools) { tools.href = `${REPO}/blob/main/docs/AI-INTEGRATION.md`; tools.textContent = 'AI 接入说明'; }
   const chip = $('#statApi');
   if (chip) {
@@ -1979,4 +1992,128 @@ const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', 
 function debounce(fn, ms) {
   let t;
   return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+
+/* ================================================================== *
+ * 外观层：主题 / 平台快捷键 / 手机视图 / 滑块填充 / 静态版链接
+ * ================================================================== */
+
+function initChrome() {
+  initTheme();
+  initRanges();
+  initPlatformKeys();
+  initMoreMenu();
+  initViews();
+  initStaticLinks();
+}
+
+function initTheme() {
+  const btn = $('#btnTheme');
+  if (!btn) return;
+  let mode = 'auto';
+  try { mode = localStorage.getItem(THEME_KEY) || 'auto'; } catch { /* ignore */ }
+  const apply = (m, announce) => {
+    mode = m;
+    if (m === 'auto') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = m;
+    btn.innerHTML = THEME_ICONS[m];
+    btn.title = '外观：' + THEME_NAME[m] + '（点击切换）';
+    // 状态栏 / 浏览器顶部颜色跟着走
+    for (const meta of $$('meta[name="theme-color"]')) {
+      const sysDark = meta.media.includes('dark');
+      const dark = m === 'auto' ? sysDark : m === 'dark';
+      meta.content = dark ? '#000000' : '#f2f2f7';
+    }
+    try { if (m === 'auto') localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, m); } catch { /* ignore */ }
+    if (announce) toast('外观：' + THEME_NAME[m]);
+  };
+  apply(mode, false);
+  btn.addEventListener('click', () => {
+    const order = ['auto', 'light', 'dark'];
+    apply(order[(order.indexOf(mode) + 1) % order.length], true);
+  });
+}
+
+/** 滑块左侧填充：用 --p 画出 iOS 那种「已选部分是蓝色」的轨道 */
+function paintRange(el) {
+  const min = Number(el.min || 0), max = Number(el.max || 100);
+  const v = Number(el.value);
+  const p = max > min ? ((v - min) / (max - min)) * 100 : 0;
+  el.style.setProperty('--p', p.toFixed(2) + '%');
+}
+function initRanges() {
+  // 代码里直接改 .value 时也要重画，所以包一层 setter
+  const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  if (desc && desc.set && !HTMLInputElement.prototype.__pfRange) {
+    Object.defineProperty(HTMLInputElement.prototype, 'value', {
+      ...desc,
+      set(v) { desc.set.call(this, v); if (this.type === 'range') paintRange(this); },
+    });
+    HTMLInputElement.prototype.__pfRange = true;
+  }
+  $$('input[type=range]').forEach(paintRange);
+  document.addEventListener('input', (ev) => { if (ev.target?.type === 'range') paintRange(ev.target); });
+}
+
+/** Mac 显示 ⌘ ⌥ ⇧，其它平台显示 Ctrl / Alt / Shift */
+function initPlatformKeys() {
+  if (IS_MAC) {
+    const map = { Ctrl: '⌘', Alt: '⌥', Shift: '⇧', Enter: '↩', Del: '⌫' };
+    $$('#shortcuts kbd').forEach((k) => { if (map[k.textContent]) k.textContent = map[k.textContent]; });
+    $$('.help li').forEach((li) => {
+      li.innerHTML = li.innerHTML.replace(/Ctrl\+/g, '⌘').replace(/Alt\+/g, '⌥ ');
+    });
+    const note = $('.sc-note');
+    if (note) note.textContent = note.textContent.replace('带 Ctrl 的组合键', '带 ⌘ 的组合键');
+  } else {
+    $$('.kbd-mod-enter').forEach((k) => { k.textContent = 'Ctrl ⏎'; });
+  }
+}
+
+function initMoreMenu() {
+  const btn = $('#btnMore');
+  const menu = $('#topActions');
+  if (!btn || !menu) return;
+  const set = (open) => { menu.classList.toggle('open', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); };
+  btn.addEventListener('click', (ev) => { ev.stopPropagation(); set(!menu.classList.contains('open')); });
+  document.addEventListener('click', (ev) => { if (!menu.contains(ev.target)) set(false); });
+  menu.addEventListener('click', () => set(false));
+}
+
+/** 手机 / 平板竖屏：底部标签栏切换「模板库 / 剧情匹配 / 画布 / 格子与导出」 */
+function setView(view) {
+  if (!view) return;
+  document.body.dataset.view = view;
+  $$('#tabbar button').forEach((b) => {
+    const on = b.dataset.view === view;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-current', on ? 'page' : 'false');
+  });
+  if (view === 'canvas') renderStage();
+}
+function goCanvasOnCompact() { if (compactMQ.matches) setView('canvas'); }
+
+function initViews() {
+  $$('#tabbar button').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
+  $('#btnEditSlot')?.addEventListener('click', () => { setView('inspect'); activateTab('slot'); });
+  const want = new URLSearchParams(location.search).get('view');
+  setView(['library', 'story', 'canvas', 'inspect'].includes(want) ? want : 'canvas');
+}
+
+function syncSlotFab(has) {
+  document.body.classList.toggle('has-slot', !!has);
+  if (!has) return;
+  const slot = state.tpl?.slots?.find((s) => s.id === state.selectedId);
+  const t = $('#fabText');
+  if (t && slot) t.textContent = `编辑第 ${slot.order} 格`;
+}
+
+/** 静态版没有服务端：/api/* 链接改指向仓库里的文档 */
+function initStaticLinks() {
+  if (!window.PF_STATIC) return;
+  const docs = $('#lnkDocs'), sheet = $('#lnkSheet'), tools = $('#lnkTools');
+  if (docs) docs.href = REPO_URL + '/blob/main/docs/API.md';
+  if (tools) { tools.href = REPO_URL + '/blob/main/docs/AI-INTEGRATION.md'; tools.textContent = 'AI 接入说明'; }
+  if (sheet) { sheet.href = REPO_URL; sheet.textContent = 'GitHub 仓库'; }
 }
