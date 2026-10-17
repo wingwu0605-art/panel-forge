@@ -1188,3 +1188,12 @@ html[data-vt="accent"]::view-transition-new(root){animation:fadeIn .35s var(--ea
 :root[data-motion="reduced"] *,:root[data-motion="reduced"] *::before,:root[data-motion="reduced"] *::after{
   animation:none !important;transition-duration:.01ms !important;
 }
+
+/* 折叠高度修复：主题用 grid 0fr 动画，外层必须是 flex:0 0 auto 才会真的收上去 */
+.card.collapsed{flex:0 0 auto !important;align-self:flex-start;min-height:0;height:auto !important}
+.card.collapsed > .card-body{grid-template-rows:0fr;opacity:0;overflow:hidden}
+#slotPanel.collapsed{flex:0 0 auto !important;align-self:flex-start;min-height:0;height:auto !important}
+#slotPanel.collapsed > .slot-head{margin-bottom:0}
+.tab-body{display:flex;flex-direction:column;gap:10px}
+.tab-body > #slotPanel{flex:0 0 auto;min-height:0}
+.bubble-dock.collapsed{flex:0 0 auto !important}
