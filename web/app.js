@@ -82,6 +82,8 @@ const state = {
   pages: [],          // 多页：{tplId, images, bubbles, lines}
   pageIdx: 0,
   cands: {},          // slotId -> [href...] 候选图
+  slotCollapsed: false,
+  slotAiMode: 'img',  // img | prompt
   chars: [],          // 角色卡 [{id,name,note,images:[dataURL]}]
   activeChars: [],    // 本页启用的角色 id
   clipboard: null,    // 内部剪贴板（图片或气泡）
@@ -1132,7 +1134,22 @@ function bindUI() {
     $('#ksMsg').textContent = e.verifiedAt ? '已保存并验证，可以开始用了' : '已保存（未验证，建议先点测试连接）';
     toast('已保存 Key：' + e.name);
   });
-  $('#btnAiImage')?.addEventListener('click', generateSlotImage);
+  $('#btnSlotCollapse')?.addEventListener('click', () => {
+    state.slotCollapsed = !state.slotCollapsed;
+    document.querySelector('#slotPanel')?.classList.toggle('collapsed', state.slotCollapsed);
+    $('#btnSlotCollapse')?.classList.toggle('open', !state.slotCollapsed);
+  });
+  $('#slotAiMode')?.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-m]');
+    if (!b) return;
+    state.slotAiMode = b.dataset.m;
+    for (const x of document.querySelectorAll('#slotAiMode button')) x.classList.toggle('on', x === b);
+    $('#btnAiImage').textContent = state.slotAiMode === 'prompt' ? '✏️ 只写提示词' : '✨ 生这一格';
+  });
+  $('#btnAiImage')?.addEventListener('click', () => {
+    if (state.slotAiMode === 'prompt') generateSlotPromptOnly();
+    else generateSlotImage();
+  });
   $('#btnCharPick')?.addEventListener('click', () => $('#charFiles').click());
   $('#charFiles')?.addEventListener('change', async (ev) => {
     const files = ev.target.files;
@@ -2252,6 +2269,8 @@ function currentPageSnapshot() {
     lines: { ...state.lines },
     cands: state.cands,
     activeChars: [...state.activeChars],
+    slotCollapsed: state.slotCollapsed,
+    slotAiMode: state.slotAiMode,
   };
 }
 
@@ -2347,6 +2366,36 @@ function copyShapePrefixZh() {
   const prefix = p?.shape?.prefixZh || slot?.shape?.prefixZh;
   if (!prefix) { toast('这一格没有中文形状词'); return; }
   copyText(prefix, '中文形状词已复制，粘到你提示词最前面');
+}
+
+/** 只让 AI 写这一格的提示词（不生图） */
+async function generateSlotPromptOnly() {
+  if (!state.tpl || !state.selectedId) { toast('先点一个格子'); return; }
+  const btn = $('#btnAiImage');
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = 'AI 正在写…';
+  saveLlm();
+  try {
+    const page = pagePlan();
+    const llmPanels = page ? Object.fromEntries(page.panels.map((p) => [p.id, { beat: p.beat, content: p.content, dialogue: p.dialogue }])) : null;
+    const res = await api.prompts({
+      plot: $('#plot').value.trim(),
+      templateId: state.tpl.id,
+      pageWidth: state.exportWidth,
+      characterSheet: state.charSheet,
+      llmPanels,
+      llm: state.llm,
+    });
+    if (!res?.ok) throw new Error((res?.code ? res.code + '：' : '') + (res?.error || 'AI 没返回'));
+    const want = res.plan?.panels?.find((p) => p.id === state.selectedId);
+    if (!want) throw new Error('这一格没拿到提示词');
+    const target = currentPlanPanel();
+    if (target) { target.promptEnRule = target.promptEnRule || target.promptEn; target.promptEn = want.promptEn; target.aiOptimized = true; }
+    renderSlotPanel(); renderScript();
+    toast('这一格的提示词已由 AI 改写');
+  } catch (e) {
+    toast('写提示词失败：' + e.message);
+  } finally { btn.disabled = false; btn.textContent = old; }
 }
 
 /** 用用户自己的生图模型，直接生成当前这一格 */

@@ -399,6 +399,21 @@ input[type=range]::-moz-range-thumb{
 .ks-form-head{font-size:11.5px;color:var(--label-2);margin-bottom:2px}
 .ks-msg{font-size:11.5px;color:var(--label-2);min-height:18px}
 
+
+/* 小框折叠 */
+#slotPanel.collapsed > *:not(.slot-head){display:none}
+#slotPanel.collapsed{padding-bottom:8px}
+.slot-head .caret{margin-left:auto}
+.slot-head .caret.open svg{transform:rotate(180deg)}
+.slot-head .caret svg{transform:rotate(-90deg);transition:transform .18s var(--ease)}
+/* AI 动作二选一 */
+.slot-ai-mode{display:flex;gap:4px;background:var(--fill-2);border-radius:9px;padding:3px;margin:6px 0}
+.slot-ai-mode button{
+  flex:1;border:0;background:transparent;color:var(--label-2);font-size:11.5px;
+  padding:4px 8px;border-radius:7px;cursor:pointer;transition:background .18s,color .18s;
+}
+.slot-ai-mode button.on{background:var(--tint);color:#fff;box-shadow:0 1px 4px rgba(0,122,255,.3)}
+
 /* 建议句 */
 .suggest-box{border-color:rgba(255,214,10,.28)}
 .suggest-text{font-size:12.5px;line-height:1.65;color:var(--label);padding:2px 1px 1px}

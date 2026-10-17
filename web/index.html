@@ -263,6 +263,7 @@
       </div>
       <div id="slotPanel" class="hidden">
         <div class="slot-head">
+          <button class="caret" id="btnSlotCollapse" title="收起 / 展开这一格的详情" aria-label="收起展开"></button>
           <span class="slot-index" id="slotIndex">1</span>
           <div>
             <b id="slotRole">—</b>
@@ -304,7 +305,11 @@
         <div class="kv" id="slotKv"></div>
 
         <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
-        <button class="btn wide" id="btnAiImage" title="用你自己的生图模型直接生成这一格，画完自动填入">✨ 用 AI 生这一格</button>
+        <div class="slot-ai-mode" id="slotAiMode">
+            <button data-m="img" class="on">生图</button>
+            <button data-m="prompt">只写提示词</button>
+          </div>
+          <button class="btn wide" id="btnAiImage" title="按上面的选择：直接生图，或只让 AI 写这一格提示词">✨ 生成</button>
         <div class="cand-strip hidden" id="candStrip">
           <div class="cand-head">
             <span>这一格的候选图</span>
