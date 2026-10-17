@@ -123,6 +123,18 @@ async function init() {
     || new URLSearchParams(location.search).get('tpl');
   const first = want || 'ref-4band-2col';
   await selectTemplate(first, { silent: true });
+  // 旧链接 / 打错的 ?tpl=：别停在"没有版式"的空状态，回落默认版式并说明
+  if (!state.tpl) {
+    await selectTemplate('ref-4band-2col', { silent: true });
+    if (want && state.tpl) {
+      toast(`没有「${want}」这套模板（可能是旧链接），先给你默认版式`);
+      const foot = $('#footMsg');
+      if (foot) {
+        foot.textContent = `链接里的模板「${want}」不存在，已载入默认版式 —— 从左边模板库挑一套即可`;
+        $('#stageFoot')?.classList.add('warn');
+      }
+    }
+  }
 
   const params = new URLSearchParams(location.search);
   const wantSlot = params.get('slot');
@@ -506,18 +518,41 @@ function renderStage() {
   requestAnimationFrame(() => {
     rafPending = false;
     const tpl = state.tpl;
-    const svg = renderTemplateSVG(tpl, {
-      width: 1200,
-      images: state.hollow ? {} : state.images,
-      selectedId: state.hollow ? null : state.selectedId,
-      hoverId: state.hoverId,
-      showNumbers: state.showLabels,
-      showRoles: state.showLabels,
-      slotOutline: true,
-      overlays: state.bubbles,
-      selectedBubbleId: state.selBubble,
-      uiAccent: '#007aff',
-    });
+    let svg = '';
+    try {
+      svg = renderTemplateSVG(tpl, {
+        width: 1200,
+        images: state.hollow ? {} : state.images,
+        selectedId: state.hollow ? null : state.selectedId,
+        hoverId: state.hoverId,
+        showNumbers: state.showLabels,
+        showRoles: state.showLabels,
+        slotOutline: true,
+        overlays: state.bubbles,
+        selectedBubbleId: state.selBubble,
+        uiAccent: '#007aff',
+      });
+    } catch (err) {
+      // 以前这里一抛错整块画布就空白/半渲染，看不出原因；现在直接把错误说出来
+      const holder = $('#canvas');
+      if (holder) {
+        holder.innerHTML = '';
+        const box = document.createElement('div');
+        box.className = 'stage-empty';
+        box.style.pointerEvents = 'auto';
+        box.innerHTML = '<p>这一套渲染出错了</p>'
+          + `<p class="muted">${escapeHtml(err.message || String(err))}</p>`
+          + `<p class="muted">模板 ${escapeHtml(tpl.id)} · 换一套版式，或把这句话发给我</p>`;
+        const btn = document.createElement('button');
+        btn.className = 'btn tiny';
+        btn.textContent = '复错误信息';
+        btn.addEventListener('click', () => copyText(`${tpl.id}: ${err.message}`, '错误信息已复制'));
+        box.appendChild(btn);
+        holder.appendChild(box);
+      }
+      console.error('[PanelForge] 渲染失败', err);
+      return;
+    }
     const holder = $('#canvas');
     holder.innerHTML = svg;
     const el = holder.querySelector('svg');
