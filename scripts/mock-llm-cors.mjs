@@ -56,6 +56,7 @@ const server = http.createServer(async (req, res) => {
         beat: '测试节拍',
         content: `第 ${s.order ?? i + 1} 格：测试画面内容`,
         dialogue: i === 0 ? '测试台词' : '',
+        say: i === 1 ? '测试建议句' : '',
       }));
       content = JSON.stringify({
         pick: c.id,

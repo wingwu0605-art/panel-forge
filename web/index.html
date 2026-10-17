@@ -25,7 +25,7 @@
   })();
 </script>
 <title>PanelForge 分镜坊 · 中·日·韩 漫画分镜模板库</title>
-<link rel="stylesheet" href="./styles.css?v=m1u0x">
+<link rel="stylesheet" href="./styles.css?v=zlgzs">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff6a4d'/%3E%3Cstop offset='.55' stop-color='%23ff2d55'/%3E%3Cstop offset='1' stop-color='%23c4196b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Crect x='7' y='7' width='18' height='7.5' rx='1.8' fill='%23fff'/%3E%3Crect x='7' y='17.5' width='8' height='7.5' rx='1.8' fill='%23fff' fill-opacity='.85'/%3E%3Crect x='17.5' y='17.5' width='7.5' height='7.5' rx='1.8' fill='%23fff' fill-opacity='.7'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff6a4d'/%3E%3Cstop offset='.55' stop-color='%23ff2d55'/%3E%3Cstop offset='1' stop-color='%23c4196b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Crect x='7' y='7' width='18' height='7.5' rx='1.8' fill='%23fff'/%3E%3Crect x='7' y='17.5' width='8' height='7.5' rx='1.8' fill='%23fff' fill-opacity='.85'/%3E%3Crect x='17.5' y='17.5' width='7.5' height='7.5' rx='1.8' fill='%23fff' fill-opacity='.7'/%3E%3C/svg%3E">
 </head>
@@ -156,7 +156,7 @@
           <input id="charNote" type="text" placeholder="外观一句话（黑短发、左眉疤）">
         </div>
         <div class="row2">
-          <button class="btn tiny" id="btnCharPick">＋ 选参考图（1–3 张）</button>
+          <button class="btn tiny ic-plus" id="btnCharPick">选参考图（1–3 张）</button>
           <button class="btn tiny" id="btnCharClearAll">清空角色</button>
         </div>
         <input type="file" id="charFiles" accept="image/*" multiple hidden>
@@ -227,19 +227,19 @@
         <p class="muted">点击格子选图 · 拖图到格子 · 批量拖入自动按顺序填充 · Ctrl+V 粘贴</p>
       </div>
       <div class="canvas" id="canvas"></div>
+      <button class="fab-edit" id="btnEditSlot" type="button">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.6V13h1.4l7.3-7.3-1.4-1.4L3 11.6Zm9.9-6.5a.9.9 0 0 0 0-1.3l-.7-.7a.9.9 0 0 0-1.3 0l-.7.7 2 2 .7-.7Z" fill="currentColor"/></svg>
+        <span id="fabText">编辑这一格</span>
+      </button>
     </div>
 
-    <button class="fab-edit" id="btnEditSlot" type="button">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11.6V13h1.4l7.3-7.3-1.4-1.4L3 11.6Zm9.9-6.5a.9.9 0 0 0 0-1.3l-.7-.7a.9.9 0 0 0-1.3 0l-.7.7 2 2 .7-.7Z" fill="currentColor"/></svg>
-      <span id="fabText">编辑这一格</span>
-    </button>
 
     <div class="page-bar" id="pageBar">
       <span class="pb-label">页</span>
       <div class="pb-tabs" id="pageTabs"></div>
-      <button class="btn tiny" id="btnAddPage" title="把当前页存下来，再加一页">＋ 加一页</button>
+      <button class="btn tiny ic-plus" id="btnAddPage" title="把当前页存下来，再加一页">加一页</button>
       <span class="pb-sep"></span>
-      <button class="btn tiny" id="btnExportAll" title="把每一页都导成 PNG">⇩ 导出全部页</button>
+      <button class="btn tiny ic-download" id="btnExportAll" title="把每一页都导成 PNG">导出全部页</button>
       <button class="btn tiny danger" id="btnResetDraft" title="删掉本机草稿，回到空白第一页">清空草稿</button>
     </div>
     <div class="stage-foot" id="stageFoot">
@@ -249,7 +249,22 @@
   </section>
 
   <!-- ============================== 右栏：格子 / 分镜表 / 导出 ============================== -->
-  <aside class="rail right">
+  <aside class="rail right" id="railRight" data-mod="text">
+    <!-- 手机「编辑」页：上半屏是放大的格子，这里是下半屏的抽屉头 -->
+    <div class="edit-top" id="editTop">
+      <div class="edit-head">
+        <button class="icon-btn" id="btnEditPrev" type="button" aria-label="上一格"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <span class="slot-index" id="editIndex">1</span>
+        <div class="edit-title"><b id="editRole">—</b><span id="editShot">—</span></div>
+        <button class="icon-btn" id="btnEditNext" type="button" aria-label="下一格"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="btn sm primary" id="btnEditDone" type="button">完成</button>
+      </div>
+      <div class="seg edit-seg" id="editSeg" role="tablist" aria-label="编辑内容">
+        <button type="button" data-m="text" class="on">这一格说什么</button>
+        <button type="button" data-m="image">图片</button>
+        <button type="button" data-m="bubble">气泡</button>
+      </div>
+    </div>
     <div class="tabs" id="tabs" role="tablist">
       <button data-tab="slot" class="on" role="tab" aria-selected="true">格子</button>
       <button data-tab="script" role="tab" aria-selected="false">分镜表</button>
@@ -264,79 +279,107 @@
       <div id="slotPanel" class="hidden">
         <div class="slot-head">
           <span class="slot-index" id="slotIndex">1</span>
-          <div>
+          <div class="slot-title">
             <b id="slotRole">—</b>
             <div class="muted small" id="slotShot">—</div>
-          <button class="caret" id="btnSlotCollapse" title="收起 / 展开这一格的详情" aria-label="收起展开"><svg viewBox="0 0 12 12" width="11" height="11"><path d="M2 4.2 6 8l4-3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
-        </div>
-        </div>
-
-        <div class="line-box">
-          <div class="prompt-head">
-            <span>本格句子 · <b id="lineBeat">—</b></span>
-            <button class="btn tiny" id="btnBubbleFromLine" title="用这句话新建一个对话气泡">放进气泡</button>
           </div>
-          <textarea id="slotLine" rows="2" placeholder="这一格要说什么：台词 / 旁白 / 内心独白（会自动存到本机）"></textarea>
         </div>
 
-        <div class="prompt-box shape-box">
-          <div class="prompt-head">
-            <span>形状开头词 · <b id="shapeName">—</b></span>
-            <button class="btn tiny" id="btnCopyShape" title="英文版，粘到国际模型提示词最前面">复制英文</button>
+        <!-- ① 文字：这一格说什么（建议句并进来，不再单独一块） -->
+        <section class="slot-sec" data-sec="text">
+          <button type="button" class="sec-head" aria-expanded="true">
+            <span>这一格说什么</span><span class="sec-sum" id="secTextSum"></span><span class="caret"><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 4.2 6 8l4-3.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+          </button>
+          <div class="sec-body">
+            <div class="line-box">
+              <div class="prompt-head">
+                <span>本格句子 · <b id="lineBeat">—</b></span>
+                <button class="btn tiny" id="btnBubbleFromLine" title="用这句话新建一个对话气泡">放进气泡</button>
+              </div>
+              <textarea id="slotLine" rows="2" placeholder="台词 / 旁白 / 内心独白（自动存到本机）"></textarea>
+              <div class="line-suggest" id="suggestBox">
+                <span class="ls-tag" id="suggestFrom">思路</span>
+                <span class="ls-text" id="suggestText">—</span>
+                <button class="btn tiny" id="btnUseSuggest" title="把这句思路填进上面的本格句子">填进去</button>
+              </div>
+            </div>
           </div>
-          <pre id="shapePrefix">—</pre>
-          <div class="prompt-head" style="margin-top:6px">
-            <span class="muted small">中文版（喂国内模型更稳）</span>
-            <button class="btn tiny" id="btnCopyShapeZh">复制中文</button>
+        </section>
+
+        <!-- ② 图片：填图、AI 生图（含可编辑提示词）、候选、形状词 -->
+        <section class="slot-sec" data-sec="image">
+          <button type="button" class="sec-head" aria-expanded="true">
+            <span>图片</span><span class="sec-sum" id="secImageSum"></span><span class="caret"><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 4.2 6 8l4-3.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+          </button>
+          <div class="sec-body">
+            <div class="slot-thumb" id="slotThumb"><span class="muted small">空格子</span></div>
+            <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
+            <div class="row2">
+              <button class="btn tiny" id="btnUrl">用图片链接</button>
+              <button class="btn tiny danger" id="btnRemoveImage">移除图片</button>
+            </div>
+            <label class="field"><span>缩放 <b id="zoomVal">100%</b></span>
+              <input type="range" id="zoom" min="50" max="400" value="100">
+            </label>
+            <div class="row2">
+              <button class="btn tiny" id="btnFitMode">填满 / 完整</button>
+              <button class="btn tiny" id="btnResetPan">复位位置</button>
+            </div>
+
+            <div class="sub-label">AI 生成</div>
+            <div class="prompt-box prompt-edit">
+              <div class="prompt-head">
+                <span>生图提示词 · <b id="promptState">自动</b></span>
+                <span class="ph-acts">
+                  <button class="btn tiny hidden" id="btnPromptReset" title="丢掉手改，回到自动生成的提示词">恢复自动</button>
+                  <button class="btn tiny" id="btnCopyPrompt">复制</button>
+                </span>
+              </div>
+              <textarea id="slotPrompt" rows="6" spellcheck="false" placeholder="写一段剧情并匹配后，这里会出现贴合这一格的提示词；也可以直接自己写"></textarea>
+              <div class="neg-row">
+                <span>避免出现</span>
+                <input id="slotNegative" type="text" spellcheck="false" placeholder="text, watermark, extra fingers …">
+              </div>
+              <details class="sent-preview">
+                <summary>实际发给生图模型的完整内容</summary>
+                <pre id="slotPromptSent">—</pre>
+              </details>
+            </div>
+            <div class="ai-gen">
+              <div class="seg slot-ai-mode" id="slotAiMode" role="tablist" aria-label="AI 动作">
+                <button type="button" data-m="img" class="on">生图</button>
+                <button type="button" data-m="prompt">只写提示词</button>
+              </div>
+              <button class="btn wide ai-soft" id="btnAiImage" title="按上面的选择：直接生图，或只让 AI 重写这一格提示词">生这一格</button>
+            </div>
+            <div class="cand-strip hidden" id="candStrip">
+              <div class="cand-head">
+                <span>这一格的候选图</span>
+                <span class="cand-acts">
+                  <button class="btn tiny" id="btnCandNext" title="换一张（随机）">换一张</button>
+                  <button class="btn tiny" id="btnCandClear">清空候选</button>
+                </span>
+              </div>
+              <div class="cand-grid" id="candGrid"></div>
+            </div>
+
+            <div class="prompt-box shape-box">
+              <div class="prompt-head">
+                <span>形状开头词 · <b id="shapeName">—</b></span>
+                <button class="btn tiny" id="btnCopyShape" title="英文版，粘到国际模型提示词最前面">复制英文</button>
+              </div>
+              <pre id="shapePrefix">—</pre>
+              <div class="prompt-head sub">
+                <span>中文版 · <b class="muted">喂国内模型更稳</b></span>
+                <button class="btn tiny" id="btnCopyShapeZh">复制中文</button>
+              </div>
+              <pre id="shapePrefixZh">—</pre>
+              <div class="shape-tip" id="shapeTip">已经自动放在上面生图提示词的最前面；自己用别的工具出图时也可以单独复制。</div>
+            </div>
+
+            <div class="kv" id="slotKv"></div>
           </div>
-          <pre id="shapePrefixZh">—</pre>
-          <div class="shape-tip" id="shapeTip">粘到你自己的提示词<b>最前面</b>，构图就会自动适配这个格子的形状。</div>
-        </div>
-
-        <div class="prompt-box suggest-box" id="suggestBox">
-          <div class="prompt-head">
-            <span>这里应该是 · <b id="suggestFrom">建议</b></span>
-            <button class="btn tiny" id="btnUseSuggest">用这一句</button>
-          </div>
-          <div class="suggest-text" id="suggestText">—</div>
-        </div>
-
-        <div class="slot-thumb" id="slotThumb"><span class="muted small">空格子</span></div>
-        <div class="kv" id="slotKv"></div>
-
-        <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
-        <div class="slot-ai-mode" id="slotAiMode">
-            <button data-m="img" class="on">生图</button>
-            <button data-m="prompt">只写提示词</button>
-          </div>
-          <button class="btn wide" id="btnAiImage" title="按上面的选择：直接生图，或只让 AI 写这一格提示词">✨ 生成</button>
-        <div class="cand-strip hidden" id="candStrip">
-          <div class="cand-head">
-            <span>这一格的候选图</span>
-            <span class="cand-acts">
-              <button class="btn tiny" id="btnCandNext" title="换一张（随机）">换一张</button>
-              <button class="btn tiny" id="btnCandClear">清空候选</button>
-            </span>
-          </div>
-          <div class="cand-grid" id="candGrid"></div>
-        </div>
-        <div class="row2">
-          <button class="btn tiny" id="btnUrl">用图片链接</button>
-          <button class="btn tiny danger" id="btnRemoveImage">移除图片</button>
-        </div>
-
-        <label class="field"><span>缩放 <b id="zoomVal">100%</b></span>
-          <input type="range" id="zoom" min="50" max="400" value="100">
-        </label>
-        <div class="row2">
-          <button class="btn tiny" id="btnFitMode">填满 / 完整</button>
-          <button class="btn tiny" id="btnResetPan">复位位置</button>
-        </div>
-
-        <div class="prompt-box">
-          <div class="prompt-head"><span>本格生图提示词</span><button class="btn tiny" id="btnCopyPrompt">复制</button></div>
-          <pre id="slotPrompt">—</pre>
-        </div>
+        </section>
       </div>
     </div>
 
@@ -417,15 +460,19 @@
   </button>
   <button type="button" data-view="story">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2 13.6 8l4.9 1.6-4.9 1.6L12 16l-1.6-4.8L5.5 9.6 10.4 8 12 3.2Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" fill="currentColor"/></svg>
-    剧情匹配
+    剧情
   </button>
   <button type="button" data-view="canvas" class="on">
     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="2.8" width="15" height="18.4" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.5 10.2h15M12 10.2v11" stroke="currentColor" stroke-width="1.7"/></svg>
     画布
   </button>
-  <button type="button" data-view="inspect">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="15" cy="7" r="2.3" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="17" r="2.3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
-    格子与导出
+  <button type="button" data-view="edit">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19.5h3.2L18.6 8.6a2.26 2.26 0 0 0-3.2-3.2L4.5 16.3v3.2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m14 6.8 3.2 3.2" stroke="currentColor" stroke-width="1.7"/></svg>
+    编辑
+  </button>
+  <button type="button" data-view="output">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M8 7.3l4-3.8 4 3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 10.5H6.8a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10.4a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    分镜与导出
   </button>
 </nav>
 
@@ -547,6 +594,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script type="module" src="./app.js?v=m1u0x"></script>
+<script type="module" src="./app.js?v=zlgzs"></script>
 </body>
 </html>

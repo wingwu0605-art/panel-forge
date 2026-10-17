@@ -33,6 +33,15 @@ let html = await readFile(path.join(site, 'index.html'), 'utf8');
 if (!html.includes('PF_STATIC')) {
   html = html.replace('</head>', '<script>window.PF_STATIC = true;</script>\n</head>');
 }
+// 按内容哈希给 CSS / JS 加版本号：内容一变链接就变，浏览器不会吃旧缓存（不用再手动改 ?v=）
+{
+  const { createHash } = await import('node:crypto');
+  const h = createHash('sha1');
+  for (const f of ['app.js', 'styles.css', 'api-static.js']) h.update(await readFile(path.join(site, f)));
+  for (const f of await readdir(path.join(site, 'lib'))) h.update(await readFile(path.join(site, 'lib', f)));
+  const v = h.digest('hex').slice(0, 8);
+  html = html.replace(/(\.\/(?:styles\.css|app\.js))(\?v=[\w-]*)?(?=")/g, `$1?v=${v}`);
+}
 await writeFile(path.join(site, 'index.html'), html, 'utf8');
 await writeFile(path.join(site, '.nojekyll'), '', 'utf8');
 

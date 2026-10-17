@@ -70,6 +70,8 @@ const state = {
   bubbles: [],        // 气泡实例（画在页面上，导出时一起走）
   selBubble: null,
   lines: {},          // slotId -> 这一格的句子（台词/旁白）
+  editMod: 'text',     // 手机编辑页：text | image | bubble
+  promptEdits: {},    // slotId -> {prompt?, negative?} 用户手改的生图提示词（没改就不存）
   bubTab: 'rec',      // rec | fav
   bubUse: {},         // 气泡使用次数（常用排序）
   engine: null,
@@ -94,6 +96,11 @@ const CULTURE_LABEL = { jp: '日', cn: '中', kr: '韩', core: '通' };
 const CULTURE_ZH = { jp: '日式页漫', cn: '中式漫画', kr: '韩式条漫', core: '通用/跨界' };
 
 /* 外观层常量（init() 在顶层就跑，所以必须放在这里，不能放文件末尾） */
+const VIEW_ORDER = ['library', 'story', 'canvas', 'edit', 'output'];
+const VIEW_ALIAS = { inspect: 'edit' };
+const ZOOM_EASE = 'cubic-bezier(.32,.72,0,1)';
+let zoomT = { tx: 0, ty: 0, k: 1 };   // #canvas 当前的变换
+let zoomKey = '';
 const ACCENTS = [
   { id: 'blue', zh: '蓝色', l: '#007aff', d: '#0a84ff' },
   { id: 'indigo', zh: '靛蓝', l: '#5856d6', d: '#5e5ce6' },
@@ -226,6 +233,7 @@ async function init() {
       state.images = { ...(pg?.images || {}) };
       state.bubbles = (pg?.bubbles || []).map((b) => ({ ...b }));
       state.lines = { ...(pg?.lines || {}) };
+      state.promptEdits = { ...(pg?.promptEdits || {}) };
       if (Array.isArray(pg?.activeChars)) state.activeChars = pg.activeChars;
       state.selectedId = state.tpl?.slots?.[0]?.id || null;
       renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
@@ -417,6 +425,7 @@ function snapshot() {
     images: Object.fromEntries(Object.entries(state.images).map(([k, v]) => [k, { ...v }])),
     bubbles: state.bubbles.map((b) => ({ ...b })),
     lines: { ...state.lines },
+    promptEdits: JSON.parse(JSON.stringify(state.promptEdits || {})),
     selectedId: state.selectedId,
     selBubble: state.selBubble,
   };
@@ -426,6 +435,7 @@ function restore(snap) {
   state.images = Object.fromEntries(Object.entries(snap.images).map(([k, v]) => [k, { ...v }]));
   state.bubbles = snap.bubbles.map((b) => ({ ...b }));
   state.lines = { ...snap.lines };
+  state.promptEdits = JSON.parse(JSON.stringify(snap.promptEdits || {}));
   state.selectedId = snap.selectedId;
   state.selBubble = snap.selBubble;
   renderStage();
@@ -506,21 +516,8 @@ function initCollapsibles() {
     head.appendChild(caret);
 
     const apply = (open, save = true) => {
-      if (save) {
-        // 展开/收起过程中先裁切，动画结束再放开（否则阴影、焦点环会被一直裁掉）
-        el.classList.add('animating');
-        clearTimeout(el._animT);
-        el._animT = setTimeout(() => el.classList.remove('animating'), 600);
-      }
-      el.classList.toggle('collapsed', !open);
-      // 主题的 grid 0fr 在部分容器里收不干净：再用内联 max-height 兜一层
-      const _body = el.querySelector(':scope > .card-body');
-      if (_body) {
-        _body.style.overflow = 'hidden';
-        _body.style.transition = 'max-height .5s cubic-bezier(.25,.8,.25,1), opacity .3s cubic-bezier(.25,.8,.25,1)';
-        _body.style.maxHeight = open ? 'none' : '0px';
-        _body.style.opacity = open ? '1' : '0';
-      }
+      animateFold(el, body, open, { instant: !save });
+      caret.setAttribute('aria-expanded', open ? 'true' : 'false');
       if (save) { saved[key] = open; persist(); }
     };
     apply(initialOpen, false);
@@ -599,6 +596,7 @@ async function selectTemplate(id, opts = {}) {
   state.selBubble = null;
   resetHistory();
   loadLines(tpl.id);
+  state.promptEdits = {};
   attachSuggestions($('#plot').value || '', state.plan?.pages?.[0]?.plan);
   state.selectedId = tpl.slots[0]?.id || null;
   state.plan = null;
@@ -722,6 +720,7 @@ function bindUI() {
     const pt = pagePoint(ev);
     const bub = bubbleAt(pt);
     if (bub) {
+      if (document.body.dataset.view === 'edit') setEditMod('bubble');
       state.selBubble = bub.id;
       drag = { bubble: bub, moved: false, x0: ev.clientX, y0: ev.clientY };
       renderStage();
@@ -855,6 +854,8 @@ function bindUI() {
     // Ctrl+Enter：按规则匹配（输入框里也能用）
     if (mod && k === 'Enter') { ev.preventDefault(); runMatch(); return; }
 
+    // 输入框里按 Esc：先退出输入（之后的单键快捷键才能用）
+    if (typing && k === 'Escape') { document.activeElement.blur(); return; }
     if (typing) return;
 
     // ?：快捷键表（任何状态都能开）
@@ -1066,19 +1067,45 @@ function bindUI() {
     syncZoomSlider(); renderStage(); toast('已复位');
   });
   $('#btnCopyPrompt').addEventListener('click', () => {
-    const p = currentPlanPanel();
-    if (p) copyText(p.promptEn, '提示词已复制');
+    if (state.selectedId) copyText(effectivePrompt(state.selectedId).prompt, '提示词已复制');
   });
   $('#btnCopyShape').addEventListener('click', copyShapePrefix);
   $('#btnCopyShapeZh')?.addEventListener('click', copyShapePrefixZh);
   $('#btnUseSuggest')?.addEventListener('click', () => {
     const txt = state._suggest || '';
-    if (!txt) return;
+    if (!txt || !state.selectedId) return;
+    commit();
     const el = $('#slotLine');
-    el.value = el.value ? el.value + '\n' + txt : txt;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    toast('已填入本格句子');
+    el.value = el.value.trim() ? el.value.replace(/\s+$/, '') + '\n' + txt : txt;
+    state.lines[state.selectedId] = el.value;
+    saveLines(); queueSave?.();
+    syncSuggest(); syncSecSummary();
+    toast('已填进本格句子（可撤销）');
   });
+  // 生图提示词：可编辑
+  $('#slotPrompt').addEventListener('input', (ev) => {
+    if (!state.selectedId) return;
+    commitThrottled(900);
+    setPromptEdit(state.selectedId, 'prompt', ev.target.value);
+    syncPromptMeta();
+    syncSecSummary(); renderScriptSoon();
+  });
+  $('#slotNegative').addEventListener('input', (ev) => {
+    if (!state.selectedId) return;
+    commitThrottled(900);
+    setPromptEdit(state.selectedId, 'negative', ev.target.value);
+    syncPromptMeta();
+    syncSecSummary();
+  });
+  $('#btnPromptReset').addEventListener('click', () => {
+    if (!state.selectedId) return;
+    commit();
+    delete state.promptEdits[state.selectedId];
+    queueSave?.();
+    renderSlotPanel(); renderScript();
+    toast('已恢复自动生成的提示词');
+  });
+  $('#slotPromptSent').closest('details')?.addEventListener('toggle', syncPromptMeta);
   $('#btnKeyMgr')?.addEventListener('click', openKeySheet);
   $('#btnKeySheetClose')?.addEventListener('click', closeKeySheet);
   $('#keySheet')?.addEventListener('click', (ev) => { if (ev.target.id === 'keySheet') closeKeySheet(); });
@@ -1142,16 +1169,13 @@ function bindUI() {
     $('#ksMsg').textContent = e.verifiedAt ? '已保存并验证，可以开始用了' : '已保存（未验证，建议先点测试连接）';
     toast('已保存 Key：' + e.name);
   });
-  $('#btnSlotCollapse')?.addEventListener('click', () => {
-    state.slotCollapsed = !state.slotCollapsed;
-    applySlotCollapse();
-  });
+  initSlotSections();
   $('#slotAiMode')?.addEventListener('click', (ev) => {
     const b = ev.target.closest('button[data-m]');
     if (!b) return;
     state.slotAiMode = b.dataset.m;
     for (const x of document.querySelectorAll('#slotAiMode button')) x.classList.toggle('on', x === b);
-    $('#btnAiImage').textContent = state.slotAiMode === 'prompt' ? '✏️ 只写提示词' : '✨ 生这一格';
+    $('#btnAiImage').textContent = state.slotAiMode === 'prompt' ? '只写这一格的提示词' : '生这一格';
   });
   $('#btnAiImage')?.addEventListener('click', () => {
     if (state.slotAiMode === 'prompt') generateSlotPromptOnly();
@@ -1188,7 +1212,7 @@ function bindUI() {
     if (!confirm('清空本机草稿？所有页的图片、气泡和句子都会删掉，不能恢复。')) return;
     await idbSet('pages', null);
     state.pages = [{ tplId: state.tpl?.id || 'ref-4band-2col', name: '第 1 页', images: {}, bubbles: [], lines: {} }];
-    state.pageIdx = 0; state.images = {}; state.bubbles = []; state.lines = {}; state.cands = {};
+    state.pageIdx = 0; state.images = {}; state.bubbles = []; state.lines = {}; state.cands = {}; state.promptEdits = {};
     resetHistory(); renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
     toast('草稿已清空');
   });
@@ -1292,10 +1316,12 @@ function bindUI() {
     commitThrottled(900);
     state.lines[state.selectedId] = ev.target.value;
     saveLines();
+    syncSuggest(); syncSecSummary();
   });
   $('#btnBubbleFromLine').addEventListener('click', () => {
     const text = currentLine().trim();
     addBubble(text ? 'talk-ellipse' : 'narration-box', { text });
+    if (document.body.dataset.view === 'edit') setEditMod('bubble');
     if (!text) toast('已加一个空气泡，用上面的「文字」填内容');
   });
 
@@ -1467,11 +1493,106 @@ function makePlaceholder(slot) {
  * 右栏：格子
  * ================================================================== */
 /** 小框折叠：内联样式驱动，保证真的塌下去 */
+/* ---------------- 格子面板：「这一格说什么」/「图片」两段各自折叠 ---------------- */
+const SLOT_SEC_KEY = 'pf.slotsec';
+function initSlotSections() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(SLOT_SEC_KEY) || '{}') || {}; } catch { /* ignore */ }
+  for (const sec of $$('#slotPanel .slot-sec')) {
+    const key = sec.dataset.sec;
+    const head = sec.querySelector('.sec-head');
+    const body = sec.querySelector('.sec-body');
+    const apply = (open, animate) => {
+      animateFold(sec, body, open, { instant: !animate });
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    apply(saved[key] !== false, false);
+    head.addEventListener('click', () => {
+      const open = sec.classList.contains('collapsed');
+      apply(open, true);
+      saved[key] = open;
+      try { localStorage.setItem(SLOT_SEC_KEY, JSON.stringify(saved)); } catch { /* ignore */ }
+    });
+  }
+}
+
+/* ---------------- 生图提示词：自动生成 + 用户可改 ---------------- */
+function autoPromptOf(slot, panel) {
+  if (panel?.promptEn) return panel.promptEn;
+  const shape = panel?.shape || slot?.shape || null;
+  return [shape?.prefixEn, 'single panel, no text'].filter(Boolean).join(', ');
+}
+/** 这一格最终用的提示词：手改过就用手改的 */
+function effectivePrompt(slotId) {
+  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
+  const panel = (pagePlan()?.panels || []).find((p) => p.id === slotId) || null;
+  const edit = state.promptEdits?.[slotId] || {};
+  const autoPrompt = autoPromptOf(slot, panel);
+  const autoNeg = panel?.negative || '';
+  return {
+    prompt: edit.prompt ?? autoPrompt,
+    negative: edit.negative ?? autoNeg,
+    autoPrompt, autoNeg,
+    edited: edit.prompt != null || edit.negative != null,
+  };
+}
+/** 真正发给生图模型的那一段（角色一致性 + 提示词 + 避免项），预览和生图共用 */
+function buildImagePrompt(slotId) {
+  const e = effectivePrompt(slotId);
+  const chars = activeCharPayload();
+  const body = [chars.block, e.prompt].filter(Boolean).join(' ');
+  return { ...e, chars, full: e.negative ? `${body} | avoid: ${e.negative}` : body };
+}
+function setPromptEdit(slotId, field, value) {
+  const e = effectivePrompt(slotId);
+  const cur = { ...(state.promptEdits[slotId] || {}) };
+  const auto = field === 'prompt' ? e.autoPrompt : e.autoNeg;
+  if (value.trim() === auto.trim()) delete cur[field]; else cur[field] = value;
+  if (Object.keys(cur).length) state.promptEdits[slotId] = cur; else delete state.promptEdits[slotId];
+  queueSave?.();
+}
+function syncPromptMeta() {
+  const id = state.selectedId;
+  if (!id) return;
+  const b = buildImagePrompt(id);
+  $('#promptState').textContent = b.edited ? '已手改' : (currentPlanPanel()?.aiOptimized ? 'AI 写的' : '自动');
+  $('#promptState').classList.toggle('edited', b.edited);
+  $('#btnPromptReset').classList.toggle('hidden', !b.edited);
+  $('#slotPromptSent').textContent = b.full || '—';
+}
+
+/**
+ * 折叠 / 展开（卡片、格子面板、气泡库共用）
+ * 量出当前高度和目标高度，用 Web Animations 走一段弹簧；
+ * 终态交给 CSS 的 .collapsed（height:0 + visibility:hidden），所以动画被打断也不会卡在半截。
+ */
+const FOLD_EASE = 'linear(0, 0.0128, 0.0467, 0.0955, 0.1544, 0.2194, 0.2874, 0.3559, 0.4232, 0.488, 0.5491, 0.6062, 0.6587, 0.7065, 0.7497, 0.7882, 0.8224, 0.8524, 0.8786, 0.9013, 0.9207, 0.9373, 0.9512, 0.9629, 0.9726, 0.9806, 0.987, 0.9922, 0.9963, 0.9994, 1.0018, 1.0036, 1.0048, 1.0056, 1.0061, 1.0063, 1.0063, 1.0061, 1.0058, 1.0055, 1.0051, 1.0047, 1.0043, 1.0038, 1.0034, 1.003, 1.0026, 1.0023, 1)';
+function animateFold(container, body, open, { instant = false } = {}) {
+  if (!container || !body) return;
+  const wasOpen = !container.classList.contains('collapsed');
+  const from = body.getBoundingClientRect().height;
+  body.getAnimations?.().forEach((a) => a.cancel());
+  container.classList.toggle('collapsed', !open);
+  if (instant || wasOpen === open || !body.animate || !motionOK()) return;
+
+  const to = open ? body.scrollHeight : 0;
+  const frames = open
+    ? [{ height: from + 'px', opacity: 0, visibility: 'visible' }, { opacity: 1, offset: 0.55 }, { height: to + 'px', opacity: 1, visibility: 'visible' }]
+    : [{ height: from + 'px', opacity: 1, visibility: 'visible' }, { opacity: 0, offset: 0.6 }, { height: '0px', opacity: 0, visibility: 'visible' }];
+  container.classList.add('folding');
+  let anim;
+  const opt = { duration: open ? 560 : 420, easing: open ? FOLD_EASE : 'cubic-bezier(.32,.72,0,1)' };
+  try { anim = body.animate(frames, opt); } catch { anim = body.animate(frames, { ...opt, easing: 'cubic-bezier(.32,.72,0,1)' }); }
+  const done = () => container.classList.remove('folding');
+  anim.addEventListener('finish', done);
+  anim.addEventListener('cancel', done);
+}
+
+/** 小框折叠：内联样式驱动，保证真的塌下去 */
 function applySlotCollapse() {
   const panel = document.querySelector('#slotPanel');
   if (!panel) return;
-  const kids = [...panel.children].filter((c) => !c.classList.contains('slot-head'));
-  for (const k of kids) {
+  for (const k of [...panel.children].filter((c) => !c.classList.contains('slot-head'))) {
     k.style.overflow = 'hidden';
     k.style.transition = 'max-height .45s cubic-bezier(.25,.8,.25,1), opacity .28s, margin .3s';
     k.style.maxHeight = state.slotCollapsed ? '0px' : 'none';
@@ -1523,7 +1644,14 @@ function renderSlotPanel() {
     ['构图提示', panel ? (panel.beatHint || panel.composition || '—') : '—'],
   ].map(([k, v]) => `<b>${k}</b><span>${escapeHtml(String(v))}</span>`).join('');
 
-  $('#slotPrompt').textContent = panel ? panel.promptEn : '（先在左侧输入剧情并点「按规则匹配」，可获得贴合这一格的提示词）';
+  {
+    const e = effectivePrompt(slot.id);
+    const ta = $('#slotPrompt'), neg = $('#slotNegative');
+    // 正在打字时不回写，免得光标跳
+    if (document.activeElement !== ta) ta.value = e.prompt;
+    if (document.activeElement !== neg) neg.value = e.negative;
+    syncPromptMeta();
+  }
 
   // 形状开头词（不依赖 AI，永远可用）
   const shape = panel?.shape || slot.shape || null;
@@ -1532,18 +1660,12 @@ function renderSlotPanel() {
   if ($('#shapePrefixZh')) $('#shapePrefixZh').textContent = shape?.prefixZh || '—';
 
   // 这一格应该是什么：AI 给的优先，没有就用规则引擎算的建议句
-  if ($('#suggestBox')) {
-    const sug = panel?.suggest || slotSuggest(slot.id);
-    const fromAi = !!panel?.suggestAi;
-    $('#suggestFrom').textContent = fromAi ? 'AI 的思路' : (sug ? '按剧情推的' : '还没剧情');
-    $('#suggestText').textContent = sug || '先在左边写一段剧情，或用 AI 导演排一次戏';
-    $('#btnUseSuggest').disabled = !sug;
   renderCands();
-    state._suggest = sug || '';
-  }
+  state._suggest = panel?.suggest || slotSuggest(slot.id) || '';
+  state._suggestAi = !!panel?.suggestAi;
   $('#shapeTip').innerHTML = shape
-    ? `粘到你自己的提示词<b>最前面</b>，构图就会适配这个形状。${escapeHtml(shape.hintZh || '')}`
-    : '粘到你自己的提示词<b>最前面</b>。';
+    ? `已自动放在生图提示词<b>最前面</b>；用别的工具出图时也可单独复制。${escapeHtml(shape.hintZh || '')}`
+    : '已自动放在生图提示词<b>最前面</b>。';
 
   $('#zoom').value = Math.round((img?.zoom || 1) * 100);
   $('#zoomVal').textContent = Math.round((img?.zoom || 1) * 100) + '%';
@@ -1555,7 +1677,10 @@ function renderSlotPanel() {
   $('#slotLine').value = saved != null ? saved : (panel?.dialogue || '');
   $('#slotLine').placeholder = panel?.content
     ? `这一格：${panel.content.slice(0, 40)}…  ← 在这里写台词`
-    : '这一格要说什么：台词 / 旁白 / 内心独白（会自动存到本机）';
+    : '台词 / 旁白 / 内心独白（自动存到本机）';
+  syncSuggest();
+  syncSecSummary();
+  if (document.body.dataset.view === 'edit') { syncEditHead(); syncEditZoom(); }
 
   renderBubbles();
 }
@@ -1876,7 +2001,7 @@ function renderScript() {
       <div class="asp">${p.aspectLabel} · 建议出图 ${p.genSize} · 占页 ${p.areaPct}%</div>
       ${p.content ? `<div class="ct">${escapeHtml(p.content)}</div>` : ''}
       ${p.dialogue ? `<div class="dl">「${escapeHtml(p.dialogue)}」</div>` : ''}
-      <div class="pr">${escapeHtml(p.promptEn)}</div>
+      <div class="pr">${escapeHtml(effectivePrompt(p.id).prompt)}</div>
       ${p.promptZh ? `<div class="pr zh">${escapeHtml(p.promptZh)}</div>` : ''}
       <div class="act">
         <button class="btn tiny" data-act="copy">复制提示词</button>
@@ -1892,7 +2017,7 @@ function renderScript() {
     const p = panels.find((x) => x.id === card.dataset.id);
     card.addEventListener('click', (ev) => {
       const act = ev.target.closest('button')?.dataset.act;
-      if (act === 'copy') copyText(p.promptEn, '该格提示词已复制');
+      if (act === 'copy') copyText(effectivePrompt(p.id).prompt, '该格提示词已复制');
       else if (act === 'prefix') copyText(p.shape?.prefixEn || '', '形状开头词已复制');
       else if (act === 'prefixZh') copyText(p.shape?.prefixZh || '', '中文形状词已复制');
       else if (act === 'promptZh') copyText(p.promptZh || '', '中文提示词已复制');
@@ -2290,6 +2415,7 @@ function currentPageSnapshot() {
     images: { ...state.images },
     bubbles: state.bubbles.map((b) => ({ ...b })),
     lines: { ...state.lines },
+    promptEdits: { ...state.promptEdits },
     cands: state.cands,
     activeChars: [...state.activeChars],
     slotCollapsed: state.slotCollapsed,
@@ -2321,6 +2447,7 @@ async function switchPage(i) {
   state.images = { ...(pg.images || {}) };
   state.bubbles = (pg.bubbles || []).map((b) => ({ ...b }));
   state.lines = { ...(pg.lines || {}) };
+  state.promptEdits = { ...(pg.promptEdits || {}) };
   state.selBubble = null;
   state.cands = pg.cands || {};
   if (Array.isArray(pg.activeChars)) state.activeChars = [...pg.activeChars];
@@ -2414,6 +2541,7 @@ async function generateSlotPromptOnly() {
     if (!want) throw new Error('这一格没拿到提示词');
     const target = currentPlanPanel();
     if (target) { target.promptEnRule = target.promptEnRule || target.promptEn; target.promptEn = want.promptEn; target.aiOptimized = true; }
+    if (state.promptEdits[state.selectedId]?.prompt != null) { commit(); delete state.promptEdits[state.selectedId].prompt; if (!Object.keys(state.promptEdits[state.selectedId]).length) delete state.promptEdits[state.selectedId]; }
     renderSlotPanel(); renderScript();
     toast('这一格的提示词已由 AI 改写');
   } catch (e) {
@@ -2426,23 +2554,20 @@ async function generateSlotImage() {
   if (!state.tpl || !state.selectedId) { toast('先点一个格子'); return; }
   const panel = currentPlanPanel();
   const slot = state.tpl.slots.find((s) => s.id === state.selectedId);
-  const shape = panel?.shape || slot?.shape || null;
-  const promptEn = panel?.promptEn || [shape?.prefixEn, 'single panel, no text'].filter(Boolean).join(', ');
-  const negative = panel?.negative || '';
   const btn = $('#btnAiImage');
   const old = btn.textContent;
   btn.disabled = true;
   btn.textContent = '正在生图…（10–60 秒）';
   saveLlm();
   try {
-    const charPayload = activeCharPayload();
+    const built = buildImagePrompt(state.selectedId);
+    const charPayload = built.chars;
     if (!charPayload.block) {
       const ok = confirm('还没启用角色参考图，生成的图可能每格长得不一样。\n\n建议先去左边「角色参考图」加一张。\n\n仍然继续生图吗？');
       if (!ok) { btn.disabled = false; btn.textContent = old; return; }
     }
-    const fullPrompt = [charPayload.block, promptEn].filter(Boolean).join(' ');
     const res = await api.imageGenerate({
-      prompt: negative ? fullPrompt + ' | avoid: ' + negative : fullPrompt,
+      prompt: built.full,
       refs: charPayload.refs,
       size: panel?.genSize || undefined,
       model: state.llm.imgModel || undefined,
@@ -2547,7 +2672,7 @@ function scriptMarkdown() {
       p.content ? `- 画面：${p.content}` : `- 构图：${p.beatHint}`,
       `- 台词：${(state.lines[p.id] ?? p.dialogue) ? '「' + (state.lines[p.id] ?? p.dialogue) + '」' : '无'}`,
       `- 形状开头词：\`${p.shape?.prefixEn || ''}\``,
-      `- 提示词：\`${p.promptEn}\``,
+      `- 提示词：\`${effectivePrompt(p.id).prompt}\``,
       `- 精简版：\`${p.promptShort || ''}\``,
       `- 负面词：\`${p.negative}\``,
     ].join('\n')),
@@ -2633,6 +2758,7 @@ function exportJSON() {
       name: v.name, iw: v.iw, ih: v.ih, zoom: v.zoom, panX: v.panX, panY: v.panY, mode: v.mode,
     }])),
     lines: state.lines,
+    promptEdits: state.promptEdits,
     bubbles: state.bubbles,
     plan: state.plan?.pages?.[0] || null,
     exportedAt: new Date().toISOString(),
@@ -3141,32 +3267,199 @@ function initMoreMenu() {
   menu.addEventListener('click', () => set(false));
 }
 
-/** 手机 / 平板竖屏：底部标签栏切换「模板库 / 剧情匹配 / 画布 / 格子与导出」 */
-const VIEW_ORDER = ['library', 'story', 'canvas', 'inspect'];
+/** 手机 / 平板竖屏：底部标签栏切换「模板库 / 剧情 / 画布 / 编辑 / 分镜与导出」 */
 function setView(view, opts = {}) {
-  if (!view) return;
+  view = VIEW_ALIAS[view] || view;
+  if (!VIEW_ORDER.includes(view)) return;
   const prev = document.body.dataset.view;
-  if (opts.animate && prev && prev !== view && compactMQ.matches) {
-    const dir = VIEW_ORDER.indexOf(view) > VIEW_ORDER.indexOf(prev) ? 'view-fwd' : 'view-back';
-    withTransition(dir, () => setView(view));
+  const compact = compactMQ.matches;
+  if (view === 'edit' && state.tpl && !state.selectedId) {
+    state.selectedId = state.tpl.slots[0]?.id || null;
+    renderStage(); renderSlotPanel();
+  }
+  if (opts.animate && prev && prev !== view && compact) {
     replay($(`#tabbar button[data-view="${view}"]`), 'bounce');
+    // 画布 ⇄ 编辑：页面直接放大 / 缩回这一格，比整页滑动更有空间感
+    if (view === 'edit') { enterEdit(prev === 'canvas'); return; }
+    if (prev === 'edit') { exitEdit(view); return; }
+    const dir = VIEW_ORDER.indexOf(view) > VIEW_ORDER.indexOf(prev) ? 'view-fwd' : 'view-back';
+    withTransition(dir, () => applyView(view));
     return;
   }
-  document.body.dataset.view = view;
+  if (view === 'edit' && compact) { enterEdit(false, { instant: !opts.animate }); return; }
+  if (prev === 'edit') clearEditZoom();
+  applyView(view);
+}
+function applyView(view) {
+  const body = document.body;
+  body.dataset.view = view;
+  body.classList.toggle('sheet-on', view === 'edit');
   $$('#tabbar button').forEach((b) => {
     const on = b.dataset.view === view;
     b.classList.toggle('on', on);
     b.setAttribute('aria-current', on ? 'page' : 'false');
   });
-  if (view === 'canvas') renderStage();
+  if (view === 'output') {
+    const cur = $('#tabs button.on')?.dataset.tab;
+    if (!cur || cur === 'slot') activateTab('script');
+  }
+  if (view === 'edit') { activateTab('slot'); setEditMod(state.editMod || 'text', { quiet: true }); syncEditHead(); }
+  if (view === 'canvas' || view === 'edit') renderStage();
 }
 function goCanvasOnCompact() { if (compactMQ.matches) setView('canvas', { animate: true }); }
 
+/* ---------------- 编辑页：放大到选中的格子 ---------------- */
+
+function holderEl() { return $('#canvas'); }
+function setHolderT(t, transition) {
+  const h = holderEl();
+  if (!h) return;
+  zoomT = t;
+  h.style.transition = transition || 'none';
+  h.style.transform = (t.k === 1 && !t.tx && !t.ty) ? '' : `translate(${t.tx}px, ${t.ty}px) scale(${t.k})`;
+}
+/** 不受当前变换影响的几何：holder 左上角 + 页面 svg 的位置（反算 zoomT） */
+function untransformed() {
+  const h = holderEl(), svg = h?.querySelector('svg');
+  if (!svg) return null;
+  const hr = h.getBoundingClientRect(), sr = svg.getBoundingClientRect();
+  const { tx, ty, k } = zoomT;
+  const hl = hr.left - tx, ht = hr.top - ty;
+  return {
+    hl, ht,
+    svg: { left: hl + (sr.left - hl - tx) / k, top: ht + (sr.top - ht - ty) / k, width: sr.width / k, height: sr.height / k },
+  };
+}
+/** 选中格子放大填满上半屏需要的变换 */
+function zoomTargetFor(slotId) {
+  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
+  const g = untransformed();
+  const stage = $('#stage')?.getBoundingClientRect();
+  if (!slot || !g || !stage?.width) return { tx: 0, ty: 0, k: 1 };
+  const pw = state.tpl.page.w, ph = state.tpl.page.h, R = g.svg;
+  const sw = (slot.w / pw) * R.width, sh = (slot.h / ph) * R.height;
+  const cx = R.left + ((slot.x + slot.w / 2) / pw) * R.width;
+  const cy = R.top + ((slot.y + slot.h / 2) / ph) * R.height;
+  const pad = 18;
+  const k = clamp(Math.min((stage.width - pad * 2) / sw, (stage.height - pad * 2) / sh), 1, 6);
+  const scx = stage.left + stage.width / 2, scy = stage.top + stage.height / 2;
+  return { tx: scx - g.hl - (cx - g.hl) * k, ty: scy - g.ht - (cy - g.ht) * k, k };
+}
+/** 选中格变了 / 尺寸变了就平滑移过去 */
+function syncEditZoom(force = false) {
+  if (document.body.dataset.view !== 'edit' || !compactMQ.matches || document.body.classList.contains('zooming')) return;
+  const key = [state.selectedId, state.tpl?.id, $('#stage')?.clientWidth, $('#stage')?.clientHeight].join('|');
+  if (!force && key === zoomKey) return;
+  zoomKey = key;
+  const t = zoomTargetFor(state.selectedId);
+  setHolderT(t, motionOK() ? `transform .62s ${ZOOM_EASE}` : 'none');
+}
+function clearEditZoom() { zoomKey = ''; setHolderT({ tx: 0, ty: 0, k: 1 }); }
+
+/** FLIP：从 rect A 看起来的位置，变到 rect B 现在的位置所需的起始变换 */
+function flipFrom(A, g) {
+  const k0 = A.width / g.svg.width;
+  return { tx: A.left - g.hl - (g.svg.left - g.hl) * k0, ty: A.top - g.ht - (g.svg.top - g.ht) * k0, k: k0 };
+}
+
+function enterEdit(fromCanvas, { instant = false } = {}) {
+  const svg = holderEl()?.querySelector('svg');
+  const A = fromCanvas && svg ? svg.getBoundingClientRect() : null;
+  const body = document.body;
+  clearEditZoom();
+  applyView('edit');
+  if (instant || !motionOK()) { requestAnimationFrame(() => syncEditZoom(true)); return; }
+  body.classList.add('zooming');
+  replay(body, 'sheet-in');
+  requestAnimationFrame(() => {
+    const g = untransformed();
+    if (A && g) setHolderT(flipFrom(A, g));            // 先摆回原来整页的位置
+    void holderEl().offsetWidth;
+    const t = zoomTargetFor(state.selectedId);
+    zoomKey = [state.selectedId, state.tpl?.id, $('#stage')?.clientWidth, $('#stage')?.clientHeight].join('|');
+    setHolderT(t, `transform .7s ${ZOOM_EASE}`);       // 再放大到这一格
+    setTimeout(() => body.classList.remove('zooming', 'sheet-in'), 720);
+  });
+}
+
+function exitEdit(toView) {
+  const body = document.body;
+  const svg = holderEl()?.querySelector('svg');
+  const E = svg ? svg.getBoundingClientRect() : null;
+  if (!motionOK() || toView !== 'canvas' || !E) {
+    clearEditZoom();
+    withTransition(VIEW_ORDER.indexOf(toView) > VIEW_ORDER.indexOf('edit') ? 'view-fwd' : 'view-back', () => applyView(toView));
+    return;
+  }
+  // 抽屉往下收，页面从这一格缩回整页
+  body.classList.add('sheet-on', 'sheet-out', 'zooming');
+  clearEditZoom();
+  body.dataset.view = toView;
+  $$('#tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.view === toView));
+  renderStage();
+  requestAnimationFrame(() => {
+    const g = untransformed();
+    if (g) setHolderT(flipFrom(E, g));
+    void holderEl().offsetWidth;
+    setHolderT({ tx: 0, ty: 0, k: 1 }, `transform .6s ${ZOOM_EASE}`);
+    setTimeout(() => {
+      body.classList.remove('sheet-on', 'sheet-out', 'zooming');
+      applyView(toView);
+      setHolderT({ tx: 0, ty: 0, k: 1 });
+    }, 620);
+  });
+}
+
+function setEditMod(m, { quiet = false } = {}) {
+  state.editMod = m;
+  const rail = $('#railRight');
+  if (!rail) return;
+  const changed = rail.dataset.mod !== m;
+  rail.dataset.mod = m;
+  $$('#editSeg button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+  if (changed && !quiet) { replay(rail, 'mod-swap'); rail.scrollTo({ top: 0, behavior: motionOK() ? 'smooth' : 'auto' }); }
+}
+
+function syncEditHead() {
+  const slot = state.tpl?.slots?.find((s) => s.id === state.selectedId);
+  if (!slot) return;
+  const panel = currentPlanPanel();
+  $('#editIndex').textContent = slot.order;
+  $('#editRole').textContent = panel ? panel.roleZh : slot.role;
+  $('#editShot').textContent = panel ? `${panel.shot} · ${panel.beat || '通用'}` : '';
+  const idx = state.tpl.slots.findIndex((s) => s.id === slot.id);
+  $('#btnEditPrev').disabled = idx <= 0;
+  $('#btnEditNext').disabled = idx >= state.tpl.slots.length - 1;
+}
+
+function stepSlot(dir) {
+  if (!state.tpl) return;
+  const list = state.tpl.slots;
+  const i = list.findIndex((s) => s.id === state.selectedId);
+  const next = list[clamp(i + dir, 0, list.length - 1)];
+  if (!next || next.id === state.selectedId) return;
+  state.selectedId = next.id; state.selBubble = null;
+  renderStage(); renderSlotPanel();
+}
+
 function initViews() {
   $$('#tabbar button').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view, { animate: true })));
-  $('#btnEditSlot')?.addEventListener('click', () => { activateTab('slot'); setView('inspect', { animate: true }); });
+  $('#btnEditSlot')?.addEventListener('click', () => setView('edit', { animate: true }));
+  $('#btnEditDone')?.addEventListener('click', () => setView('canvas', { animate: true }));
+  $('#btnEditPrev')?.addEventListener('click', () => stepSlot(-1));
+  $('#btnEditNext')?.addEventListener('click', () => stepSlot(1));
+  $('#editSeg')?.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-m]');
+    if (b) setEditMod(b.dataset.m);
+  });
+  // 上半屏尺寸变了（旋转屏幕、键盘弹出）就重新对准
+  if (window.ResizeObserver) new ResizeObserver(() => syncEditZoom()).observe($('#stage'));
+  compactMQ.addEventListener?.('change', () => {
+    if (!compactMQ.matches) { clearEditZoom(); document.body.classList.remove('sheet-on', 'sheet-in', 'sheet-out', 'zooming'); }
+    else if (document.body.dataset.view === 'edit') { applyView('edit'); syncEditZoom(true); }
+  });
   const want = new URLSearchParams(location.search).get('view');
-  setView(['library', 'story', 'canvas', 'inspect'].includes(want) ? want : 'canvas');
+  setView(VIEW_ALIAS[want] || (VIEW_ORDER.includes(want) ? want : 'canvas'));
 }
 
 function syncSlotFab(has) {
@@ -3184,4 +3477,29 @@ function initStaticLinks() {
   if (docs) docs.href = REPO_URL + '/blob/main/docs/API.md';
   if (tools) { tools.href = REPO_URL + '/blob/main/docs/AI-INTEGRATION.md'; tools.textContent = 'AI 接入说明'; }
   if (sheet) { sheet.href = REPO_URL; sheet.textContent = 'GitHub 仓库'; }
+}
+
+
+/* ---------------- 本格句子里的建议行 & 两段的小结 ---------------- */
+const renderScriptSoon = debounce(() => { if (state.tpl) renderScript(); }, 400);
+
+function syncSuggest() {
+  const box = $('#suggestBox');
+  if (!box) return;
+  const sug = (state._suggest || '').trim();
+  const cur = ($('#slotLine')?.value || '').trim();
+  // 没建议、或者已经用上了，就不占地方
+  box.classList.toggle('hidden', !sug || cur.includes(sug));
+  $('#suggestFrom').textContent = state._suggestAi ? 'AI 思路' : '思路';
+  $('#suggestText').textContent = sug;
+}
+function syncSecSummary() {
+  const id = state.selectedId;
+  if (!id) return;
+  const line = ($('#slotLine')?.value || '').trim();
+  $('#secTextSum').textContent = line ? '「' + (line.length > 14 ? line.slice(0, 14) + '…' : line) + '」' : '还没写';
+  const img = state.images[id];
+  const nc = (state.cands?.[id] || []).length;
+  const edited = !!state.promptEdits?.[id];
+  $('#secImageSum').textContent = [img ? '已填图' : '空', nc ? `${nc} 张候选` : '', edited ? '提示词已手改' : ''].filter(Boolean).join(' · ');
 }
