@@ -2,7 +2,7 @@
  * app.js — PanelForge 分镜坊 前端
  * 零框架；渲染内核与后端共用同一份 /lib/svg.mjs，保证「所见即导出」。
  */
-import { renderTemplateSVG } from './lib/svg.mjs';
+import { renderTemplateSVG, imageAttrs } from './lib/svg.mjs';
 import { pointInPoly } from './lib/geometry.mjs';
 import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble, bubbleThumb } from './lib/bubbles.mjs';
 
@@ -130,6 +130,86 @@ const compactMQ = window.matchMedia('(max-width:1024px)');
 /** ?dbg=1：底栏换成一行动调试信息（排查多页 / 面板问题时用） */
 const DBG = new URLSearchParams(location.search).get('dbg') === '1';
 
+/* ------------------------------------------------------------------ *
+ * ?perf=1：性能浮层
+ * 只在这个参数下存在；用来量「拖动 / 缩放」热路径到底花了多少时间，
+ * 手机上也能直接看（不用连 Mac 抓 Safari 时间线）。
+ * ---------------------------------------------------------------- */
+const PERF = new URLSearchParams(location.search).get('perf') === '1';
+const perf = {
+  frames: [], render: [], patch: [], save: [], longtask: [],
+  lastSaveBytes: 0, renders: 0, patches: 0, saves: 0,
+};
+function perfPush(arr, v) { arr.push(v); if (arr.length > 90) arr.shift(); }
+function perfStats(arr) {
+  if (!arr.length) return { avg: 0, p95: 0, max: 0 };
+  const s = [...arr].sort((a, b) => a - b);
+  const at = (q) => s[Math.min(s.length - 1, Math.floor(s.length * q))];
+  return {
+    avg: s.reduce((n, v) => n + v, 0) / s.length,
+    p95: at(0.95), max: s[s.length - 1],
+  };
+}
+/** 量一段代码耗时（只在 ?perf=1 下记录，别的地方调它不会变慢） */
+const perfNow = () => (PERF ? performance.now() : 0);
+const perfDone = (kind, t0) => {
+  if (!PERF || !t0) return;
+  perfPush(perf[kind], performance.now() - t0);
+  if (kind === 'render') perf.renders++;
+  if (kind === 'patch') perf.patches++;
+};
+function initPerfHud() {
+  if (!PERF) return;
+  const el = document.createElement('div');
+  el.className = 'perf-hud';
+  el.id = 'perfHud';
+  el.textContent = 'perf…';
+  document.body.appendChild(el);
+  let last = performance.now();
+  const tick = (t) => { perfPush(perf.frames, t - last); last = t; requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+  if (window.PerformanceObserver) {
+    try {
+      new PerformanceObserver((l) => l.getEntries().forEach((e) => perfPush(perf.longtask, Math.round(e.duration))))
+        .observe({ type: 'longtask', buffered: true });
+    } catch { /* 老浏览器没有 longtask */ }
+  }
+  const cls = (v, warn, bad) => (v >= bad ? 'bad' : v >= warn ? 'warn' : '');
+  const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(2) + 'MB' : Math.round(n / 1024) + 'KB');
+  window.__pfPerf = {
+    reset() {
+      for (const k of ['frames', 'render', 'patch', 'save', 'longtask']) perf[k].length = 0;
+      perf.renders = 0; perf.patches = 0; perf.saves = 0; perf.lastSaveBytes = 0;
+    },
+    snapshot() {
+      return {
+        frames: perfStats(perf.frames), render: perfStats(perf.render), patch: perfStats(perf.patch),
+        save: perfStats(perf.save), renders: perf.renders, patches: perf.patches, saves: perf.saves,
+        longtasks: perf.longtask.slice(-8), saveBytes: perf.lastSaveBytes,
+        images: Object.keys(state.images || {}).length,
+        imageBytes: Object.values(state.images || {}).reduce((n, im) => n + String(im?.href || '').length, 0),
+        markupBytes: ($('#canvas svg')?.outerHTML || '').length,
+      };
+    },
+  };
+  setInterval(() => {
+    const f = perfStats(perf.frames);
+    const r = perfStats(perf.render);
+    const p = perfStats(perf.patch);
+    const imgs = Object.values(state.images || {});
+    const bytes = imgs.reduce((n, im) => n + String(im?.href || '').length, 0);
+    const markup = ($('#canvas svg')?.outerHTML || '').length;
+    const fps = f.avg > 0 ? Math.round(1000 / f.avg) : 0;
+    el.innerHTML = [
+      `<b>${fps}</b> fps · 帧 p95 <span class="${cls(f.p95, 20, 34)}">${f.p95.toFixed(1)}ms</span> · 长任务 ${perf.longtask.length}`,
+      `render ${perf.renders} 次 · 最近 ${r.p95.toFixed(1)}ms · 峰 ${r.max.toFixed(1)}ms`,
+      `patch ${perf.patches} 次 · 最近 ${p.p95.toFixed(2)}ms`,
+      `存盘 ${perf.saves} 次 · ${kb(perf.lastSaveBytes)} · 峰 ${perfStats(perf.save).max.toFixed(0)}ms`,
+      `图 ${imgs.length} 张 · base64 ${kb(bytes)} · 标记 ${kb(markup)}`,
+    ].join('\n');
+  }, 250);
+}
+
 const THEME_ICONS = {
   auto: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2Z" fill="currentColor"/></svg>',
   light: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8v2.1M10 16.1v2.1M1.8 10h2.1M16.1 10h2.1M4.2 4.2l1.5 1.5M14.3 14.3l1.5 1.5M4.2 15.8l1.5-1.5M14.3 5.7l1.5-1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
@@ -162,6 +242,7 @@ async function directFirst(name, body) {
 
 async function init() {
   initChrome();
+  initPerfHud();
   bindUI();
   initCollapsibles();
   api = await makeApi();
@@ -232,7 +313,7 @@ async function init() {
       state.pageIdx = Math.min(draft.pageIdx || 0, draft.pages.length - 1);
       const pg = state.pages[state.pageIdx];
       if (pg?.tplId) await selectTemplate(pg.tplId, { silent: true });
-      state.images = { ...(pg?.images || {}) };
+      state.images = rehydrateImages(pg?.images || {});
       state.bubbles = (pg?.bubbles || []).map((b) => ({ ...b }));
       state.lines = { ...(pg?.lines || {}) };
       state.promptEdits = { ...(pg?.promptEdits || {}) };
@@ -636,12 +717,67 @@ function readOrderText(r) {
  * ================================================================== */
 let rafPending = false;
 let pageEnterTimer = 0;
+/**
+ * 拖动 / 缩放图片的热路径：只改被拖那一格 <image> 的几何属性，不重建整页。
+ *
+ * 以前每次 pointermove 都走 renderStage()：把整页 SVG（含所有图片的 base64）
+ * 重新拼成字符串再 innerHTML —— 8 张图就是每帧 3MB 出头的字符串，
+ * 桌面掉到 36fps，手机上直接个位数帧。这里只写 5 个属性，代价是微秒级。
+ * 返回值 false 表示这一格没有 <image>（比如刚换过模板），调用方可以退回整页重绘。
+ */
+function patchSlotImage(slotId) {
+  const t0 = perfNow();
+  const svg = $('#canvas svg');
+  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
+  const img = state.images[slotId];
+  if (!svg || !slot || !img) return false;
+  const el = svg.querySelector(`image[data-slot="${(window.CSS?.escape || String)(slotId)}"]`);
+  if (!el) return false;
+  const a = imageAttrs(slot, img);
+  el.setAttribute('x', a.x);
+  el.setAttribute('y', a.y);
+  el.setAttribute('width', a.width);
+  el.setAttribute('height', a.height);
+  el.setAttribute('preserveAspectRatio', a.preserveAspectRatio);
+  if (a.rotate) el.setAttribute('transform', a.rotate);
+  else el.removeAttribute('transform');
+  perfDone('patch', t0);
+  return true;
+}
+/** 热路径的兜底：能量到就只改属性，量不到（没图 / 换过模板）才整页重绘 */
+function refreshSlotImage(slotId) {
+  if (!patchSlotImage(slotId)) renderStage();
+}
+
+/**
+ * 拖动气泡的热路径：只给这个气泡的 <g> 加一个 translate。
+ * 标记里的位置是「烤死」的（data-x/data-y），所以每次按 state 和目标位置算一次偏移，
+ * 不用累加，也就不会漂。
+ */
+function patchBubble(id) {
+  const t0 = perfNow();
+  const svg = $('#canvas svg');
+  const b = state.bubbles.find((x) => x.id === id);
+  const g = svg?.querySelector(`g[data-bubble="${(window.CSS?.escape || String)(id)}"]`);
+  if (!g || !b) return false;
+  const dx = b.x - (Number(g.dataset.x) || 0);
+  const dy = b.y - (Number(g.dataset.y) || 0);
+  if (dx || dy) g.setAttribute('transform', `translate(${Math.round(dx * 100) / 100} ${Math.round(dy * 100) / 100})`);
+  else g.removeAttribute('transform');
+  perfDone('patch', t0);
+  return true;
+}
+function refreshBubble(id) {
+  if (!patchBubble(id)) renderStage();
+}
+
 function renderStage() {
   if (!state.tpl) return;
   if (rafPending) return;
   rafPending = true;
   requestAnimationFrame(() => {
     rafPending = false;
+    const t0 = perfNow();
     const tpl = state.tpl;
     let svg = '';
     try {
@@ -690,6 +826,7 @@ function renderStage() {
     }
     const el = holder.querySelector('svg');
     if (el) el.addEventListener('dblclick', onCanvasDblClick);
+    perfDone('render', t0);
     // 镂空模式要说清楚：图片是故意藏起来，不是丢了
     const foot = $('#footMsg');
     if (foot) {
@@ -763,6 +900,7 @@ function bindUI() {
     const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
     if (!drag.moved && Math.hypot(dx, dy) > 4) {
       drag.moved = true;
+      document.body.classList.add('pf-dragging');
       if (drag.bubble || (drag.slot && state.images[drag.slot.id])) commit();
     }
     if (drag.moved && drag.bubble) {
@@ -774,7 +912,7 @@ function bindUI() {
       b.y = clamp(b.y + dy * k, -b.h * 0.5, state.tpl.page.h - b.h * 0.5);
       drag.x0 = ev.clientX;
       drag.y0 = ev.clientY;
-      renderStage();
+      refreshBubble(b.id);
       return;
     }
     if (drag.moved && drag.slot && state.images[drag.slot.id]) {
@@ -786,14 +924,16 @@ function bindUI() {
       img.panY += dy * k;
       drag.x0 = ev.clientX;
       drag.y0 = ev.clientY;
-      renderStage();
+      refreshSlotImage(drag.slot.id);
     }
   });
 
   const endDrag = (ev) => {
+    document.body.classList.remove('pf-dragging');
     if (!drag) return;
     if (drag.bubble) {
       if (!drag.moved) renderBubbleInspector();
+      else { renderStage(); queueSave(); } // 松手把 translate 烘回标记，并落一次草稿
       drag = null;
       return;
     }
@@ -801,12 +941,14 @@ function bindUI() {
       if (drag.slot) { state.selectedId = drag.slot.id; state.selBubble = null; renderStage(); renderSlotPanel(); renderBubbles(); }
       else { state.selectedId = null; state.selBubble = null; renderStage(); renderSlotPanel(); }
     } else if (drag.slot) {
+      // 拖动过程中走的是 patch 热路径（不存盘），松手这里才真正落一次草稿
       renderSlotPanel();
+      queueSave();
     }
     drag = null;
   };
   canvas.addEventListener('pointerup', endDrag);
-  canvas.addEventListener('pointercancel', () => { drag = null; });
+  canvas.addEventListener('pointercancel', () => { drag = null; document.body.classList.remove('pf-dragging'); });
   canvas.addEventListener('pointerleave', () => {
     if (state.hoverId) { state.hoverId = null; renderStage(); }
   });
@@ -819,9 +961,11 @@ function bindUI() {
     ev.preventDefault();
     const img = state.images[slot.id];
     img.zoom = clamp((img.zoom || 1) * (ev.deltaY < 0 ? 1.08 : 0.93), 0.3, 6);
-    if (state.selectedId !== slot.id) { state.selectedId = slot.id; renderSlotPanel(); }
+    // 换格子要整页重绘（选中框跟着变），同一格内滚动只改属性
+    if (state.selectedId !== slot.id) { state.selectedId = slot.id; renderSlotPanel(); renderStage(); }
+    else refreshSlotImage(slot.id);
     syncZoomSlider();
-    renderStage();
+    queueSave();
   }, { passive: false });
 
   // 拖拽文件
@@ -1066,14 +1210,15 @@ function bindUI() {
     commitThrottled(600);
     img.zoom = Number(ev.target.value) / 100;
     $('#zoomVal').textContent = ev.target.value + '%';
-    renderStage();
+    refreshSlotImage(state.selectedId);
+    queueSave();
   });
   $('#btnFitMode').addEventListener('click', () => {
     const img = state.images[state.selectedId];
     if (!img) return;
     commit();
     img.mode = img.mode === 'contain' ? 'cover' : 'contain';
-    renderSlotPanel(); renderStage();
+    renderSlotPanel(); refreshSlotImage(state.selectedId); queueSave();
     toast(img.mode === 'contain' ? '完整显示（可留白）' : '填满格子（裁切）');
   });
   $('#btnResetPan').addEventListener('click', () => {
@@ -1081,7 +1226,7 @@ function bindUI() {
     if (!img) return;
     commit();
     img.panX = 0; img.panY = 0; img.zoom = 1;
-    syncZoomSlider(); renderStage(); toast('已复位');
+    syncZoomSlider(); refreshSlotImage(state.selectedId); queueSave(); toast('已复位');
   });
   $('#btnCopyPrompt').addEventListener('click', () => {
     if (state.selectedId) copyText(effectivePrompt(state.selectedId).prompt, '提示词已复制');
@@ -1235,6 +1380,9 @@ function bindUI() {
   $('#btnResetDraft')?.addEventListener('click', async () => {
     if (!confirm('清空本机草稿？所有页的图片、气泡和句子都会删掉，不能恢复。')) return;
     await idbSet('pages', null);
+    // 图片是分页单独存的，清草稿要连它们一起删，否则几 MB 会一直占着
+    for (const pg of state.pages) if (pg.id) await idbSet('img:' + pg.id, null);
+    savedImageSigs.clear();
     state.pages = [{ tplId: state.tpl?.id || 'ref-4band-2col', name: '第 1 页', images: {}, bubbles: [], lines: {} }];
     state.pageIdx = 0; state.images = {}; state.bubbles = []; state.lines = {}; state.cands = {}; state.promptEdits = {};
     resetHistory(); renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
@@ -1414,13 +1562,99 @@ function activateTab(tab) {
 /* ================================================================== *
  * 图片
  * ================================================================== */
+/**
+ * 图片资产：一张图存成「显示用小图」的 Blob，href 用 blob URL。
+ *
+ * 为什么不用 data URL：
+ * 整页重绘要把每张图的 href 拼进 SVG 字符串，8 张 1600×2000 的照片就是
+ * 每帧 3.3MB 的字符串（实测桌面掉到 36fps）；换成 blob URL 后整页标记只有几十 KB。
+ * 代价：导出时 SVG 当 <img> 加载，读不到 blob:，必须转回 data URL（见 exportImageMap）。
+ *
+ * 为什么存小图：手机上内存/解码是硬约束。长边 2000 够 2× 屏和 2000px 导出，
+ * 又比原图（往往 4000×3000）省一个数量级的解码开销。
+ */
+const IMG_MAX_SIDE = 2000;
+const IMG_QUALITY = 0.9;
+const dataHrefCache = new WeakMap(); // Blob → data URL，导出时用一次就够
+const blobUrlCache = new WeakMap();  // Blob → blob URL，同一个 blob 永远拿同一个 URL（换页不会越攒越多）
+
+const urlForBlob = (blob) => {
+  let u = blobUrlCache.get(blob);
+  if (!u) { u = URL.createObjectURL(blob); blobUrlCache.set(blob, u); }
+  return u;
+};
+
+const loadImgEl = (src) => new Promise((res, rej) => {
+  const img = new Image();
+  img.onload = () => res(img);
+  img.onerror = () => rej(new Error('图片读不出来'));
+  img.src = src;
+});
+const blobOf = async (src) => (src instanceof Blob ? src : (await fetch(src)).blob());
+
+/** 任何来源（File / data URL / blob URL / http）→ 统一的图片资产 */
+async function imageAsset(src, { name = 'image', maxSide = IMG_MAX_SIDE } = {}) {
+  const blob = await blobOf(src);
+  const tmpUrl = URL.createObjectURL(blob);
+  let el;
+  try {
+    el = await loadImgEl(tmpUrl);
+  } catch (e) {
+    URL.revokeObjectURL(tmpUrl);
+    throw e;
+  }
+  const iw = el.naturalWidth || 1000;
+  const ih = el.naturalHeight || 1000;
+  const k = Math.min(1, maxSide / Math.max(iw, ih));
+  let display = blob;
+  if (k < 1) {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(iw * k));
+    c.height = Math.max(1, Math.round(ih * k));
+    c.getContext('2d').drawImage(el, 0, 0, c.width, c.height);
+    display = (await new Promise((res) => c.toBlob(res, 'image/jpeg', IMG_QUALITY))) || blob;
+  }
+  URL.revokeObjectURL(tmpUrl);
+  return {
+    blob: display,
+    href: urlForBlob(display),
+    iw, ih, zoom: 1, panX: 0, panY: 0, mode: 'cover', name,
+  };
+}
+
+/** 草稿里取回来时 blob URL 已失效：按 blob 重建（老的 data URL 草稿原样保留） */
+function rehydrateImages(map) {
+  const out = {};
+  for (const [k, v] of Object.entries(map || {})) {
+    if (!v) continue;
+    out[k] = v.blob ? { ...v, href: urlForBlob(v.blob) } : { ...v };
+  }
+  return out;
+}
+
+/** 导出用：把 blob 转回 data URL（结果按 Blob 缓存，重复导出不再转） */
+async function exportImageMap(map = state.images) {
+  const out = {};
+  for (const [k, v] of Object.entries(map || {})) {
+    if (!v) continue;
+    if (!v.blob) { out[k] = { ...v }; continue; }
+    let data = dataHrefCache.get(v.blob);
+    if (!data) { data = await blobToDataURL(v.blob); dataHrefCache.set(v.blob, data); }
+    out[k] = { ...v, href: data };
+  }
+  return out;
+}
+
 async function putImage(slotId, file, opts = {}) {
   if (!opts.noCommit) commit();
-  const href = await fileToDataURL(file);
-  const dim = await imageSize(href);
-  state.images[slotId] = {
-    href, iw: dim.w, ih: dim.h, zoom: 1, panX: 0, panY: 0, mode: 'cover', name: file.name || 'image',
-  };
+  let asset;
+  try {
+    asset = await imageAsset(file, { name: file.name || 'image' });
+  } catch {
+    toast('这张图读不出来，换一张试试');
+    return;
+  }
+  state.images[slotId] = asset;
   state.selectedId = slotId;
   if (opts.render !== false) {
     renderStage(); renderSlotPanel(); refreshScript();
@@ -1432,13 +1666,10 @@ async function importByUrl() {
   const url = prompt('图片链接（http/https，或用 data:image/... 开头）：');
   if (!url) return;
   try {
-    let href = url.trim();
-    if (/^https?:\/\//.test(href)) {
-      href = await blobToDataURL(await api.proxyImage(href));
-    }
-    const dim = await imageSize(href);
+    let src = url.trim();
+    if (/^https?:\/\//.test(src)) src = await api.proxyImage(src);
     commit();
-    state.images[state.selectedId] = { href, iw: dim.w, ih: dim.h, zoom: 1, panX: 0, panY: 0, mode: 'cover', name: 'url' };
+    state.images[state.selectedId] = await imageAsset(src, { name: 'url' });
     renderStage(); renderSlotPanel(); refreshScript();
     toast('已填入链接图片');
   } catch (e) {
@@ -2140,9 +2371,10 @@ function applyCand(i) {
   const list = state.selectedId ? candsOf(state.selectedId) : [];
   const href = list[i];
   if (!href) return;
-  imageSize(href).then((dim) => {
+  const sid = state.selectedId;
+  imageAsset(href, { name: 'ai' }).then((asset) => {
     commit();
-    state.images[state.selectedId] = { href, iw: dim.w, ih: dim.h, zoom: 1, panX: 0, panY: 0, mode: 'cover', name: 'ai' };
+    state.images[sid] = asset;
     renderStage(); renderSlotPanel(); refreshScript();
     toast('已换成候选 ' + (i + 1));
   }).catch((e) => toast('这张图读不出来：' + e.message));
@@ -2481,6 +2713,47 @@ function openDb() {
   return dbPromise;
 }
 
+/**
+ * 草稿存储分两块：
+ *   drafts/pages      小记录（模板、句子、气泡、图片的变换；**不含图片字节**）
+ *   drafts/img:<页id> 图片 Blob，只在那一页换了图时才重写
+ * 这样改一句台词只写几 KB，不用把几 MB 的图重写一遍（手机上那一下停顿很明显）。
+ */
+let pageSeq = 0;
+const savedImageSigs = new Map(); // pageId → 图片指纹
+const blobIds = new WeakMap();
+let blobSeq = 0;
+const blobIdOf = (blob) => {
+  if (!blob) return 0;
+  let id = blobIds.get(blob);
+  if (!id) { id = ++blobSeq; blobIds.set(blob, id); }
+  return id;
+};
+const imageSig = (images) => Object.entries(images || {})
+  .map(([k, v]) => `${k}#${blobIdOf(v?.blob)}#${v?.iw || 0}x${v?.ih || 0}`).join('|');
+const stripBlobs = (images) => Object.fromEntries(Object.entries(images || {}).map(([k, v]) => {
+  if (!v) return [k, v];
+  const { blob, ...rest } = v;
+  return [k, rest];
+}));
+const blobMap = (images) => Object.fromEntries(Object.entries(images || {})
+  .filter(([, v]) => v && v.blob).map(([k, v]) => [k, v.blob]));
+
+/** 老草稿里的图是 data URL：转成 Blob（顺手按 IMG_MAX_SIDE 降采样），之后存盘就不用再搬那几 MB */
+async function upgradeImages(images) {
+  const out = {};
+  for (const [k, v] of Object.entries(images || {})) {
+    if (!v) continue;
+    if (v.blob) { out[k] = { ...v, href: urlForBlob(v.blob) }; continue; }
+    if (!/^data:image\//i.test(String(v.href || ''))) { out[k] = { ...v }; continue; }
+    try {
+      const a = await imageAsset(v.href, { name: v.name || 'image' });
+      out[k] = { ...a, zoom: v.zoom ?? 1, panX: v.panX ?? 0, panY: v.panY ?? 0, mode: v.mode || 'cover' };
+    } catch { out[k] = { ...v }; }
+  }
+  return out;
+}
+
 async function idbSet(key, value) {
   const db = await openDb();
   if (!db) return false;
@@ -2515,16 +2788,47 @@ function queueSave() {
 
 async function saveDraft() {
   if (!state.tpl || !state.pages.length) return;
+  const t0 = perfNow();
   savePage();
-  const ok = await idbSet('pages', {
-    pages: state.pages, pageIdx: state.pageIdx, savedAt: Date.now(), v: 1,
-  });
+  for (const pg of state.pages) if (!pg.id) pg.id = 'pg' + (++pageSeq);
+  const meta = {
+    pages: state.pages.map((pg) => ({ ...pg, images: stripBlobs(pg.images) })),
+    pageIdx: state.pageIdx, savedAt: Date.now(), v: 2,
+  };
+  const ok = await idbSet('pages', meta);
   if (ok) dirty = false;
+  // 图片单独写，而且只有那一页真的换了图才写
+  let blobBytes = 0;
+  for (const pg of state.pages) {
+    const sig = imageSig(pg.images);
+    if (savedImageSigs.get(pg.id) === sig) continue;
+    const blobs = blobMap(pg.images);
+    await idbSet('img:' + pg.id, blobs);
+    savedImageSigs.set(pg.id, sig);
+    for (const b of Object.values(blobs)) blobBytes += b.size || 0;
+  }
+  if (PERF) {
+    perf.saves++;
+    perf.lastSaveBytes = JSON.stringify(meta).length + blobBytes;
+    perfDone('save', t0);
+  }
 }
 
 async function loadDraft() {
   const d = await idbGet('pages');
   if (!d || !Array.isArray(d.pages) || !d.pages.length) return null;
+  for (const pg of d.pages) {
+    // 图片字节单独存着，先装回 Blob，再（老草稿）把 data URL 换成 Blob
+    const stored = pg.id ? await idbGet('img:' + pg.id) : null;
+    if (stored) {
+      for (const [slot, blob] of Object.entries(stored)) {
+        if (pg.images?.[slot] && blob instanceof Blob) pg.images[slot].blob = blob;
+      }
+    }
+    pg.images = await upgradeImages(pg.images);
+    if (!pg.id) pg.id = 'pg' + (++pageSeq);
+    savedImageSigs.set(pg.id, imageSig(pg.images));
+  }
   return d;
 }
 
@@ -2546,6 +2850,8 @@ async function renamePage(i) {
 /* ---------------- 多页 ---------------- */
 function currentPageSnapshot() {
   return {
+    // 页 id 必须带下去：图片是按 `img:<页id>` 单独存的，丢了 id 就每次都重写图片
+    id: state.pages[state.pageIdx]?.id || undefined,
     tplId: state.tpl?.id || 'ref-4band-2col',
     images: { ...state.images },
     bubbles: state.bubbles.map((b) => ({ ...b })),
@@ -2579,7 +2885,7 @@ async function switchPage(i) {
   state.pageIdx = i;
   const pg = state.pages[i];
   await selectTemplate(pg.tplId, { silent: true });
-  state.images = { ...(pg.images || {}) };
+  state.images = rehydrateImages(pg.images || {});
   state.bubbles = (pg.bubbles || []).map((b) => ({ ...b }));
   state.lines = { ...(pg.lines || {}) };
   state.promptEdits = { ...(pg.promptEdits || {}) };
@@ -2613,7 +2919,7 @@ async function exportAllPages() {
       btn.textContent = `导出中 ${i + 1}/${state.pages.length}…`;
       await switchPage(i);
       await new Promise((r) => setTimeout(r, 420));
-      const svg = stageSVG();
+      const svg = stageSVG({ images: await exportImageMap() });
       const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const img = await new Promise((res, rej) => {
@@ -2716,15 +3022,12 @@ async function generateSlotImage() {
     if (!href && res.b64) href = 'data:image/png;base64,' + res.b64;
     if (!href && res.url) href = await api.proxyImage ? await blobToDataURL(await api.proxyImage(res.url)) : res.url;
     if (!href) throw new Error('生图接口没有返回可用的图片');
-    const dim = await imageSize(href);
     const sid = state.selectedId;
     const list = candsOf(sid);
     list.unshift(href);
     if (list.length > 8) list.pop();
     commit();
-    state.images[sid] = {
-      href, iw: dim.w, ih: dim.h, zoom: 1, panX: 0, panY: 0, mode: 'cover', name: 'ai',
-    };
+    state.images[sid] = await imageAsset(href, { name: 'ai' });
     renderStage(); renderSlotPanel(); refreshScript(); renderCands();
     toast('已生成并填入这一格（候选里还留着，可以换一张）');
   } catch (e) {
@@ -2822,10 +3125,11 @@ function scriptMarkdown() {
 /* ================================================================== *
  * 导出
  * ================================================================== */
-function stageSVG({ withImages = true, numbers = false } = {}) {
+/** 导出用的整页 SVG（图片传进来的必须是 data URL，SVG 当 <img> 加载时读不到 blob:） */
+function stageSVG({ withImages = true, numbers = false, images = null } = {}) {
   return renderTemplateSVG(state.tpl, {
     width: state.exportWidth,
-    images: withImages ? state.images : {},
+    images: withImages ? (images || state.images) : {},
     overlays: state.bubbles,
     showNumbers: numbers,
     showRoles: false,
@@ -2839,7 +3143,7 @@ function stageSVG({ withImages = true, numbers = false } = {}) {
 async function exportPNG() {
   if (!state.tpl) return;
   try {
-    const svg = stageSVG();
+    const svg = stageSVG({ images: await exportImageMap() });
     const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const img = await new Promise((res, rej) => {
@@ -2866,9 +3170,9 @@ async function exportPNG() {
   }
 }
 
-function exportSVG() {
+async function exportSVG() {
   if (!state.tpl) return;
-  downloadText(stageSVG(), `${state.tpl.id}.svg`, 'image/svg+xml');
+  downloadText(stageSVG({ images: await exportImageMap() }), `${state.tpl.id}.svg`, 'image/svg+xml');
   toast('已导出 SVG');
 }
 

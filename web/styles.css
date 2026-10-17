@@ -713,6 +713,28 @@ kbd{
 /* ?dbg=1：一行状态，等宽字体，方便截图 / 复制给下一个人排查 */
 .stage-foot #footMsg.pf-dbg{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--label-2);white-space:normal}
 
+/* 拖动 / 缩放进行中：关掉画布周围的实时模糊和页面投影。
+   iPhone 上这些层每帧都要重新合成，是「明明只动了一个属性却还是发涩」的那部分开销。 */
+body.pf-dragging .stage-bar,
+body.pf-dragging .stage-foot,
+body.pf-dragging .bubble-dock{
+  -webkit-backdrop-filter:none !important;backdrop-filter:none !important;
+  background:var(--bg);
+}
+body.pf-dragging .canvas svg{box-shadow:none}
+
+/* ?perf=1：性能浮层（量拖动/缩放热路径用，平时不存在） */.perf-hud{
+  position:fixed;left:10px;bottom:46px;z-index:400;pointer-events:none;
+  padding:8px 10px;border-radius:10px;
+  background:rgba(20,20,22,.86);color:#e8e8ea;
+  font:11.5px/1.55 ui-monospace,Consolas,monospace;white-space:pre;
+  box-shadow:0 6px 20px rgba(0,0,0,.28);
+  max-width:calc(100vw - 20px);overflow:hidden;
+}
+.perf-hud b{color:#7dd3a0;font-weight:600}
+.perf-hud .warn{color:#ffb86b}
+.perf-hud .bad{color:#ff7b72}
+
 /* 手机：点格子后出现的「编辑这一格」浮钮 */
 .fab-edit{
   display:none;position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:5;
