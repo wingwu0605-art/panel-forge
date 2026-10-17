@@ -45,9 +45,16 @@ for /f "delims=" %%r in ('git remote get-url origin 2^>nul') do set "REMOTE=%%r"
 if defined REMOTE goto have_remote
 
 if not "%~2"=="" (
-  git remote add origin "%~2"
-  set "REMOTE=%~2"
-  echo   Step 1/3  origin = %~2
+  set "ARG=%~2"
+  if /i "!ARG:~0,4!"=="http" (
+    git remote add origin "!ARG!"
+    set "REMOTE=!ARG!"
+  ) else (
+    set "BARE=!ARG:.git=!"
+    set "REMOTE=https://github.com/!BARE!.git"
+    git remote add origin "!REMOTE!"
+  )
+  echo   Step 1/3  origin = !REMOTE!
   echo   [ok] remote added
   goto remote_done
 )
@@ -67,8 +74,14 @@ echo   (do NOT tick README / .gitignore / license), then paste
 echo   its URL here, e.g.
 echo      https://github.com/yourname/panel-forge.git
 echo.
-set /p "INPUT_URL=   URL (empty = cancel): "
+set /p "INPUT_URL=   URL, or just  username/repo  (empty = cancel): "
 if "%INPUT_URL%"=="" goto cancelled
+rem accept "https://github.com/u/r.git", "u/r", or "u/r.git"
+if /i not "%INPUT_URL:~0,4%"=="http" (
+  set "BARE=%INPUT_URL:.git=%"
+  echo   using https://github.com/!BARE!.git
+  set "INPUT_URL=https://github.com/!BARE!.git"
+)
 git remote add origin "%INPUT_URL%"
 if errorlevel 1 goto remote_failed
 set "REMOTE=%INPUT_URL%"
@@ -90,6 +103,11 @@ rem the placeholder identity this repo was prepared with -> ask for the real one
 if /i "%GIT_NAME%"=="PanelForge" set "GIT_NAME="
 if /i "%GIT_MAIL%"=="panel-forge@users.noreply.github.com" set "GIT_MAIL="
 if not "%GIT_NAME%"=="" if not "%GIT_MAIL%"=="" goto identity_done
+if "%CHECK_ONLY%"=="1" (
+  echo   Step 2/3  identity not set yet (name=[%GIT_NAME%] email=[%GIT_MAIL%])
+  echo   [check] the script would ask for these before pushing.
+  goto identity_done
+)
 
 echo   Step 2/3  Your git identity (stored in this repo only)
 echo   ------------------------------------------------------
