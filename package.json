@@ -12,6 +12,7 @@
     "test:units": "node scripts/test-units.mjs",
     "test:ai": "node scripts/test-llm-mock.mjs",
     "test:visual": "node scripts/visual-check.mjs",
+    "test:perf": "node scripts/perf-bench.mjs",
     "build:static": "node scripts/build-static.mjs",
     "preview": "node scripts/serve-static.mjs",
     "sheet": "node scripts/contact-sheet.mjs",

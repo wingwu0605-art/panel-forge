@@ -499,6 +499,162 @@ const scenarios = [
       check('坏文件只提示、不改数据', bad.items === 2 && /JSON/.test(bad.toast || ''), bad.toast);
     },
   },
+
+  {
+    name: 'hotpath',
+    title: '⑥ 图片拖动热路径 / 草稿往返 / 导出（手机宽度 430）',
+    async run(page, shot, { check }) {
+      await page.viewport(430, 900);
+      await page.goto('/?perf=1&tpl=ref-4band-2col');
+      await page.ready();
+
+      // 灌 3 张 2400×3000 的真图（走真实 drop 入口）
+      await page.evaluate(`(async () => {
+        const mk = (hue) => new Promise((res) => {
+          const c = document.createElement('canvas');
+          c.width = 2400; c.height = 3000;
+          const g = c.getContext('2d');
+          g.fillStyle = 'hsl(' + hue + ',75%,45%)'; g.fillRect(0, 0, 2400, 3000);
+          g.fillStyle = '#fff'; g.beginPath(); g.arc(1200, 900, 500, 0, 7); g.fill();
+          c.toBlob(res, 'image/jpeg', 0.92);
+        });
+        const files = [];
+        for (const hue of [0, 120, 240]) files.push(new File([await mk(hue)], 'p' + hue + '.jpg', { type: 'image/jpeg' }));
+        const canvas = document.querySelector('#canvas');
+        const r = canvas.getBoundingClientRect();
+        const dt = new DataTransfer();
+        files.forEach((f) => dt.items.add(f));
+        canvas.dispatchEvent(new DragEvent('drop', {
+          dataTransfer: dt, bubbles: true, cancelable: true,
+          clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+        }));
+      })()`);
+      await page.waitFor("document.querySelectorAll('#canvas svg image[data-slot]').length >= 3", { label: '图片落格' });
+      await sleep(600);
+
+      const dom = await page.evaluate(`({
+        imgs: document.querySelectorAll('#canvas svg image[data-slot]').length,
+        allBlob: [...document.querySelectorAll('#canvas svg image[data-slot]')].every((e) => (e.getAttribute('href') || '').startsWith('blob:')),
+        markupKB: Math.round(document.querySelector('#canvas svg').outerHTML.length / 1024),
+      })`);
+      check('图片以 blob URL 进 DOM', dom.imgs === 3 && dom.allBlob, `${dom.imgs} 图`);
+      check('页面上不再搬 base64', dom.markupKB < 200, `整页标记 ${dom.markupKB}KB`);
+      await shot('hot-images');
+
+      const drag = await page.evaluate(`(async () => {
+        window.__pfPerf.reset();
+        const pick = () => [...document.querySelectorAll('#canvas svg image[data-slot]')].map((e) => e.getAttribute('x') + ',' + e.getAttribute('width'));
+        const before = pick();
+        const canvas = document.querySelector('#canvas');
+        const el = canvas.querySelector('svg image[data-slot]');
+        const r = el.getBoundingClientRect();
+        const x0 = r.left + r.width / 2, y0 = r.top + r.height / 2;
+        const ev = (t, x, y) => new PointerEvent(t, { bubbles: true, clientX: x, clientY: y, pointerId: 1, isPrimary: true });
+        canvas.dispatchEvent(ev('pointerdown', x0, y0));
+        for (let i = 0; i < 30; i++) {
+          await new Promise((res) => requestAnimationFrame(() => { canvas.dispatchEvent(ev('pointermove', x0 + i * 2, y0 + i)); res(); }));
+        }
+        const during = pick();
+        const perf = window.__pfPerf.snapshot();
+        canvas.dispatchEvent(ev('pointerup', x0, y0));
+        await new Promise((res) => setTimeout(res, 400));
+        return { moved: JSON.stringify(before) !== JSON.stringify(during), renders: perf.renders, patches: perf.patches, patchMs: perf.patch.p95 };
+      })()`);
+      check('拖动真的改了图片位置', drag.moved);
+      check('拖动期间几乎不整页重绘', drag.renders <= 3,
+        `render ${drag.renders} 次 · patch ${drag.patches} 次 · 单次 patch ${drag.patchMs.toFixed(2)}ms`);
+      await shot('hot-images-dragged');
+
+      // 刷新：图片存在 IndexedDB 里（Blob），取回来要能重建 href
+      await page.goto('/?perf=1&tpl=ref-4band-2col');
+      await page.ready();
+      await page.waitFor("document.querySelectorAll('#canvas svg image[data-slot]').length >= 3", { label: '草稿里的图片回来', timeout: 12000 });
+      const back = await page.evaluate(`({
+        imgs: document.querySelectorAll('#canvas svg image[data-slot]').length,
+        allBlob: [...document.querySelectorAll('#canvas svg image[data-slot]')].every((e) => (e.getAttribute('href') || '').startsWith('blob:')),
+      })`);
+      check('刷新后图片还在（Blob 草稿往返）', back.imgs >= 3 && back.allBlob, `${back.imgs} 图`);
+
+      // 导出 PNG：blob 图必须被转成 data URL 才能进 SVG，否则导出是白页
+      await page.evaluate(`(() => {
+        window.__dl = [];
+        const orig = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function () {
+          if (this.download) { window.__dl.push({ name: this.download, href: this.href }); return; }
+          return orig.call(this);
+        };
+        document.querySelector('#tabs button[data-tab=export]').click();
+      })()`);
+      await sleep(300);
+      await page.evaluate("document.querySelector('#btnPng')?.click()");
+      await page.waitFor('window.__dl.length > 0', { label: 'PNG 导出完成', timeout: 25000 });
+      const png = await page.evaluate(`(async () => {
+        const dl = window.__dl[window.__dl.length - 1];
+        const blob = await (await fetch(dl.href)).blob();
+        const bmp = await createImageBitmap(blob);
+        const c = document.createElement('canvas');
+        c.width = bmp.width; c.height = bmp.height;
+        const g = c.getContext('2d');
+        g.drawImage(bmp, 0, 0);
+        const d = g.getImageData(0, 0, bmp.width, bmp.height).data;
+        let colored = 0, total = 0;
+        for (let i = 0; i < d.length; i += 4 * 17) {
+          total++;
+          if (!(d[i] > 238 && d[i + 1] > 238 && d[i + 2] > 238)) colored++;
+        }
+        return { name: dl.name, bytes: blob.size, w: bmp.width, h: bmp.height, coloredPct: +((colored / total) * 100).toFixed(1) };
+      })()`);
+      check('导出的 PNG 里有图（不是白页）', png.coloredPct > 2,
+        `${png.name} · ${Math.round(png.bytes / 1024)}KB · ${png.w}×${png.h} · 非白像素 ${png.coloredPct}%`);
+    },
+  },
+
+  {
+    name: 'bubble-drag',
+    title: '⑦ 气泡拖动热路径（手机宽度 430）',
+    async run(page, shot, { check }) {
+      await page.viewport(430, 900);
+      await page.goto(`/?perf=1&tpl=ref-4band-2col&plot=${encodeURIComponent(PLOT)}`);
+      await page.ready();
+      await sleep(400);
+
+      await page.evaluate("document.querySelector('#bubGrid .bub-item')?.click()");
+      await page.waitFor("!!document.querySelector('#canvas svg g[data-bubble]')", { label: '气泡出现' });
+      await sleep(300);
+
+      const drag = await page.evaluate(`(async () => {
+        window.__pfPerf.reset();
+        const canvas = document.querySelector('#canvas');
+        const live = () => canvas.querySelector('svg g[data-bubble]');
+        const g = live();
+        const r = g.getBoundingClientRect();
+        const x0 = r.left + r.width / 2, y0 = r.top + r.height / 2;
+        const ev = (t, x, y) => new PointerEvent(t, { bubbles: true, clientX: x, clientY: y, pointerId: 1, isPrimary: true });
+        const before = g.dataset.x + ',' + g.dataset.y;
+        canvas.dispatchEvent(ev('pointerdown', x0, y0));
+        for (let i = 0; i < 24; i++) {
+          await new Promise((res) => requestAnimationFrame(() => { canvas.dispatchEvent(ev('pointermove', x0 + i * 2, y0 + i)); res(); }));
+        }
+        // 注意：pointerdown 会整页重绘，之前抓的节点已经不在文档里了，必须重新查
+        const mid = { transform: live()?.getAttribute('transform'), perf: window.__pfPerf.snapshot() };
+        canvas.dispatchEvent(ev('pointerup', x0, y0));
+        await new Promise((res) => setTimeout(res, 500));
+        const g2 = live();
+        return {
+          movedDuringDrag: !!mid.transform && /translate/.test(mid.transform),
+          renders: mid.perf.renders, patches: mid.perf.patches, patchMs: mid.perf.patch.p95,
+          bakedX: g2?.dataset.x, bakedY: g2?.dataset.y, beforeXY: before,
+          bakedNoTransform: !g2?.getAttribute('transform'),
+        };
+      })()`);
+      check('拖动中气泡靠 translate 移动', drag.movedDuringDrag);
+      check('拖动期间几乎不整页重绘', drag.renders <= 3,
+        `render ${drag.renders} 次 · patch ${drag.patches} 次 · 单次 patch ${drag.patchMs.toFixed(2)}ms`);
+      check('松手后位置烘进标记（transform 清掉）', drag.bakedNoTransform && drag.bakedX + ',' + drag.bakedY !== drag.beforeXY,
+        `${drag.beforeXY} → ${drag.bakedX},${drag.bakedY}`);
+      await shot('bubble-dragged');
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */
