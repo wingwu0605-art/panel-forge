@@ -780,12 +780,42 @@ body.paint-engine .paint-bar,
 body.paint-engine .paint-hint{display:none}
 body.paint-engine .paint-top{padding-top:calc(6px + env(safe-area-inset-top))}
 
+/* ---------------------------------------------------------------- 模板库：标签筛选 */
+.facet-bar{margin:8px 0 2px}
+.frow{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-width:0}
+.flabel{flex:0 0 28px;font-size:10.5px;color:var(--label-3);letter-spacing:.02em}
+.fchips{
+  display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding:1px 0;min-width:0;
+  -webkit-overflow-scrolling:touch;
+}
+.fchips::-webkit-scrollbar{display:none}
+.fchip{
+  flex:0 0 auto;border:0;cursor:pointer;border-radius:999px;padding:3px 8px;
+  background:var(--fill-2);color:var(--label-2);font:inherit;font-size:11px;line-height:1.5;
+  box-shadow:inset 0 0 0 .5px var(--sep);white-space:nowrap;
+  transition:background .2s var(--ease),color .2s;
+}
+.fchip i{font-style:normal;opacity:.55;margin-left:3px;font-size:10px}
+.fchip:hover{color:var(--label)}
+.fchip.on{background:var(--tint);color:#fff;box-shadow:none}
+.fclear{margin-top:2px}
+/* 卡片上的可点标签 */
+.tpl-tags{display:flex;flex-wrap:wrap;gap:4px;margin:1px 0 5px}
+.ttag{
+  border:0;cursor:pointer;border-radius:999px;padding:1px 6px;
+  background:var(--fill-2);color:var(--label-3);font:inherit;font-size:10px;line-height:1.45;
+  white-space:nowrap;transition:background .18s,color .18s;
+}
+.ttag:hover{background:var(--tint);color:#fff}
+.match-ai{margin-top:8px}
+
 /* ---------------------------------------------------------------- 画师版（?mode=artist） */
 /* 每格里的 AI 按钮：由「AI 总开关」控制（body[data-ai="off"]），
    左栏的 AI 导演卡由面板管理控制（[data-panel="ai"]），两边互不干扰。 */
 body[data-ai="off"] .ai-gen,
 body[data-ai="off"] #candStrip,
 body[data-ai="off"] #btnAiPrompts,
+body[data-ai="off"] #btnMatchAi,
 body[data-ai="off"] #keySheet{display:none !important}
 /* 被面板管理隐藏的块 */
 .rail.left [data-panel][hidden]{display:none !important}

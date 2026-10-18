@@ -93,6 +93,8 @@ const state = {
   chars: [],          // 角色卡 [{id,name,note,images:[dataURL]}]
   activeChars: [],    // 本页启用的角色 id
   clipboard: null,    // 内部剪贴板（图片或气泡）
+  libFilter: null,    // 模板库的标签筛选 {kind:'panels'|'intent'|'ratio'|'tag', value}
+  intentZh: {},       // 戏路 id → 中文（从 /api/meta 来）
   history: { past: [], future: [] },
 };
 
@@ -268,6 +270,9 @@ async function init() {
   state.items = list.items;
   state.filtered = list.items;
   state.engine = meta.engine || null;
+  // 戏路 id → 中文，模板库的题材筛选和搜索都要用
+  state.intentZh = Object.fromEntries((Array.isArray(meta.intents) ? meta.intents : [])
+    .map((i) => [i.id, i.zh || i.id]));
   $('#statTpl').textContent = `${meta.templates} 套模板 · ${meta.roles.length} 种格型`;
   $('#statPort').textContent = window.PF_STATIC ? '离线可用' : location.host;
   $('#analyzeHint').textContent = '本地规则引擎';
@@ -644,37 +649,123 @@ function initCollapsibles() {
 /* ================================================================== *
  * 模板列表
  * ================================================================== */
+/** 戏路 id → 中文（从 /api/meta 拿；拿不到就退回 id） */
+function intentZh(id) {
+  return state.intentZh?.[id] || id;
+}
+
 function renderList() {
   const q = ($('#search').value || '').trim().toLowerCase();
   let list = state.items;
   if (state.cultureTab !== 'all') list = list.filter((t) => t.culture === state.cultureTab);
   if (q) {
-    list = list.filter((t) =>
-      (t.id + t.name + t.desc + t.tags.join('') + t.intents.join('')).toLowerCase().includes(q));
+    // 搜索框也吃标签的**中文名**（「四格」「战斗」「9:16」都能命中）
+    list = list.filter((t) => {
+      const hay = (t.id + t.name + t.desc + t.tags.join('') + t.intents.map(intentZh).join('')
+        + intentZh(t.ratio) + ratioName(t.ratio) + t.panels + '格 ' + CULTURE_ZH[t.culture]).toLowerCase();
+      return hay.includes(q);
+    });
   }
+  if (state.libFilter) list = list.filter((t) => matchFacet(t, state.libFilter));
   state.filtered = list;
   $('#listCount').textContent = `${list.length} 套`;
+  renderFacetBar();
 
   const frag = document.createDocumentFragment();
   for (const t of list) {
     const el = document.createElement('div');
     el.className = 'tpl' + (state.tpl && state.tpl.id === t.id ? ' on' : '');
     el.dataset.id = t.id;
+    const chips = [
+      `<button class="ttag" data-facet="panels" data-val="${t.panels}">${t.panels}格</button>`,
+      ...t.tags.slice(0, 2).map((x) => `<button class="ttag" data-facet="tag" data-val="${escapeHtml(x)}">${escapeHtml(x)}</button>`),
+      ...(t.intents[0] ? [`<button class="ttag" data-facet="intent" data-val="${escapeHtml(t.intents[0])}">${escapeHtml(intentZh(t.intents[0]))}</button>`] : []),
+    ].join('');
     el.innerHTML = `
       <div class="th">${renderTemplateSVG({ ...t, slots: t.thumbSlots }, { width: 220, showEmptyTint: false, slotOutline: true })}</div>
       <div class="nm">${escapeHtml(t.name)}</div>
       <div class="mt">
         <span>${t.panels}格</span><span>·</span><span>${ratioName(t.ratio)}</span><span>·</span><span>${CULTURE_LABEL[t.culture]}</span>
       </div>
+      <div class="tpl-tags">${chips}</div>
       <span class="bd">${t.panels}</span>
       <span class="cul">${CULTURE_LABEL[t.culture]}</span>`;
-    el.addEventListener('click', () => { selectTemplate(t.id); goCanvasOnCompact(); });
+    el.addEventListener('click', (ev) => {
+      const tag = ev.target.closest('[data-facet]');
+      if (tag) {   // 点卡片上的标签 = 按它筛选，而不是换模板
+        ev.stopPropagation();
+        setFacet(tag.dataset.facet, tag.dataset.val);
+        return;
+      }
+      selectTemplate(t.id); goCanvasOnCompact();
+    });
     frag.appendChild(el);
   }
   const grid = $('#tplGrid');
   [...frag.children].forEach((el, i) => el.style.setProperty('--i', Math.min(i, 14)));
   grid.innerHTML = '';
   grid.appendChild(frag);
+}
+
+/* ---------------- 模板库的标签筛选（格数 / 题材 / 画幅 / 标签） ---------------- */
+function matchFacet(t, f) {
+  if (f.kind === 'panels') return t.panels === Number(f.value);
+  if (f.kind === 'intent') return t.intents.includes(f.value);
+  if (f.kind === 'ratio') return t.ratio === f.value;
+  if (f.kind === 'tag') return t.tags.includes(f.value);
+  return true;
+}
+function setFacet(kind, value) {
+  const same = state.libFilter && state.libFilter.kind === kind && state.libFilter.value === value;
+  state.libFilter = same ? null : { kind, value };
+  renderList();
+}
+function clearFacet() { state.libFilter = null; renderList(); }
+
+function renderFacetBar() {
+  const bar = $('#facetBar');
+  if (!bar) return;
+  const items = state.items;
+  const act = state.libFilter || {};
+  const chip = (kind, value, label, count) => {
+    const on = act.kind === kind && String(act.value) === String(value);
+    return `<button class="fchip${on ? ' on' : ''}" data-facet="${kind}" data-val="${escapeHtml(value)}">${escapeHtml(label)}${count != null ? `<i>${count}</i>` : ''}</button>`;
+  };
+  const tally = (fn) => {
+    const m = new Map();
+    for (const t of items) for (const k of fn(t)) m.set(k, (m.get(k) || 0) + 1);
+    return m;
+  };
+  // 格数：只显示有 ≥2 套的
+  const panelEntries = [...tally((t) => [t.panels]).entries()]
+    .filter(([, n]) => n >= 2).sort((a, b) => a[0] - b[0]).map(([p, n]) => [String(p), n]);
+  // 题材：按出现次数取前 10
+  const intentEntries = [...tally((t) => t.intents).entries()]
+    .sort((a, b) => b[1] - a[1]).slice(0, 10).map(([i, n]) => [i, n]);
+  // 画幅
+  const ratioEntries = [...tally((t) => [t.ratio]).entries()]
+    .sort((a, b) => b[1] - a[1]).map(([r, n]) => [r, n]);
+  // 标签：按出现次数取前 12
+  const tagEntries = [...tally((t) => t.tags).entries()]
+    .sort((a, b) => b[1] - a[1]).slice(0, 12).map(([x, n]) => [x, n]);
+
+  const groups = [
+    { kind: 'panels', label: '格数', entries: panelEntries, fmt: (v) => `${v}格` },
+    { kind: 'intent', label: '题材', entries: intentEntries, fmt: (v) => intentZh(v) },
+    { kind: 'ratio', label: '画幅', entries: ratioEntries, fmt: (v) => ratioName(v) },
+    { kind: 'tag', label: '标签', entries: tagEntries, fmt: (v) => v },
+  ];
+  bar.innerHTML = groups.map((g) => {
+    let entries = g.entries;
+    // 当前生效的筛选可能不在「前 N 名」里（比如点了卡片上某个冷门题材）——
+    // 那也要把它显示出来并高亮，否则用户看不出现在筛的是什么
+    if (act.kind === g.kind && !entries.some(([v]) => String(v) === String(act.value))) {
+      const n = items.filter((t) => matchFacet(t, act)).length;
+      entries = [[act.value, n], ...entries];
+    }
+    const html = entries.map(([v, n]) => chip(g.kind, v, g.fmt(v), n)).join('');
+    return `<div class="frow"><span class="flabel">${g.label}</span><div class="fchips">${html}</div></div>`;
+  }).join('') + (state.libFilter ? '<button class="btn tiny fclear" id="facetClear">清除筛选</button>' : '');
 }
 
 function ratioName(r) {
@@ -1578,6 +1669,14 @@ function bindUI() {
   });
   $('#search').addEventListener('input', debounce(renderList, 160));
   $('#btnMatch').addEventListener('click', runMatch);
+  // 第二个选择：让 AI 排戏（和「按规则匹配」并排；AI 关掉时这条隐藏）
+  $('#btnMatchAi')?.addEventListener('click', () => runAiDecide());
+  // 模板库的标签筛选
+  $('#facetBar')?.addEventListener('click', (ev) => {
+    if (ev.target.closest('#facetClear')) { clearFacet(); return; }
+    const c = ev.target.closest('[data-facet]');
+    if (c) setFacet(c.dataset.facet, c.dataset.val);
+  });
 
   // 画布工具
   $('#btnFill').addEventListener('click', () => { $('#filePick').dataset.mode = 'fill'; $('#filePick').click(); });

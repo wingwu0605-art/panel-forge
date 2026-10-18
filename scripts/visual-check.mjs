@@ -1124,6 +1124,81 @@ const scenarios = [
       await shot('panels-artist');
     },
   },
+
+  {
+    name: 'library-facets',
+    title: '⑫ 模板库标签筛选 + 剧情卡两个选择（规则 / AI）',
+    async run(page, shot, { check }) {
+      await page.viewport(1200, 900);
+      await page.goto('/?fresh=1&tpl=ref-4band-2col');
+      await page.ready();
+
+      // 剧情卡：规则 + AI 两个选择要并排出现（AI 开着时）
+      const both = await page.evaluate(`({
+        rule: !!document.querySelector('#btnMatch')?.offsetParent,
+        ai: !!document.querySelector('#btnMatchAi')?.offsetParent,
+        aiSwitch: document.body.dataset.ai,
+      })`);
+      check('剧情卡里两个选择都在（规则 + 让 AI 排戏）', both.rule && both.ai && both.aiSwitch === 'on',
+        `ai=${both.aiSwitch}`);
+
+      // 展开模板库
+      await page.evaluate(`(() => {
+        const card = document.querySelector('.card.browse');
+        if (card?.classList.contains('collapsed')) card.querySelector('.card-head')?.click();
+      })()`);
+      await sleep(700);
+      const bar = await page.evaluate(`({
+        rows: [...document.querySelectorAll('#facetBar .frow .flabel')].map((x) => x.textContent),
+        chips: document.querySelectorAll('#facetBar .fchip').length,
+        cardTags: document.querySelectorAll('.tpl .ttag').length,
+      })`);
+      check('四行筛选（格数/题材/画幅/标签）都在', bar.rows.length === 4 && bar.chips > 20,
+        `${bar.rows.join('/')} · ${bar.chips} 个 chip`);
+      check('每张模板卡带可点标签', bar.cardTags > 50, `${bar.cardTags} 个标签`);
+      await shot('facets-bar');
+
+      // 点「4格」
+      await page.evaluate(`(() => {
+        const c = [...document.querySelectorAll('#facetBar .fchip')].find((x) => x.textContent.startsWith('4格'));
+        c.click();
+      })()`);
+      await sleep(500);
+      const four = await page.evaluate(`({
+        count: (document.querySelector('#listCount')?.textContent || '').trim(),
+        allFour: [...document.querySelectorAll('.tpl .mt span:first-child')].every((s) => s.textContent === '4格'),
+        n: document.querySelectorAll('.tpl').length,
+        clear: !!document.querySelector('#facetClear'),
+      })`);
+      check('点「4格」只剩四格模板', four.allFour && four.n === 24 && /24/.test(four.count), `${four.count} / ${four.n} 张`);
+      check('有「清除筛选」', four.clear);
+
+      // 点卡片上的标签（题材）也能筛选
+      await page.evaluate(`(() => {
+        const tag = [...document.querySelectorAll('.tpl .ttag')].find((x) => x.dataset.facet === 'intent');
+        tag.click();
+      })()`);
+      await sleep(500);
+      const byTag = await page.evaluate(`({
+        count: (document.querySelector('#listCount')?.textContent || '').trim(),
+        on: !!document.querySelector('#facetBar .fchip.on'),
+      })`);
+      check('点卡片标签能筛选（且过滤条高亮）', byTag.on && byTag.count !== four.count, `${four.count} → ${byTag.count}`);
+
+      // 清除 + 用搜索框搜「战斗」（中文戏路名要能命中）
+      await page.evaluate("document.querySelector('#facetClear')?.click()");
+      await sleep(400);
+      await page.evaluate(`(() => {
+        const s = document.querySelector('#search');
+        s.value = '战斗';
+        s.dispatchEvent(new Event('input', { bubbles: true }));
+      })()`);
+      await sleep(600);
+      const searched = await page.evaluate("(document.querySelector('#listCount')?.textContent || '').trim()");
+      check('搜索框能搜中文戏路（战斗）', /^[1-9]\d* 套/.test(searched) && searched !== '138 套', searched);
+      await shot('facets-search');
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */
