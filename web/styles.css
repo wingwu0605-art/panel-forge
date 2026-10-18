@@ -1628,3 +1628,218 @@ html[data-vt="accent"]::view-transition-new(root){animation:fadeIn .35s var(--ea
   max-height:104px;overflow:auto;white-space:pre-wrap;word-break:break-word}
 .bp-neg{margin-top:4px;font-size:11px;color:var(--label-3);display:flex;gap:6px}
 .bp-neg b{color:var(--label-2);flex:0 0 auto}
+
+/* =====================================================================
+ * iOS 26「液态玻璃」皮肤 —— 可选（html[data-ui="ios26"]）
+ *
+ * 思路：只重映射设计令牌 + 给「浮动层」加真玻璃，不逐组件重写。
+ * 默认外观一行都不受影响（没有 data-ui 属性时这些规则全不生效）。
+ *
+ * 两个刻意的取舍：
+ * 1) 卡片**不用** backdrop-filter：一屏十几层实时模糊在 iPhone 上非常贵
+ *    （上一轮刚把拖动性能修回来）。卡片改用「半透明底 + 1px 亮边 + 软阴影」。
+ * 2) 玻璃只给本来就浮在内容上面的层：顶栏、舞台栏、右栏标签、气泡 dock、弹层。
+ * ===================================================================== */
+
+/* ---------------- 亮色令牌 ---------------- */
+html[data-ui="ios26"]{
+  --bg:#eef0f6;
+  --bg-elev:rgba(255,255,255,.82);
+  --surface:rgba(255,255,255,.74);
+  --surface-2:rgba(255,255,255,.52);
+  --surface-3:rgba(120,120,128,.14);
+  --canvas:#e4e6ee;
+  --canvas-dot:rgba(60,60,67,.11);
+
+  --fill:rgba(120,120,128,.15);
+  --fill-2:rgba(120,120,128,.09);
+  --fill-hover:rgba(120,120,128,.22);
+
+  --material:rgba(252,252,255,.60);
+  --material-thick:rgba(255,255,255,.88);
+  --blur:saturate(210%) blur(32px);
+
+  /* 同心圆角：外层更大、内层递减，是 iOS 26 的招牌 */
+  --r-xl:28px;
+  --r-lg:20px;
+  --r-md:14px;
+  --r-sm:10px;
+
+  --shadow-1:0 1px 3px rgba(0,0,0,.05),0 1px 1px rgba(0,0,0,.03);
+  --shadow-2:0 10px 30px rgba(0,0,0,.09),0 2px 6px rgba(0,0,0,.04);
+  --shadow-3:0 34px 90px rgba(0,0,0,.22),0 10px 28px rgba(0,0,0,.10);
+  --page-shadow:0 6px 18px rgba(0,0,0,.06),0 30px 80px rgba(0,0,0,.16);
+  --card-border:rgba(255,255,255,.62);
+
+  /* 玻璃：顶部一道细 specular + 外圈 0.5px 亮边 */
+  --glass-rim:inset 0 0 0 .5px rgba(255,255,255,.72),inset 0 1px 0 rgba(255,255,255,.9);
+  --glass-sheen:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,0) 62%);
+  --card-rim:inset 0 0 0 .5px rgba(255,255,255,.62),inset 0 1px 0 rgba(255,255,255,.45);
+}
+
+/* ---------------- 暗色令牌（跟随系统） ---------------- */
+@media (prefers-color-scheme:dark){
+  html[data-ui="ios26"]:not([data-theme="light"]){
+    --bg:#0b0b0f;
+    --bg-elev:rgba(30,30,36,.86);
+    --surface:rgba(28,28,33,.74);
+    --surface-2:rgba(44,44,50,.55);
+    --surface-3:rgba(120,120,128,.22);
+    --canvas:#08080b;
+    --canvas-dot:rgba(235,235,245,.06);
+
+    --fill:rgba(120,120,128,.30);
+    --fill-2:rgba(120,120,128,.20);
+    --fill-hover:rgba(120,120,128,.38);
+
+    --material:rgba(22,22,26,.62);
+    --material-thick:rgba(30,30,35,.90);
+
+    --shadow-1:0 1px 3px rgba(0,0,0,.5);
+    --shadow-2:0 12px 34px rgba(0,0,0,.55),0 2px 6px rgba(0,0,0,.4);
+    --shadow-3:0 36px 100px rgba(0,0,0,.7),0 10px 30px rgba(0,0,0,.5);
+    --page-shadow:0 6px 18px rgba(0,0,0,.4),0 30px 90px rgba(0,0,0,.6);
+    --card-border:rgba(255,255,255,.14);
+
+    --glass-rim:inset 0 0 0 .5px rgba(255,255,255,.16),inset 0 1px 0 rgba(255,255,255,.22);
+    --glass-sheen:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0) 60%);
+    --card-rim:inset 0 0 0 .5px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.10);
+  }
+}
+
+/* ---------------- 暗色令牌（手动切深色） ---------------- */
+html[data-ui="ios26"][data-theme="dark"]{
+  --bg:#0b0b0f;
+  --bg-elev:rgba(30,30,36,.86);
+  --surface:rgba(28,28,33,.74);
+  --surface-2:rgba(44,44,50,.55);
+  --surface-3:rgba(120,120,128,.22);
+  --canvas:#08080b;
+  --canvas-dot:rgba(235,235,245,.06);
+  --fill:rgba(120,120,128,.30);
+  --fill-2:rgba(120,120,128,.20);
+  --fill-hover:rgba(120,120,128,.38);
+  --material:rgba(22,22,26,.62);
+  --material-thick:rgba(30,30,35,.90);
+  --shadow-1:0 1px 3px rgba(0,0,0,.5);
+  --shadow-2:0 12px 34px rgba(0,0,0,.55),0 2px 6px rgba(0,0,0,.4);
+  --shadow-3:0 36px 100px rgba(0,0,0,.7),0 10px 30px rgba(0,0,0,.5);
+  --page-shadow:0 6px 18px rgba(0,0,0,.4),0 30px 90px rgba(0,0,0,.6);
+  --card-border:rgba(255,255,255,.14);
+  --glass-rim:inset 0 0 0 .5px rgba(255,255,255,.16),inset 0 1px 0 rgba(255,255,255,.22);
+  --glass-sheen:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0) 60%);
+  --card-rim:inset 0 0 0 .5px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.10);
+}
+
+/* ---------------- 卡片：半透明 + 亮边（不模糊，省 GPU） ---------------- */
+html[data-ui="ios26"] .card{
+  background:var(--surface);
+  box-shadow:var(--shadow-1),var(--card-rim);
+}
+
+/* ---------------- 浮动层：真玻璃 + specular 高光 ---------------- */
+html[data-ui="ios26"] .topbar,
+html[data-ui="ios26"] .stage-bar,
+html[data-ui="ios26"] .stage-foot,
+html[data-ui="ios26"] .rail.right > .tabs,
+html[data-ui="ios26"] .bubble-dock{
+  -webkit-backdrop-filter:var(--blur);
+  backdrop-filter:var(--blur);
+  background-image:var(--glass-sheen);
+  box-shadow:var(--glass-rim);
+}
+
+/* ---------------- 控件：胶囊化 ---------------- */
+html[data-ui="ios26"] .btn{border-radius:999px;font-weight:600}
+html[data-ui="ios26"] .btn.primary{
+  box-shadow:0 6px 18px color-mix(in srgb,var(--tint) 34%,transparent),
+             inset 0 1px 0 rgba(255,255,255,.34);
+}
+html[data-ui="ios26"] .seg{border-radius:999px;padding:3px;background:var(--fill-2);
+  box-shadow:inset 0 0 0 .5px var(--sep)}
+html[data-ui="ios26"] .seg button{border-radius:999px}
+html[data-ui="ios26"] .seg button.on{
+  background:var(--bg-elev);
+  box-shadow:0 4px 12px rgba(0,0,0,.10),inset 0 0 0 .5px rgba(255,255,255,.5);
+}
+html[data-ui="ios26"] .tabs{border-radius:999px;background:var(--fill-2);margin:8px;
+  box-shadow:inset 0 0 0 .5px var(--sep)}
+html[data-ui="ios26"] .tabs button{border-radius:999px}
+html[data-ui="ios26"] .tabs button.on{background:var(--bg-elev)}
+html[data-ui="ios26"] .pill,
+html[data-ui="ios26"] .fchip,
+html[data-ui="ios26"] .ttag,
+html[data-ui="ios26"] .icon-btn{border-radius:999px}
+html[data-ui="ios26"] input[type=text],
+html[data-ui="ios26"] input[type=search],
+html[data-ui="ios26"] input[type=url],
+html[data-ui="ios26"] input[type=password],
+html[data-ui="ios26"] textarea,
+html[data-ui="ios26"] select{border-radius:var(--r-md);background:var(--fill-2)}
+
+/* ---------------- 卡片 / 模板 / 弹层：同心圆角 ---------------- */
+html[data-ui="ios26"] .tpl{border-radius:var(--r-lg)}
+html[data-ui="ios26"] .tpl.on{box-shadow:0 0 0 2px var(--tint),var(--shadow-2)}
+html[data-ui="ios26"] .keysheet{-webkit-backdrop-filter:blur(14px) saturate(150%);backdrop-filter:blur(14px) saturate(150%)}
+html[data-ui="ios26"] .ks-panel,
+html[data-ui="ios26"] .sc-panel{
+  border-radius:var(--r-xl);
+  background:var(--material-thick);
+  -webkit-backdrop-filter:var(--blur);
+  backdrop-filter:var(--blur);
+  box-shadow:var(--shadow-3),var(--glass-rim);
+}
+html[data-ui="ios26"] .appearance-pop,
+html[data-ui="ios26"] .bubble-dock{
+  border-radius:var(--r-xl);
+  box-shadow:var(--shadow-3),var(--glass-rim);
+}
+
+/* ---------------- 舞台 ---------------- */
+html[data-ui="ios26"] .canvas svg{border-radius:10px}
+html[data-ui="ios26"] .rail.left{background:transparent;border-right:0}
+html[data-ui="ios26"] .rail.right{background:transparent;border-left:0}
+
+/* ---------------- 排版 ---------------- */
+html[data-ui="ios26"] .card-head h2{letter-spacing:-.025em;font-size:15.5px}
+html[data-ui="ios26"] .bub-head b{letter-spacing:-.025em}
+
+/* ---------------- 绘制页 ---------------- */
+html[data-ui="ios26"] .paint-frame{border-radius:var(--r-xl)}
+html[data-ui="ios26"] .paint-canvas{border-radius:12px}
+/* ---------------- 环境色：玻璃必须透出颜色才成立（iOS 26 的关键一笔） ---------------- */
+html[data-ui="ios26"] body{
+  background:
+    radial-gradient(1100px 560px at 10% -8%, color-mix(in srgb, var(--tint) 30%, transparent), transparent 62%),
+    radial-gradient(900px 520px at 102% 4%, color-mix(in srgb, var(--purple) 22%, transparent), transparent 58%),
+    radial-gradient(1000px 700px at 50% 112%, color-mix(in srgb, var(--pink) 14%, transparent), transparent 62%),
+    var(--bg);
+  background-attachment: fixed;
+}
+/* 舞台底色也透一点，让两侧玻璃有东西可透。
+   这里不加 backdrop-filter：舞台内容一直在变，实时模糊是移动端性能杀手。 */
+html[data-ui="ios26"] .stage-wrap{
+  background:color-mix(in srgb, var(--canvas) 58%, transparent);
+}
+/* 顶栏 / 舞台栏：去掉硬边，换柔和外阴影 = 浮起来 */
+html[data-ui="ios26"] .topbar{
+  border-bottom:0;
+  box-shadow:0 1px 0 rgba(255,255,255,.32),0 10px 30px rgba(0,0,0,.10);
+}
+html[data-ui="ios26"] .stage-bar,
+html[data-ui="ios26"] .stage-foot{border-color:transparent}
+html[data-ui="ios26"] .rail.left,
+html[data-ui="ios26"] .rail.right{background:transparent}
+/* 卡片：加一层顶部 sheen，玻璃感更强 */
+html[data-ui="ios26"] .card{
+  background-color:var(--surface);
+  background-image:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,0) 42%);
+}
+html[data-ui="ios26"][data-theme="dark"] .card{
+  background-image:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0) 42%);
+}
+@media (prefers-color-scheme:dark){
+  html[data-ui="ios26"]:not([data-theme="light"]) .card{
+    background-image:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0) 42%);
+  }
+}

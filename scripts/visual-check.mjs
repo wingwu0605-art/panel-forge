@@ -1199,6 +1199,80 @@ const scenarios = [
       await shot('facets-search');
     },
   },
+
+  {
+    name: 'ui-skin',
+    title: '⑬ 可选皮肤：iOS 26 液态玻璃（默认外观不受影响）',
+    async run(page, shot, { check }) {
+      await page.viewport(1200, 900);
+      const tok = `(n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim()`;
+
+      // 默认：经典皮肤，没有 data-ui
+      await page.goto('/?fresh=1&tpl=ref-4band-2col');
+      await page.evaluate("localStorage.removeItem('pf.ui.v1')");
+      await page.goto('/?fresh=1&tpl=ref-4band-2col');
+      await page.ready();
+      const classic = await page.evaluate(`({
+        ui: document.documentElement.dataset.ui || '',
+        rxl: getComputedStyle(document.documentElement).getPropertyValue('--r-xl').trim(),
+        btnR: getComputedStyle(document.querySelector('.btn')).borderRadius,
+      })`);
+      check('默认是经典外观（没有 data-ui）', classic.ui === '' && classic.rxl === '20px',
+        `--r-xl=${classic.rxl} / 按钮圆角=${classic.btnR}`);
+
+      // 通过外观面板切到液态玻璃
+      await page.evaluate(`(() => {
+        const b = [...document.querySelectorAll('#uiSeg button')].find((x) => x.dataset.ui === 'ios26');
+        b.click();
+      })()`);
+      await sleep(700);
+      const glass = await page.evaluate(`({
+        ui: document.documentElement.dataset.ui || '',
+        label: document.querySelector('#uiName').textContent,
+        rxl: getComputedStyle(document.documentElement).getPropertyValue('--r-xl').trim(),
+        blur: getComputedStyle(document.documentElement).getPropertyValue('--blur').trim(),
+        btnR: getComputedStyle(document.querySelector('.btn')).borderRadius,
+        segR: getComputedStyle(document.querySelector('.seg')).borderRadius,
+        bodyGrad: getComputedStyle(document.body).backgroundImage.slice(0, 24),
+        saved: localStorage.getItem('pf.ui.v1'),
+      })`);
+      check('切到液态玻璃：data-ui + 令牌换了', glass.ui === 'ios26' && glass.rxl === '28px' && /blur\(32px\)/.test(glass.blur),
+        `--r-xl ${classic.rxl} → ${glass.rxl}`);
+      check('控件胶囊化', glass.btnR === '999px' && glass.segR === '999px', `按钮 ${glass.btnR} / 分段 ${glass.segR}`);
+      check('背景有环境色渐变（玻璃才透得出来）', glass.bodyGrad.includes('radial-gradient'), glass.bodyGrad);
+      check('记住了', glass.saved === 'ios26');
+      await page.evaluate(`(() => {
+        const b = [...document.querySelectorAll('#modeSeg button')].find((x) => x.dataset.mode === 'light');
+        b.click();
+      })()`);
+      await sleep(900);
+      await shot('skin-ios26-light');
+
+      // 刷新后仍是液态玻璃；再切回经典要能干净恢复
+      await page.goto('/?fresh=1&tpl=ref-4band-2col');
+      await page.ready();
+      const persisted = await page.evaluate("document.documentElement.dataset.ui || ''");
+      check('刷新后皮肤记忆生效', persisted === 'ios26', persisted || '(无)');
+
+      await page.evaluate(`(() => {
+        const b = [...document.querySelectorAll('#uiSeg button')].find((x) => x.dataset.ui === 'classic');
+        b.click();
+      })()`);
+      await sleep(600);
+      const back = await page.evaluate(`({
+        ui: document.documentElement.dataset.ui || '',
+        rxl: getComputedStyle(document.documentElement).getPropertyValue('--r-xl').trim(),
+        bodyBg: getComputedStyle(document.body).backgroundColor,
+      })`);
+      check('切回经典能干净恢复', back.ui === '' && back.rxl === '20px', `--r-xl=${back.rxl}`);
+
+      // ?ui=ios26 可直接分享预览链接
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&ui=ios26');
+      await page.ready();
+      const viaUrl = await page.evaluate("document.documentElement.dataset.ui || ''");
+      check('?ui=ios26 链接可直接预览', viaUrl === 'ios26');
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */

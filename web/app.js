@@ -120,6 +120,8 @@ const ACCENTS = [
   { id: 'graphite', zh: '石墨', l: '#636366', d: '#98989d' },
 ];
 const ACCENT_KEY = 'pf.accent';
+/** 界面风格：classic（默认）/ ios26（液态玻璃皮肤）；改皮肤只动 data-ui，不动组件 */
+const UI_KEY = 'pf.ui.v1';
 const MOTION_KEY = 'pf.motion';
 const sysDarkMQ = window.matchMedia('(prefers-color-scheme: dark)');
 const sysReduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -4144,6 +4146,19 @@ function initTheme() {
     }).catch(() => {});
   }));
 
+  // 界面风格：经典 / iOS 26 液态玻璃（可选皮肤，只换令牌，不动组件代码）
+  const setUi = (name) => {
+    const skin = name === 'ios26' ? 'ios26' : 'classic';
+    if (skin === 'ios26') root.dataset.ui = 'ios26'; else delete root.dataset.ui;
+    $('#uiName').textContent = skin === 'ios26' ? '液态玻璃' : '经典';
+    $$('#uiSeg button').forEach((b) => b.classList.toggle('on', (b.dataset.ui === 'ios26') === (skin === 'ios26')));
+    store.set(UI_KEY, skin === 'ios26' ? 'ios26' : null);
+  };
+  $$('#uiSeg button').forEach((b) => b.addEventListener('click', () => {
+    if ((b.dataset.ui === 'ios26') === (root.dataset.ui === 'ios26')) return;
+    withTransition('ui', () => setUi(b.dataset.ui));
+  }));
+
   // 减弱动态效果
   const chk = $('#chkReduceMotion');
   chk.checked = root.dataset.motion === 'reduced';
@@ -4164,6 +4179,8 @@ function initTheme() {
   sysDarkMQ.addEventListener?.('change', () => { syncMeta(); renderStage(); });
   setMode(mode);
   setAccent(accent);
+  // 皮肤：URL 上的 ?ui= 优先（方便发给别人看），否则用记住的
+  setUi(new URLSearchParams(location.search).get('ui') || store.get(UI_KEY) || 'classic');
 }
 
 /* ================================================================== *
