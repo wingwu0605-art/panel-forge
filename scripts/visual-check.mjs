@@ -1038,6 +1038,92 @@ const scenarios = [
       await page.evaluate('window.__pfPaint.close()');
     },
   },
+
+  {
+    name: 'panel-manager',
+    title: '⑪ 面板管理：显示/隐藏/排序 + AI 总开关（两个版本各自记忆）',
+    async run(page, shot, { check }) {
+      await page.viewport(1200, 900);
+      const state = `(() => {
+        const panels = [...document.querySelectorAll('.rail.left [data-panel]')]
+          .map((el) => ({ id: el.dataset.panel, hidden: !!el.hidden }));
+        return {
+          panels,
+          ai: document.body.dataset.ai || '',
+          aiCard: (() => { const el = document.querySelector('[data-panel="ai"]'); return el ? !el.hidden : null; })(),
+          perSlotAi: (() => { const el = document.querySelector('.ai-gen'); return el ? getComputedStyle(el).display !== 'none' : null; })(),
+          sheetOpen: !document.querySelector('#panelSheet')?.classList.contains('hidden'),
+        };
+      })()`;
+      const openSheet = `(() => { document.querySelector('#btnPanels').click(); })()`;
+
+      // ---- AI 版：默认全显示、AI 打开；能隐藏并记住 ----
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+      await page.evaluate("localStorage.removeItem('pf.layout.v2')");
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+      const d1 = await page.evaluate(state);
+      check('AI 版默认：五块面板全显示 + AI 打开',
+        d1.panels.every((p) => !p.hidden) && d1.ai === 'on' && d1.perSlotAi === true,
+        `ai=${d1.ai} / 每格AI=${d1.perSlotAi}`);
+
+      await page.evaluate(openSheet);
+      await sleep(250);
+      const sheet = await page.evaluate(state);
+      check('「面板管理」能打开，列出 5 块', sheet.sheetOpen && (await page.evaluate("document.querySelectorAll('#panelList .panel-row').length")) === 5);
+      await shot('panels-sheet');
+
+      await page.evaluate(`(() => {
+        const row = [...document.querySelectorAll('#panelList .panel-row')].find((r) => r.dataset.id === 'chars');
+        row.querySelector('[data-act="toggle"]').click();
+      })()`);
+      await sleep(250);
+      const hidden = await page.evaluate(state);
+      check('隐藏「角色参考图」后它就不见了', hidden.panels.find((p) => p.id === 'chars').hidden === true);
+
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+      const afterReload = await page.evaluate(state);
+      check('刷新后仍然记得（隐藏状态持久化）', afterReload.panels.find((p) => p.id === 'chars').hidden === true);
+
+      await page.evaluate(openSheet);
+      await sleep(200);
+      await page.evaluate("document.querySelector('#btnPanelReset').click()");
+      await sleep(250);
+      const reset = await page.evaluate(state);
+      check('「恢复默认」把它们还原', reset.panels.every((p) => !p.hidden));
+
+      // ---- 画师版：AI 默认收起；用户想用可以自己加回来 ----
+      await page.goto('/?fresh=1&mode=artist&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+      const d2 = await page.evaluate(state);
+      check('画师版默认：AI 面板收起、每格 AI 也收起', d2.aiCard === false && d2.ai === 'off' && d2.perSlotAi === false,
+        `AI面板=${d2.aiCard} / ai=${d2.ai} / 每格AI=${d2.perSlotAi}`);
+
+      await page.evaluate(openSheet);
+      await sleep(200);
+      await page.evaluate("document.querySelector('#chkAi').click()");
+      await sleep(250);
+      const aiOn = await page.evaluate(state);
+      check('用户打开「启用 AI 功能」后，每格 AI 立刻回来', aiOn.ai === 'on' && aiOn.perSlotAi === true, `ai=${aiOn.ai}`);
+
+      await page.evaluate(`(() => {
+        const row = [...document.querySelectorAll('#panelList .panel-row')].find((r) => r.dataset.id === 'ai');
+        row.querySelector('[data-act="toggle"]').click();
+      })()`);
+      await sleep(250);
+      const aiPanel = await page.evaluate(state);
+      check('也能把 AI 面板自己加回左栏', aiPanel.aiCard === true);
+
+      // 画师版的布局和 AI 版是两套，互不影响
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+      const backMain = await page.evaluate(state);
+      check('两套布局互不干扰（回到 AI 版仍是 AI 开）', backMain.ai === 'on');
+      await shot('panels-artist');
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */

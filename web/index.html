@@ -62,6 +62,7 @@
     <span class="pill dim mono" id="statPort"></span>
   </div>
   <nav class="top-actions" id="topActions">
+    <button class="btn ghost sm" id="btnPanels" type="button">面板管理</button>
     <a class="btn ghost sm" id="lnkDocs" href="/api/docs" target="_blank" rel="noreferrer">API 文档</a>
     <a class="btn ghost sm" id="lnkSheet" href="/api/sheet" target="_blank" rel="noreferrer">全部模板接触表</a>
     <a class="btn ghost sm" id="lnkTools" href="/api/ai-tools.json" target="_blank" rel="noreferrer">AI 工具定义</a>
@@ -76,7 +77,7 @@
 
   <!-- ============================== 左栏：匹配 + 模板库 ============================== -->
   <aside class="rail left">
-    <section class="card match" data-collapse="match">
+    <section class="card match" data-panel="plot" data-panel-name="剧情 → 分镜" data-collapse="match">
       <div class="card-head">
         <h2>剧情 → 分镜</h2>
         <span class="hint" id="analyzeHint">本地规则引擎</span>
@@ -110,7 +111,7 @@
       <div class="results hidden" id="matchResults"></div>
     </section>
 
-    <section class="card ai" data-collapse="ai">
+    <section class="card ai" data-panel="ai" data-panel-name="AI 导演" data-collapse="ai">
       <div class="card-head">
         <h2>AI 导演 <span class="tag-opt">可选</span></h2>
         <span class="hint" id="llmBadge">未配置</span>
@@ -145,7 +146,7 @@
       <div class="ai-result hidden" id="aiResult"></div>
     </section>
 
-    <section class="card chars" data-collapse="chars">
+    <section class="card chars" data-panel="chars" data-panel-name="角色参考图" data-collapse="chars">
       <div class="card-head">
         <h2>角色参考图</h2>
         <span class="hint">让同一个人每格都长一样</span>
@@ -170,7 +171,7 @@
       </div>
     </section>
 
-    <section class="card browse" data-collapse="browse">
+    <section class="card browse" data-panel="browse" data-panel-name="分镜模板库" data-collapse="browse">
       <div class="card-head">
         <h2>分镜模板库</h2>
         <span class="hint" id="listCount"></span>
@@ -186,7 +187,7 @@
       <div class="tpl-grid" id="tplGrid"></div>
     </section>
 
-    <details class="help card" data-collapse="help">
+    <details class="help card" data-panel="help" data-panel-name="怎么用" data-collapse="help">
       <summary>怎么用（30 秒）</summary>
       <ol>
         <li>在「分镜模板库」选一套版式（或先写剧情，让引擎替你挑）。</li>
@@ -497,6 +498,25 @@
 </nav>
 
 <input type="file" id="filePick" accept="image/*" multiple hidden>
+
+<!-- ============================== 面板管理：左栏每块可显示/隐藏/调顺序 ============================== -->
+<div class="keysheet hidden" id="panelSheet">
+  <div class="ks-panel">
+    <div class="ks-head">
+      <b>面板管理</b>
+      <span class="muted small">左栏每一块都能隐藏或调顺序 · 记住</span>
+      <button class="btn tiny" id="btnPanelClose">关闭</button>
+    </div>
+    <div class="ks-body">
+      <label class="switch block"><input type="checkbox" id="chkAi"> 启用 AI 功能（AI 导演 / 生图 / 优化提示词 / API Key）</label>
+      <div class="panel-list" id="panelList"></div>
+      <div class="row2">
+        <button class="btn tiny" id="btnPanelReset">恢复默认</button>
+      </div>
+      <p class="muted small" style="margin:6px 0 0">关掉 AI 后，左栏的 AI 面板、每格的生图按钮和候选图会一起收起来；想用随时打开。</p>
+    </div>
+  </div>
+</div>
 
 <div class="keysheet hidden" id="keySheet">
   <div class="ks-panel">

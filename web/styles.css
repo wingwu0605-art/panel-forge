@@ -781,13 +781,29 @@ body.paint-engine .paint-hint{display:none}
 body.paint-engine .paint-top{padding-top:calc(6px + env(safe-area-inset-top))}
 
 /* ---------------------------------------------------------------- 画师版（?mode=artist） */
-/* AI 相关界面全部收起：AI 导演卡、密钥面板、每格的 AI 动作/候选图、AI 优化提示词。
-   规则匹配、分镜信息、提示词文本、绘制都保留（提示词是画师可用的 brief，不调模型）。 */
-body[data-mode="artist"] .card.ai,
-body[data-mode="artist"] #ksSheet,
-body[data-mode="artist"] #btnAiPrompts,
-body[data-mode="artist"] .ai-gen,
-body[data-mode="artist"] #candStrip{display:none !important}
+/* 每格里的 AI 按钮：由「AI 总开关」控制（body[data-ai="off"]），
+   左栏的 AI 导演卡由面板管理控制（[data-panel="ai"]），两边互不干扰。 */
+body[data-ai="off"] .ai-gen,
+body[data-ai="off"] #candStrip,
+body[data-ai="off"] #btnAiPrompts,
+body[data-ai="off"] #keySheet{display:none !important}
+/* 被面板管理隐藏的块 */
+.rail.left [data-panel][hidden]{display:none !important}
+
+/* 面板管理列表 */
+/* .ks-body 是给「Key 表单」做的两列网格，这里是一条竖排列表，单独覆盖掉 */
+#panelSheet .ks-panel{max-width:560px}
+#panelSheet .ks-body{display:block;padding:14px 16px 16px}
+.panel-list{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.panel-row{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;
+  background:var(--fill-2);box-shadow:inset 0 0 0 .5px var(--sep);
+}
+.panel-row.off{opacity:.5}
+.panel-row .panel-name{flex:1 1 auto;min-width:0;font-size:13.5px;font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.panel-row .panel-acts{display:flex;gap:6px;flex:0 0 auto}
+.panel-row .panel-acts .btn{min-width:34px;padding:0 8px}
 
 /* 拖动 / 缩放进行中：关掉画布周围的实时模糊和页面投影。   iPhone 上这些层每帧都要重新合成，是「明明只动了一个属性却还是发涩」的那部分开销。 */
 body.pf-dragging .stage-bar,
