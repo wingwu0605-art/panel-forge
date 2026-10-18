@@ -866,6 +866,11 @@ async function openPaint(slotId = state.selectedId) {
     paintHost = host;
     paintEngine = 'klecks';
     document.body.classList.add('paint-engine');
+    // 窄屏（手机竖屏）上 Klecks 的桌面工具栏不收起，工作区只剩一百多像素，画布会缩得很小。
+    // 这里不硬改它的 UI（那是 fork 级别的事），只把预期说清楚。
+    if (window.innerWidth < 560) {
+      $('#paintSub').textContent = `${slot.shape?.zh || '常规格'} · 竖屏空间小，建议横屏或平板/电脑`;
+    }
     animatePaintIn(slot, host.el);
     perfDone('paint', t0);
     return;

@@ -77,12 +77,18 @@ window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '�
   document.getElementById('pf-load')?.classList.add('hide');
 
   // 画布默认是 100%：格子大一点就会超出视口，只看到中间一块。
-  // Klecks 的自动适配只在「画布 ≤ 视口 1/4」时才触发，所以这里手动适配一次。
-  // easel 是它内部的缩放/平移管理器（TS private，运行时可达）；改了名字也只是适配失效，不影响画画。
+  // Klecks 的自动适配只在「画布 ≤ 视口 1/4」时才触发，所以这里手动适配。
+  // easel 是它内部的缩放/平移管理器（TS private，运行时可达）；改名了也只是适配失效，不影响画画。
+  // 它布局完成的时间点不确定，所以前面几秒多试几次（手机上尤其要命：不定就只看到画布一角）。
   const fit = () => {
     try { window.__pfKlecks.embed?.klApp?.easel?.fitTransform(true); } catch { /* ignore */ }
   };
-  requestAnimationFrame(() => { fit(); setTimeout(fit, 120); });
+  let tries = 0;
+  const tryFit = () => {
+    fit();
+    if (++tries < 9) setTimeout(tryFit, 120 + tries * 160);
+  };
+  requestAnimationFrame(tryFit);
   window.addEventListener('resize', () => setTimeout(fit, 150));
   return true;
 };
