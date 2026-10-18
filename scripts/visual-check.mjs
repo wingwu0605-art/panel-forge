@@ -715,6 +715,172 @@ const scenarios = [
       await shot('bubble-dragged');
     },
   },
+
+  {
+    name: 'paint-klecks',
+    title: '⑧ 格子绘制：外部引擎 + 按形状裁切（手机宽度 430）',
+    async run(page, shot, { check }) {
+      await page.viewport(430, 900);
+      // p6 是 ref-4band-2col 里的斜切格（上宽下窄），bbox 右下角落在多边形外。
+      // fresh=1：别恢复上一个用例的草稿，否则模板会被换掉、p6 可能不存在
+      await page.goto('/?perf=1&fresh=1&tpl=ref-4band-2col&slot=p6');
+      await page.ready();
+
+      const hasHook = await page.evaluate('!!window.__pfPaint');
+      check('绘制钩子在（?perf=1）', hasHook);
+      if (!hasHook) return;
+
+      // 先给画面中心那一格塞一张纯色照片：既覆盖「描线」场景，也给像素断言一个基准
+      const seeded = await page.evaluate(`(async () => {
+        const before = [...document.querySelectorAll('#canvas svg image[data-slot]')].map((e) => e.dataset.slot);
+        const c = document.createElement('canvas');
+        c.width = 1200; c.height = 1600;
+        const g = c.getContext('2d');
+        g.fillStyle = '#2f6bff'; g.fillRect(0, 0, 1200, 1600);
+        const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
+        const canvas = document.querySelector('#canvas');
+        const r = canvas.getBoundingClientRect();
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'base.jpg', { type: 'image/jpeg' }));
+        canvas.dispatchEvent(new DragEvent('drop', {
+          dataTransfer: dt, bubbles: true, cancelable: true,
+          clientX: r.left + r.width * 0.5, clientY: r.top + r.height * 0.5,
+        }));
+        await new Promise((res) => setTimeout(res, 1400));
+        const after = [...document.querySelectorAll('#canvas svg image[data-slot]')].map((e) => e.dataset.slot);
+        // 只认「这次新落进去的那一格」，别拿别的用例留下的图当基准
+        return { all: after, fresh: after.filter((s) => !before.includes(s))[0] || null };
+      })()`);
+      check('底图落进了一格（且是这次新填的）', !!seeded.fresh, seeded.all.join(',') || '没有');
+
+      await page.evaluate('window.__pfPaint.close()');
+      await page.evaluate("window.__pfPaint.open('p6')");
+      await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '绘制页打开', timeout: 30000 });
+      await sleep(1500);
+
+      const info = await page.evaluate('window.__pfPaint.info()');
+      check('外部引擎（Klecks）挂上了', info.engine === 'klecks' && info.frame && info.sheetOpen, `engine=${info.engine}`);
+      check('画布比例跟格子包围盒一致', info.hostSize && Math.abs(info.hostSize.w / info.hostSize.h - 0.453) < 0.03,
+        `画布 ${info.hostSize?.w}×${info.hostSize?.h}`);
+      await shot('paint-open');
+
+      const inner = await page.evaluate(`(() => {
+        const f = document.querySelector('.paint-frame');
+        const w = f && f.contentWindow;
+        return { klecks: !!w?.Klecks, inst: !!w?.__pfKlecks, canvas: !!f?.contentDocument?.querySelector('canvas') };
+      })()`);
+      check('iframe 里有 Klecks 实例和画布', inner.klecks && inner.inst && inner.canvas);
+
+      /* 真画一笔：用 CDP 派发「可信」鼠标事件 ——
+         合成 PointerEvent 进不了它的笔刷管线（试过，它有自己的指针事件栈）。
+         坐标要从 iframe 里的画布 rect 换算到父页面视口。 */
+      const rect = await page.evaluate(`(() => {
+        const f = document.querySelector('.paint-frame');
+        const fr = f.getBoundingClientRect();
+        const doc = f.contentDocument;
+        const want = 0.453;
+        const best = [...doc.querySelectorAll('canvas')]
+          .filter((c) => c.width > 30 && c.height > 30)
+          .sort((a, b) => Math.abs((a.width / a.height) - want) - Math.abs((b.width / b.height) - want))[0];
+        if (!best) return null;
+        const r = best.getBoundingClientRect();
+        return { x: fr.left + r.left, y: fr.top + r.top, w: r.width, h: r.height, cw: best.width, ch: best.height };
+      })()`);
+      check('找到引擎的绘画画布', !!rect, rect ? `${rect.cw}×${rect.ch}（显示 ${Math.round(rect.w)}×${Math.round(rect.h)}）` : '没找到');
+
+      if (rect) {
+        const y = rect.y + rect.h * 0.5;
+        const x0 = rect.x + rect.w * 0.28;
+        const x1 = rect.x + rect.w * 0.62;
+        await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x0, y, button: 'left', clickCount: 1, buttons: 1 });
+        for (let i = 1; i <= 16; i++) {
+          await page.send('Input.dispatchMouseEvent', {
+            type: 'mouseMoved', x: x0 + ((x1 - x0) * i) / 16, y, button: 'left', buttons: 1,
+          });
+          await sleep(16);
+        }
+        await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x1, y, button: 'left', clickCount: 1, buttons: 0 });
+        await sleep(700);
+        const painted = await page.evaluate(`(async () => {
+          const w = document.querySelector('.paint-frame').contentWindow;
+          const blob = await w.__pfKlecksPng();
+          const bmp = await createImageBitmap(blob);
+          const c = document.createElement('canvas');
+          c.width = bmp.width; c.height = bmp.height;
+          const g = c.getContext('2d');
+          g.drawImage(bmp, 0, 0);
+          const d = g.getImageData(0, Math.round(bmp.height * 0.5), bmp.width, 1).data;
+          let dark = 0;
+          for (let i = 0; i < d.length; i += 4) {
+            const [r, g2, b, a] = [d[i], d[i + 1], d[i + 2], d[i + 3]];
+            if (a > 8 && r < 90 && g2 < 90 && b < 90) dark++;
+          }
+          return { dark, w: bmp.width };
+        })()`);
+        check('CDP 真输入能在引擎里画出笔迹', painted.dark > 3, `中线深色像素 ${painted.dark} 个（画布宽 ${painted.w}）`);
+        await shot('paint-drawn');
+      }
+
+      // 完成 → 回填，再从最终产物验证：底图在、格子外被裁掉
+      await page.evaluate('window.__pfPaint.finish()');
+      await page.waitFor("document.querySelector('#paintSheet')?.hidden !== false", { label: '绘制页关闭', timeout: 20000 });
+      await sleep(700);
+      const px = await page.evaluate(`(async () => {
+        const el = document.querySelector('#canvas svg image[data-slot="p6"]');
+        if (!el) return { err: '这一格没有图' };
+        const href = el.getAttribute('href') || '';
+        const blob = await (await fetch(href)).blob();
+        const bmp = await createImageBitmap(blob);
+        const c = document.createElement('canvas');
+        c.width = bmp.width; c.height = bmp.height;
+        const g = c.getContext('2d');
+        g.drawImage(bmp, 0, 0);
+        const at = (fx, fy) => {
+          const d = g.getImageData(Math.round(bmp.width * fx), Math.round(bmp.height * fy), 1, 1).data;
+          return { a: d[3], rgb: [d[0], d[1], d[2]] };
+        };
+        // 中线整行数一下不透明像素：证明笔迹真的进了最终产物
+        const row = g.getImageData(0, Math.round(bmp.height * 0.5), bmp.width, 1).data;
+        let opaqueRow = 0;
+        for (let i = 3; i < row.length; i += 4) if (row[i] > 8) opaqueRow++;
+        return {
+          blob: href.startsWith('blob:'), w: bmp.width, h: bmp.height,
+          ratio: +(bmp.width / bmp.height).toFixed(3),
+          opaqueRow, mid: at(0.45, 0.5), corner: at(0.975, 0.975),
+        };
+      })()`);
+      check('结果以 blob 贴回这一格', px.blob && px.w > 100, px.err || `${px.w}×${px.h}`);
+      check('画布比例=格子包围盒', Math.abs(px.ratio - 0.453) < 0.03, `ratio=${px.ratio}`);
+      check('笔迹进了最终产物（中线有不透明像素）', px.opaqueRow > 3, `中线 ${px.opaqueRow} 个像素`);
+      check('斜切格外的角被裁掉（右下角透明）', px.corner.a === 0, `alpha=${px.corner.a}`);
+      await shot('paint-result');
+
+      // ---- 第二段：底图必须能经引擎走一趟再回来（描线场景）----
+      if (seeded.fresh) {
+        await page.evaluate(`window.__pfPaint.open(${JSON.stringify(seeded.fresh)})`);
+        await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '底图格绘制页打开', timeout: 30000 });
+        await sleep(1600);
+        await page.evaluate('window.__pfPaint.finish()');
+        await page.waitFor("document.querySelector('#paintSheet')?.hidden !== false", { label: '关闭', timeout: 20000 });
+        await sleep(700);
+        const base = await page.evaluate(`(async () => {
+          const el = document.querySelector('#canvas svg image[data-slot=' + ${JSON.stringify(seeded.fresh)} + ']');
+          if (!el) return { err: '没有图' };
+          const blob = await (await fetch(el.getAttribute('href'))).blob();
+          const bmp = await createImageBitmap(blob);
+          const c = document.createElement('canvas');
+          c.width = bmp.width; c.height = bmp.height;
+          const g = c.getContext('2d');
+          g.drawImage(bmp, 0, 0);
+          const d = g.getImageData(Math.round(bmp.width * 0.5), Math.round(bmp.height * 0.5), 1, 1).data;
+          return { rgb: [d[0], d[1], d[2]], a: d[3] };
+        })()`);
+        check('底图经引擎走一趟还能回来（中心仍是蓝色）',
+          base.a > 200 && base.rgb[2] > 150 && base.rgb[0] < 120, `rgb=${base.rgb}`);
+        await shot('paint-base-roundtrip');
+      }
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */

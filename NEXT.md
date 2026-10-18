@@ -37,7 +37,11 @@ node scripts/perf-bench.mjs     # 拖动性能赛跑：灌 N 张图 → 合成�
 | `lib/svg.mjs` | 整页 SVG 渲染器（服务端/浏览器共用）+ `imageAttrs()`（热路径补丁与渲染共用同一份计算）|
 | `lib/llm-core.mjs` | 浏览器/Node 共用：prompt 常量、`chat()`、`aiDecide`、`optimizePrompts`、`generateImage`、`fitImageSize` |
 | `lib/llm.mjs` | Node 入口：读 `LLM_*` 环境变量后转交 core |
-| `web/app.js` | 前端全部逻辑（~3900 行，**原生 ES module，`state` 不挂在 window 上**）|
+| `web/app.js` | 前端全部逻辑（~4200 行，**原生 ES module，`state` 不挂在 window 上**）|
+| `web/paint.mjs` | 兜底轻量笔（笔刷/撤销/多边形裁剪）；外部引擎起不来时用它 |
+| `web/paint-host.mjs` | 外部绘画引擎的适配层（iframe + 同源直调），换引擎只改这里 |
+| `web/klecks/` | Klecks 的预构建产物 + 我们写的 `embed.html`；**升级步骤见该目录 README** |
+| `web/vendor/perfect-freehand.mjs` | 唯一的第三方运行时依赖（MIT，压感笔画轮廓）|
 | `web/api-static.js` | 静态版 API（规则引擎在浏览器里跑 + 直连模型）|
 | `server.mjs` | 零依赖 HTTP 服务：页面 + `/api/*` |
 | `scripts/visual-check.mjs` | 目视检查：headless Chrome + CDP，按场景点按钮、量几何、截图（也能 `import` 出来当驱动用）|
@@ -142,9 +146,49 @@ iPhone 上还叠了三个放大器：单标签内存天花板（解码结果被�
 - 草稿里的图片是 Blob，不再写进 `pages` 记录里。**`currentPageSnapshot()` 必须带 `id`**，
   否则每次存盘都会换新页 id、指纹对不上，图片被反复重写（这个 bug 犯过一次）。
 
+## 五之三、画师分支 P0：接外部绘画引擎（Klecks）
+
+选型结论（问过一圈开源项目后定的）：
+- **不走"自己写引擎"**，直接接现成的：[Klecks](https://github.com/bitbof/klecks)（MIT，Kleki.com 的底座，
+  压感笔刷/图层/撤销都是现成的）。miniPaint 强在修图（滤镜/选区/仿章）但笔刷不读压感，留作以后「修图模式」。
+- **不按终端分引擎**（iPad 用 A、桌面用 B 会毁掉肌肉记忆），只按终端分**输入适配**与**布局**。
+- 交付路线：先 **A（网页版，本轮已做）**给朋友试 → 再 **B（原生壳 + 更强引擎）** → **C（和画师现有软件文件双向同步）**。
+
+实现（壳与引擎解耦，换引擎只改一个文件）：
+
+| 环节 | 位置 |
+| --- | --- |
+| 入口「绘制这一格」按钮（图片段里） | `web/index.html` → `#btnPaint` → `openPaint()` |
+| 铺满动画（从这一格长到全屏） | `animatePaintIn()` |
+| 引擎适配层（iframe + 同源直调） | `web/paint-host.mjs` → `web/klecks/embed.html` |
+| 按格子多边形裁切 + 回填成这一格的图 | `clipToSlot()` / `finishPaint()` |
+| 兜底轻量笔（引擎起不来时） | `web/paint.mjs` + `web/vendor/perfect-freehand.mjs` |
+
+关键点：
+- Klecks 的 embed 是**单实例、挂 document.body、没有销毁接口** → 每次绘制开一个 iframe，
+  一份文档一个干净实例；同源所以父页面直接调 `__pfKlecksPng()`，不需要 postMessage 协议。
+- 画布尺寸 = 格子包围盒 × 2048 长边 → 画布比例天然等于格子 bbox，回填时才能 1:1 对上。
+- 导出时按多边形 `ctx.clip` 再裁一次 → **斜切格/三角格外的像素一定被裁掉**（有自动测试断言）。
+- 描线场景：这一格已有的图作为「底稿」层传进引擎；画完的 PNG 已包含它，直接当新图。
+
+自动测试（`visual-check` 场景⑧，12 条断言）覆盖：引擎挂载 → 画布比例 → **CDP 真输入画出笔迹** →
+完成回填成 blob → 笔迹进了最终产物 → 斜切格角落被裁掉 → 底图经引擎走一趟还能回来。
+
+> 注：合成 `PointerEvent` 进不了 Klecks 的笔刷管线（它有自己的指针栈），自动化里必须用 CDP
+> `Input.dispatchMouseEvent` 派发**可信**事件。
+
 ## 六、已知待办
 
 - [ ] **iPhone 真机复测**上面那张表（`?perf=1` 浮层已经就位），确认 60fps 能兑现
+- [ ] **真离线**：加 service worker 预缓存（`index.html / app.js / styles.css / lib / vendor / klecks`）。
+      现在只是"不需要后端"，断网打不开。做软件（B）之后这条就不重要了，但网页版要给朋友试，建议先补
+- [ ] 绘画 P1：① 打开绘制时把 Klecks 自带的「提交」按钮藏掉（现在和我们的「完成」重复）
+      ② 画布外区域给个形状提示（现在能画到 bbox 角落，回填时才被裁掉，会让人困惑）
+      ③ 分层：`getPSD()` 已可用，存下来可以做「跨会话笔画级撤销」（现在只存成图，不能撤销上一版）
+      ④ 每格绘制结果目前固定 2048 长边，导出 4000px 会略软
+- [ ] 画师模式：AI 全部收进「AI 工具箱」（`body[data-mode="artist"]` + 几处 `data-ai` 标记）
+- [ ] 左右栏可删可加：现有 `[data-collapse]` 分块已经可以当注册表，加"记忆布局 + 拖拽排序 + 面板管理"
+- [ ] 工程文件导出/导入（换设备、清缓存不丢作品）——离线可交付的另一半
 - [ ] 每格「重画」加「同种子重绘」：**先把限制说清** —— `dall-e-3` / `gpt-image-1` 都不收 `seed`，
       能用的只有硅基流动一部分模型和 Stability。要做就按服务商分叉，别给不支持的模型硬塞参数
 - [ ] 气泡 inspector 的滑杆（大小/旋转/透明度）还是走整页重绘 —— 现在一次只要 2ms，不急；
@@ -158,6 +202,12 @@ iPhone 上还叠了三个放大器：单标签内存天花板（解码结果被�
   如果在文件中间调 `init()`，它同步跑到的 `bindUI()` 会读到还没初始化的常量（TDZ）。
   以前这些读取都包在 `try/catch` 里，异常被吞了 → 表现成「折叠状态记不住」这种软故障，
   直到加了 `SLOT_SEC_OPEN` 才炸出来。改启动逻辑前先看文件最后的注释
+- **dev server 的静态回退曾只对 js/css/html 生效**：`web/` 下的 png/woff2 本地全 404（线上正常，
+  因为静态构建是把 `web/*` 拷到站点根）。现已改成任意扩展名都回落 `/web`，别再按扩展名开口子
+- **`build-static.mjs` 是白名单拷贝**：新增文件/目录必须显式加进去，否则本地好好的、线上 404。
+  `vendor/` 和 `klecks/` 已改成整目录拷贝
+- **自动化测试要带 `?fresh=1`**：不带的话上一个用例存的草稿会在下次加载时恢复，把模板换掉，
+  于是「某个 slot id 不存在」这种莫名其妙的超时就来了
 - **PowerShell 调 node 传含双引号的 JS 参数会被吃掉引号**（`"#slotPanel"` 到了页面变成私有字段语法错误）。
   写 `node scripts/page-eval.mjs --file=out/dbg-xxx.js`，表达式放文件里；用完删掉（`out/dbg*.js` 已 gitignore）
 - **改了函数不等于接通了**：`renderSlotBoard` 定义了却没调用，靠读代码看不出来，靠截图一眼就看出来。

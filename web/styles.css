@@ -713,8 +713,67 @@ kbd{
 /* ?dbg=1：一行状态，等宽字体，方便截图 / 复制给下一个人排查 */
 .stage-foot #footMsg.pf-dbg{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--label-2);white-space:normal}
 
-/* 拖动 / 缩放进行中：关掉画布周围的实时模糊和页面投影。
-   iPhone 上这些层每帧都要重新合成，是「明明只动了一个属性却还是发涩」的那部分开销。 */
+/* ---------------------------------------------------------------- 格子绘制（P0） */
+/* 铺满整屏；画布本体由 paint.mjs 造，按格子包围盒 × 工作分辨率。
+   格子多边形在画布内部用 ctx.clip 裁掉，所以这里不需要再 clip 一次。 */
+.paint-sheet{
+  position:fixed;inset:0;z-index:260;display:flex;flex-direction:column;
+  background:#0e0e10;color:#f2f2f7;
+  animation:paintFade .22s var(--ease);
+}
+.paint-sheet[hidden]{display:none}
+@keyframes paintFade{from{opacity:0}to{opacity:1}}
+.paint-top{
+  flex:0 0 auto;display:flex;align-items:center;gap:10px;
+  padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
+  border-bottom:.5px solid rgba(255,255,255,.12);
+}
+.paint-title{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;line-height:1.25;text-align:center}
+.paint-title b{font-size:14px;font-weight:600}
+.paint-title span{font-size:11.5px;color:rgba(242,242,247,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.paint-sheet .btn.tiny{background:rgba(255,255,255,.14);color:#f2f2f7}
+.paint-sheet .btn.tiny.primary{background:var(--tint);color:#fff}
+.paint-stage{
+  flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;
+  padding:10px;overflow:hidden;
+}
+.paint-canvas{
+  display:block;border-radius:6px;touch-action:none;
+  background:#fff;
+  box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 0 .5px rgba(255,255,255,.18);
+  cursor:crosshair;
+}
+.paint-bar{
+  flex:0 0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:8px 12px calc(8px + env(safe-area-inset-bottom));
+  border-top:.5px solid rgba(255,255,255,.12);
+}
+.paint-bar .seg{background:rgba(255,255,255,.12);flex:0 0 auto}
+.paint-bar .seg button{color:#f2f2f7;min-width:56px;height:30px;font-size:13px}
+.paint-bar .seg button.on{background:var(--tint);color:#fff;box-shadow:none}
+.paint-size{flex:1 1 auto;min-width:120px;display:flex;align-items:center;gap:8px}
+.paint-size input[type=range]{flex:1 1 auto;accent-color:var(--tint)}
+.paint-size b{font:12px/1 ui-monospace,Consolas,monospace;color:rgba(242,242,247,.75);min-width:20px;text-align:right}
+.paint-bar input[type=color]{
+  width:34px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;cursor:pointer;
+}
+.paint-hint{
+  margin:0;padding:0 12px calc(8px + env(safe-area-inset-bottom));
+  font-size:11.5px;color:rgba(242,242,247,.45);
+}
+body.painting{overflow:hidden}
+
+/* 外部引擎（Klecks）模式：它自带完整工具栏，我们只保留顶部「取消/完成」 */
+.paint-frame{
+  width:100%;height:100%;border:0;display:block;background:#1b1b1f;
+  border-radius:10px;overflow:hidden;
+}
+body.paint-engine .paint-stage{padding:0}
+body.paint-engine .paint-bar,
+body.paint-engine .paint-hint{display:none}
+body.paint-engine .paint-top{padding-top:calc(6px + env(safe-area-inset-top))}
+
+/* 拖动 / 缩放进行中：关掉画布周围的实时模糊和页面投影。   iPhone 上这些层每帧都要重新合成，是「明明只动了一个属性却还是发涩」的那部分开销。 */
 body.pf-dragging .stage-bar,
 body.pf-dragging .stage-foot,
 body.pf-dragging .bubble-dock{

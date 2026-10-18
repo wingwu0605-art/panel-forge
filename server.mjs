@@ -614,8 +614,9 @@ const server = http.createServer(async (req, res) => {
   };
 
   let hit = await readStatic(rel);
-  // 前端脚本在 /web 下，但页面是以根路径打开的（./app.js → /app.js）
-  if (!hit && /\.(js|mjs|css|html)$/i.test(rel)) hit = await readStatic('/web' + rel);
+  // 前端所有资源都在 web/ 下，但页面是以根路径打开的（./app.js → /app.js、./klecks/x.png → /klecks/x.png）。
+  // 这里不能只给 js/css/html 开口子 —— 图片、字体、json 也得回落，否则本地开发时那些资源全 404。
+  if (!hit) hit = await readStatic('/web' + rel);
   if (!hit && !path.extname(rel)) hit = await readStatic('/web/index.html');
   if (!hit) return send(res, 404, `404 Not Found: ${routePath}`, { 'Content-Type': 'text/plain; charset=utf-8' });
 

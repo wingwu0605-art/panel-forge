@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231b1b1f'/%3E%3Cpath d='M4 11 9 4l3 3-5 5z' fill='%23fff'/%3E%3C/svg%3E">
+<title>Klecks · 绘制</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#1b1b1f}
+  #pf-load{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#c9c9cf;font:14px/1.6 ui-sans-serif,system-ui,'PingFang SC',sans-serif;
+    background:#1b1b1f;z-index:9;
+  }
+  #pf-load.hide{display:none}
+</style>
+<script type="module" src="./embed.js"></script>
+</head>
+<body>
+<div id="pf-load">正在准备画笔…</div>
+<script type="module">
+/**
+ * Klecks 的引导页（跑在同源 iframe 里，一个 iframe = 一个全新实例）
+ *
+ * 为什么是 iframe：
+ *   1. Klecks 的 embed 是单实例、直接挂到 document.body 的全屏应用，关不掉也重建不了；
+ *      每次绘制开一个新 iframe，等于每次都是干净的实例。
+ *   2. 它自带一整套样式，放进 iframe 就不会污染主应用的设计系统。
+ *   3. 同源 → 父页面直接调下面的函数，不需要设计 postMessage 协议。
+ *
+ * 父页面（web/paint-host.mjs）会：
+ *   await iframe.contentWindow.__pfKlecksReady
+ *   await iframe.contentWindow.__pfKlecksBoot({ width, height, baseUrl })
+ *   const png = await iframe.contentWindow.__pfKlecksPng()
+ */
+const ready = () => new Promise((res, rej) => {
+  const t0 = Date.now();
+  (function poll() {
+    if (window.Klecks) return res(window.Klecks);
+    if (Date.now() - t0 > 25000) return rej(new Error('Klecks 加载超时（检查 web/klecks/embed.js 是否 404）'));
+    setTimeout(poll, 40);
+  })();
+});
+
+window.__pfKlecksReady = ready();
+
+/**
+ * 建实例。project 只有两层：底稿（可选）+ 一张空的「绘制」层。
+ * 笔迹和底稿分开，撤销才不会把底稿一起擦掉。
+ */
+window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '底稿' } = {}) => {
+  await ready();
+  if (window.__pfKlecks) throw new Error('这一份文档已经建过实例了');
+  const layers = [];
+  if (baseUrl) {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error('底图读不出来'));
+      i.src = baseUrl;
+    });
+    layers.push({ name: baseLayerName, opacity: 1, isVisible: true, image: img });
+  }
+  const blank = document.createElement('canvas');
+  blank.width = Math.max(1, width);
+  blank.height = Math.max(1, height);
+  layers.push({ name: '绘制', opacity: 1, isVisible: true, image: blank });
+
+  window.__pfKlecks = new window.Klecks({
+    project: { width, height, layers },
+    // Klecks 自带的「完成」会走 onSubmit，我们把它转给父页面
+    onSubmit: (ok) => {
+      try { ok && ok(); } catch { /* ignore */ }
+      try { window.__pfOnSubmit && window.__pfOnSubmit(); } catch { /* ignore */ }
+    },
+  });
+  document.getElementById('pf-load')?.classList.add('hide');
+
+  // 画布默认是 100%：格子大一点就会超出视口，只看到中间一块。
+  // Klecks 的自动适配只在「画布 ≤ 视口 1/4」时才触发，所以这里手动适配一次。
+  // easel 是它内部的缩放/平移管理器（TS private，运行时可达）；改了名字也只是适配失效，不影响画画。
+  const fit = () => {
+    try { window.__pfKlecks.embed?.klApp?.easel?.fitTransform(true); } catch { /* ignore */ }
+  };
+  requestAnimationFrame(() => { fit(); setTimeout(fit, 120); });
+  window.addEventListener('resize', () => setTimeout(fit, 150));
+  return true;
+};
+
+/** 取当前画面（所有可见图层合成后的 PNG，带透明通道） */
+window.__pfKlecksPng = async () => {
+  if (!window.__pfKlecks) throw new Error('还没初始化');
+  return await window.__pfKlecks.getPNG();
+};
+
+/** 取分层 PSD（留着以后做「分层回填」用） */
+window.__pfKlecksPsd = async () => {
+  if (!window.__pfKlecks) throw new Error('还没初始化');
+  return await window.__pfKlecks.getPSD();
+};
+</script>
+</body>
+</html>

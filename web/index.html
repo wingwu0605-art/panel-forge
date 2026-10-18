@@ -330,6 +330,7 @@
           <div class="sec-body">
             <div class="slot-thumb" id="slotThumb"><span class="muted small">空格子</span></div>
             <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
+            <button class="btn wide" id="btnPaint" title="按这一格的形状铺开画布，直接画（笔画出不了格子）">绘制这一格</button>
             <div class="row2">
               <button class="btn tiny" id="btnUrl">用图片链接</button>
               <button class="btn tiny danger" id="btnRemoveImage">移除图片</button>
@@ -609,6 +610,32 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- ============================== 格子绘制（P0）：铺满动画 + 按格子形状裁剪的画布 ============================== -->
+<div class="paint-sheet" id="paintSheet" hidden role="dialog" aria-modal="true" aria-label="绘制这一格">
+  <div class="paint-top">
+    <button class="btn tiny" id="paintCancel">取消</button>
+    <div class="paint-title">
+      <b id="paintTitle">绘制</b>
+      <span id="paintSub">—</span>
+    </div>
+    <button class="btn tiny primary" id="paintDone">完成</button>
+  </div>
+  <div class="paint-stage" id="paintStage"></div>
+  <div class="paint-bar">
+    <div class="seg paint-tools" id="paintTools">
+      <button type="button" data-t="pen" class="on">笔</button>
+      <button type="button" data-t="eraser">橡皮</button>
+    </div>
+    <label class="paint-size">
+      <input type="range" id="paintSize" min="1" max="60" step="1" value="12" aria-label="笔尖粗细">
+      <b id="paintSizeVal">12</b>
+    </label>
+    <input type="color" id="paintColor" value="#1d1d1f" aria-label="颜色">
+    <button class="btn tiny" id="paintUndo" title="撤销一笔">撤销</button>
+  </div>
+  <p class="paint-hint" id="paintHint">笔迹出不了这一格；iPad 支持压感，笔在画时手指不会误触。</p>
+</div>
 
 <script type="module" src="./app.js?v=0qqy5"></script>
 </body>

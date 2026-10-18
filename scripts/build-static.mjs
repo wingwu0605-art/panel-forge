@@ -22,8 +22,14 @@ const site = path.join(root, 'site');
 await rm(site, { recursive: true, force: true });
 await mkdir(path.join(site, 'lib'), { recursive: true });
 
-for (const f of ['index.html', 'app.js', 'styles.css', 'api-static.js']) {
+for (const f of ['index.html', 'app.js', 'styles.css', 'api-static.js', 'paint.mjs', 'paint-host.mjs']) {
   await cp(path.join(root, 'web', f), path.join(site, f));
+}
+// 目录整体拷贝（新增文件不用每次改白名单）：
+//   vendor/  perfect-freehand（轻量笔用）
+//   klecks/  外部绘画引擎的预构建产物（iframe 里跑）
+for (const d of ['vendor', 'klecks']) {
+  await cp(path.join(root, 'web', d), path.join(site, d), { recursive: true });
 }
 for (const f of await readdir(path.join(root, 'lib'))) {
   if (f.endsWith('.mjs')) await cp(path.join(root, 'lib', f), path.join(site, 'lib', f));
@@ -37,7 +43,7 @@ if (!html.includes('PF_STATIC')) {
 {
   const { createHash } = await import('node:crypto');
   const h = createHash('sha1');
-  for (const f of ['app.js', 'styles.css', 'api-static.js']) h.update(await readFile(path.join(site, f)));
+  for (const f of ['app.js', 'styles.css', 'api-static.js', 'paint.mjs', 'paint-host.mjs']) h.update(await readFile(path.join(site, f)));
   for (const f of await readdir(path.join(site, 'lib'))) h.update(await readFile(path.join(site, 'lib', f)));
   const v = h.digest('hex').slice(0, 8);
   html = html.replace(/(\.\/(?:styles\.css|app\.js))(\?v=[\w-]*)?(?=")/g, `$1?v=${v}`);

@@ -3,6 +3,8 @@
  * 零框架；渲染内核与后端共用同一份 /lib/svg.mjs，保证「所见即导出」。
  */
 import { renderTemplateSVG, imageAttrs } from './lib/svg.mjs';
+import { createCellPainter, localPoly } from './paint.mjs';
+import { createKlecksHost } from './paint-host.mjs';
 import { pointInPoly } from './lib/geometry.mjs';
 import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble, bubbleThumb } from './lib/bubbles.mjs';
 
@@ -86,6 +88,8 @@ const state = {
   cands: {},          // slotId -> [href...] 候选图
   slotCollapsed: false,
   slotAiMode: 'img',  // img | prompt
+  paint: {},          // slotId -> {strokes:[...], workSide} 格子内绘制的笔画（唯一真相）
+  under: {},          // slotId -> 图片资产：画在照片上时，照片留在这里当底图
   chars: [],          // 角色卡 [{id,name,note,images:[dataURL]}]
   activeChars: [],    // 本页启用的角色 id
   clipboard: null,    // 内部剪贴板（图片或气泡）
@@ -137,7 +141,7 @@ const DBG = new URLSearchParams(location.search).get('dbg') === '1';
  * ---------------------------------------------------------------- */
 const PERF = new URLSearchParams(location.search).get('perf') === '1';
 const perf = {
-  frames: [], render: [], patch: [], save: [], longtask: [],
+  frames: [], render: [], patch: [], save: [], paint: [], longtask: [],
   lastSaveBytes: 0, renders: 0, patches: 0, saves: 0,
 };
 function perfPush(arr, v) { arr.push(v); if (arr.length > 90) arr.shift(); }
@@ -303,8 +307,9 @@ async function init() {
   await loadChars();
 
   // 再尝试恢复草稿：IndexedDB 不可用/被策略拦住时也不能拖死启动
+  // ?fresh=1 跳过恢复（自动化测试要干净的初始状态，否则上一个用例的草稿会换掉模板）
   try {
-    const draft = await Promise.race([
+    const draft = params.get('fresh') === '1' ? null : await Promise.race([
       loadDraft(),
       new Promise((r) => setTimeout(() => r(null), 1500)),
     ]);
@@ -771,6 +776,247 @@ function refreshBubble(id) {
   if (!patchBubble(id)) renderStage();
 }
 
+/* ================================================================== *
+ * 格子内绘制（P0）：铺满动画 → 按格子形状裁剪的画布 → 存回这一格
+ * ================================================================== */
+let painter = null;        // 轻量笔会话（web/paint.mjs），引擎起不来时的兜底
+let paintHost = null;      // 外部引擎会话（web/paint-host.mjs → Klecks iframe）
+let paintEngine = 'none';  // 'klecks' | 'brush'
+let paintSlotId = null;
+let paintBound = false;
+
+/** 把一张矩形 PNG 按格子多边形裁掉多余部分（斜切格靠这个贴合） */
+async function clipToSlot(blob, slot) {
+  const bmp = await createImageBitmap(blob);
+  const k = bmp.width / slot.w;   // 输出分辨率 / 包围盒单位
+  const c = document.createElement('canvas');
+  c.width = bmp.width; c.height = bmp.height;
+  const g = c.getContext('2d');
+  const path = new Path2D();
+  localPoly(slot).forEach(([x, y], i) => {
+    const px = x * k, py = y * k;
+    if (i) path.lineTo(px, py); else path.moveTo(px, py);
+  });
+  path.closePath();
+  g.clip(path);
+  g.drawImage(bmp, 0, 0);
+  return await new Promise((res) => c.toBlob(res, 'image/png'));
+}
+
+/** 把画布等比放进舞台（画布的像素尺寸固定，只有 CSS 尺寸随屏幕变） */
+function fitPaintCanvas() {
+  if (!painter) return;
+  const stage = $('#paintStage');
+  if (!stage) return;
+  const box = stage.getBoundingClientRect();
+  const ar = painter.w / painter.h;
+  let w = Math.max(40, box.width - 20);
+  let h = w / ar;
+  if (h > box.height - 20) { h = Math.max(40, box.height - 20); w = h * ar; }
+  painter.canvas.style.width = Math.round(w) + 'px';
+  painter.canvas.style.height = Math.round(h) + 'px';
+}
+
+/** 铺满：从这一格在页面上的位置，长大到整屏 */
+function animatePaintIn(slot, el) {
+  const svg = $('#canvas svg');
+  const node = el || painter?.canvas;
+  if (!svg || !node || !motionOK()) return;
+  const r = svg.getBoundingClientRect();
+  const k = r.width / state.tpl.page.w;
+  const to = node.getBoundingClientRect();
+  if (!to.width) return;
+  const from = { x: r.left + slot.x * k, y: r.top + slot.y * k, w: slot.w * k, h: slot.h * k };
+  node.animate([
+    { transform: `translate(${from.x - to.left}px,${from.y - to.top}px) scale(${from.w / to.width})`, opacity: 0.35 },
+    { transform: 'none', opacity: 1 },
+  ], { duration: 460, easing: 'cubic-bezier(.32,.72,0,1)' });
+}
+
+/**
+ * 打开某一格的绘制。
+ * 优先用外部引擎（Klecks iframe）；它没产物 / 起不来时退回自带的轻量笔。
+ */
+async function openPaint(slotId = state.selectedId) {
+  if (!state.tpl || !slotId) { toast('先选一个格子'); return; }
+  const slot = state.tpl.slots.find((s) => s.id === slotId);
+  if (!slot) return;
+  if (painter || paintHost) closePaint();
+
+  // 底图 = 这一格现在的图（第一次是照片/参考图，之后再进是自己的上一版成图）
+  const baseUrl = state.images[slotId]?.href || '';
+  const rec = state.paint[slotId] || null;
+
+  paintSlotId = slotId;
+  const t0 = perfNow();
+  const sheet = $('#paintSheet');
+  const stage = $('#paintStage');
+  stage.innerHTML = '';
+  sheet.hidden = false;
+  document.body.classList.add('painting');
+  $('#paintTitle').textContent = `绘制第 ${slot.order} 格`;
+  $('#paintSub').textContent = `${slot.shape?.zh || '常规格'} · ${Math.round(slot.w)}×${Math.round(slot.h)}`;
+  if (!paintBound) bindPaintUI();
+
+  // ---- 1) 先试外部引擎 ----
+  const host = createKlecksHost({ slot, baseUrl });
+  try {
+    host.onSubmit = () => { finishPaint(); };
+    await host.mount(stage);
+    paintHost = host;
+    paintEngine = 'klecks';
+    document.body.classList.add('paint-engine');
+    animatePaintIn(slot, host.el);
+    perfDone('paint', t0);
+    return;
+  } catch (e) {
+    console.warn('[paint] 外部引擎没起来，退回轻量笔：', e.message);
+    host.destroy();
+    stage.innerHTML = '';
+  }
+
+  // ---- 2) 退回轻量笔 ----
+  paintEngine = 'brush';
+  document.body.classList.remove('paint-engine');
+  if (!state.paint[slotId] && state.images[slotId] && !state.under[slotId]) {
+    state.under[slotId] = state.images[slotId];
+  }
+  const under = state.under[slotId] || null;
+  painter = createCellPainter({ slot, strokes: rec?.strokes || [] });
+  stage.appendChild(painter.canvas);
+  fitPaintCanvas();
+  $('#paintUndo').disabled = !painter.strokes.length;
+  wirePaintCanvas();
+  if (under?.href) {
+    try { painter.setUnderlay(await loadImgEl(under.href)); } catch { /* 底图读不出来就白底画 */ }
+  }
+  painter.render();
+  animatePaintIn(slot, painter.canvas);
+  perfDone('paint', t0);
+}
+
+function closePaint() {
+  if (paintHost) { paintHost.destroy(); paintHost = null; }
+  if (painter) { painter.destroy(); painter = null; }
+  paintEngine = 'none';
+  paintSlotId = null;
+  document.body.classList.remove('painting', 'paint-engine');
+  const sheet = $('#paintSheet');
+  if (sheet) sheet.hidden = true;
+  const stage = $('#paintStage');
+  if (stage) stage.innerHTML = '';
+}
+
+/** 完成：外部引擎取图 → 按格子多边形裁 → 当这一格的图 */
+async function finishPaint() {
+  if (!paintSlotId) { closePaint(); return; }
+  const slotId = paintSlotId;
+  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
+
+  if (paintEngine === 'klecks' && paintHost) {
+    const host = paintHost;
+    const btn = $('#paintDone');
+    const old = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = '取图…'; }
+    try {
+      const raw = await host.exportPNG();
+      const workSide = Math.max(host.width, host.height);
+      const clipped = slot ? await clipToSlot(raw, slot) : raw;
+      commit();
+      // maxSide = 工作分辨率 → 不缩放，保住 PNG 的清晰边缘
+      state.images[slotId] = await imageAsset(clipped, { name: 'paint', maxSide: workSide });
+      delete state.paint[slotId];   // 外部引擎不交笔画，只交成图
+      closePaint();
+      renderStage(); renderSlotPanel(); refreshScript(); queueSave();
+      toast('已画好并贴回这一格');
+    } catch (e) {
+      console.error('[paint] 取图失败', e);
+      toast('取图失败：' + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = old || '完成'; }
+    }
+    return;
+  }
+
+  if (!painter) { closePaint(); return; }
+  const strokes = painter.strokes.map((s) => ({ ...s, pts: [...s.pts] }));
+  const workSide = Math.max(painter.w, painter.h);
+  const blob = await painter.toBlob();
+  commit();
+  state.paint[slotId] = { strokes, workSide };
+  if (blob) {
+    state.images[slotId] = await imageAsset(blob, { name: 'paint', maxSide: workSide });
+  }
+  closePaint();
+  renderStage(); renderSlotPanel(); refreshScript(); queueSave();
+  toast(strokes.length ? `已存这一格（${strokes.length} 笔）` : '笔迹已清空');
+}
+
+/** 把指针事件接到当前画布（每次 open 都是新画布，所以单独抽出来） */
+function wirePaintCanvas() {
+  const c = painter?.canvas;
+  if (!c || c.dataset.wired) return;
+  c.dataset.wired = '1';
+  c.addEventListener('pointerdown', (ev) => { painter?.begin(ev); syncPaintMeta(); });
+  c.addEventListener('pointermove', (ev) => { painter?.move(ev); });
+  const stop = (ev) => { painter?.end(ev); syncPaintMeta(); };
+  c.addEventListener('pointerup', stop);
+  c.addEventListener('pointercancel', stop);
+  c.addEventListener('pointerleave', (ev) => { if (ev.buttons) stop(ev); });
+}
+function syncPaintMeta() {
+  const btn = $('#paintUndo');
+  if (btn) btn.disabled = !(painter && painter.strokes.length);
+}
+
+function bindPaintUI() {
+  paintBound = true;
+  $('#paintTools')?.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-t]');
+    if (!b || !painter) return;
+    painter.setTool(b.dataset.t);
+    $$('#paintTools button').forEach((x) => x.classList.toggle('on', x === b));
+  });
+  $('#paintSize')?.addEventListener('input', (ev) => {
+    if (!painter) return;
+    painter.setSize(Number(ev.target.value));
+    $('#paintSizeVal').textContent = ev.target.value;
+  });
+  $('#paintColor')?.addEventListener('input', (ev) => { painter?.setColor(ev.target.value); });
+  $('#paintUndo')?.addEventListener('click', () => { if (painter?.undo()) syncPaintMeta(); });
+  $('#paintCancel')?.addEventListener('click', closePaint);
+  $('#paintDone')?.addEventListener('click', () => { finishPaint(); });
+  $('#paintSheet')?.addEventListener('pointerdown', (ev) => { if (ev.target.id === 'paintStage') closePaint(); });
+  window.addEventListener('resize', () => { fitPaintCanvas(); });
+  window.addEventListener('keydown', (ev) => {
+    if (!painter && !paintHost) return;
+    if (ev.key === 'Escape') { ev.stopPropagation(); closePaint(); }
+    else if (!painter) return;   // 下面这些只对轻量笔有意义
+    else if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'z') {
+      ev.preventDefault(); ev.stopPropagation();
+      if (painter.undo()) syncPaintMeta();
+    }
+  }, true);
+}
+
+/* 自动化测试用的只读/驱动钩子（只在 ?dbg=1 / ?perf=1 下存在） */
+if (PERF || DBG) {
+  window.__pfPaint = {
+    open: (id) => openPaint(id),
+    finish: () => finishPaint(),
+    close: () => closePaint(),
+    info: () => ({
+      engine: paintEngine,
+      slot: paintSlotId,
+      hasHost: !!paintHost,
+      hasBrush: !!painter,
+      frame: !!document.querySelector('.paint-frame'),
+      sheetOpen: !document.querySelector('#paintSheet')?.hidden,
+      hostSize: paintHost ? { w: paintHost.width, h: paintHost.height } : null,
+    }),
+  };
+}
+
 function renderStage() {
   if (!state.tpl) return;
   if (rafPending) return;
@@ -1197,6 +1443,7 @@ function bindUI() {
 
   // 格子面板
   $('#btnPickImage').addEventListener('click', () => { $('#filePick').dataset.mode = 'slot'; $('#filePick').click(); });
+  $('#btnPaint')?.addEventListener('click', () => openPaint());
   $('#btnRemoveImage').addEventListener('click', () => {
     if (!state.selectedId) return;
     commit();
@@ -2863,7 +3110,15 @@ function currentPageSnapshot() {
     activeChars: [...state.activeChars],
     slotCollapsed: state.slotCollapsed,
     slotAiMode: state.slotAiMode,
+    paint: clonePaint(state.paint),
+    under: { ...state.under },
   };
+}
+/** 笔画对象要深拷一层（pts 是扁平数组），否则撤销会把旧的笔画改掉 */
+function clonePaint(map) {
+  return Object.fromEntries(Object.entries(map || {}).map(([k, v]) => [k, {
+    ...v, strokes: (v.strokes || []).map((s) => ({ ...s, pts: [...s.pts] })),
+  }]));
 }
 
 function savePage() {
@@ -2888,6 +3143,8 @@ async function switchPage(i) {
   const pg = state.pages[i];
   await selectTemplate(pg.tplId, { silent: true });
   state.images = rehydrateImages(pg.images || {});
+  state.under = rehydrateImages(pg.under || {});
+  state.paint = clonePaint(pg.paint || {});
   state.bubbles = (pg.bubbles || []).map((b) => ({ ...b }));
   state.lines = { ...(pg.lines || {}) };
   state.promptEdits = { ...(pg.promptEdits || {}) };

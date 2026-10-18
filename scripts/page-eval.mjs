@@ -39,7 +39,8 @@ try {
   const { page } = session;
   await page.viewport(width, height);
   await page.goto(opt.path || '/');
-  await page.ready();
+  // --noready：打开的不是主应用（比如 /klecks/embed.html）时，别等应用启动标记
+  if (!opt.noready) await page.ready();
   if (opt.wait) await page.waitFor(opt.wait, { timeout: Number(opt.timeout || 15000), label: opt.wait });
   const value = await page.evaluate(expr);
   console.log(JSON.stringify(value, null, 2));
