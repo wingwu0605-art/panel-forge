@@ -1310,6 +1310,7 @@ function bindUI() {
     // ---- 切换类 ----
     if (!mod && lower === 'g') { ev.preventDefault(); toggleCheck('#chkLabels'); return; }
     if (!mod && lower === 'h') { ev.preventDefault(); toggleCheck('#chkHollow'); return; }
+    if (!mod && lower === 'p') { ev.preventDefault(); openPaint(); return; }   // 画这一格
     if (!mod && lower === 'e') {
       ev.preventDefault();
       if (ev.shiftKey) exportSVG(); else exportPNG();
@@ -1461,6 +1462,8 @@ function bindUI() {
   // 格子面板
   $('#btnPickImage').addEventListener('click', () => { $('#filePick').dataset.mode = 'slot'; $('#filePick').click(); });
   $('#btnPaint')?.addEventListener('click', () => openPaint());
+  // 标题行那个「绘制」永远可见：图片段被收起时也能进画
+  $('#btnPaintTop')?.addEventListener('click', () => openPaint());
   $('#btnRemoveImage').addEventListener('click', () => {
     if (!state.selectedId) return;
     commit();
@@ -1804,6 +1807,8 @@ function onCanvasDblClick(ev) {
   if (!slot) return;
   state.selectedId = slot.id;
   renderStage(); renderSlotPanel();
+  // 画师版：双击格子直接进画布（这是画师最顺的手势）
+  if (ARTIST) { openPaint(slot.id); return; }
   $('#filePick').dataset.mode = 'slot';
   $('#filePick').click();
 }

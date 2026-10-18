@@ -1550,8 +1550,10 @@ html[data-vt="accent"]::view-transition-new(root){animation:fadeIn .35s var(--ea
   body[data-view="output"] .bubble-dock{display:none !important}
 }
 
-/* 标题行：编号 · 标题 · caret 同一行 */
+/* 标题行：编号 · 标题 · 绘制 · caret 同一行 */
 .slot-head{display:flex;align-items:center;gap:12px;flex-wrap:nowrap}
+/* 「绘制」常驻：图片段收起来时也要能一键进画布（标题 flex:1 会把它推到右侧） */
+.slot-head .slot-paint{flex:0 0 auto;height:30px;padding:0 12px}
 .slot-head-main{flex:1 1 auto;min-width:0}
 .slot-head .caret{flex:0 0 auto;margin-left:auto;order:9}
 .slot-head .caret svg{transform:rotate(0deg);transition:transform .5s var(--spring)}

@@ -174,7 +174,10 @@ iPhone 上还叠了三个放大器：单标签内存天花板（解码结果被�
 
 | 环节 | 位置 |
 | --- | --- |
-| 入口「绘制这一格」按钮（图片段里） | `web/index.html` → `#btnPaint` → `openPaint()` |
+| 入口「绘制这一格」按钮（**格子标题行，常驻**） | `web/index.html` → `#btnPaintTop` → `openPaint()` |
+| 另一个绘制入口（「图片」段里，段收起时看不到） | `#btnPaint` |
+| 双击格子 → 进画布（**只在画师版**；AI 版仍是弹文件选择） | `onCanvasDblClick()` |
+| 快捷键 `P` → 画这一格 | keydown 处理里 |
 | 铺满动画（从这一格长到全屏） | `animatePaintIn()` |
 | 引擎适配层（iframe + 同源直调） | `web/paint-host.mjs` → `web/klecks/embed.html` |
 | 按格子多边形裁切 + 回填成这一格的图 | `clipToSlot()` / `finishPaint()` |

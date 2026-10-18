@@ -915,8 +915,19 @@ const scenarios = [
         `画布=${st.canvas} / 绘制=${st.paintBtn}`);
       await shot('painter-mode');
 
-      // 画师版里绘制必须能用（这是这个入口存在的意义）
-      await page.evaluate("window.__pfPaint.open('p1')");
+      // 真实入口：把「图片」段收起来，再用标题行那个常驻的「绘制」—— 这才是用户会走的路
+      await page.evaluate(`(() => {
+        const sec = document.querySelector('#slotPanel .slot-sec[data-sec="image"]');
+        if (sec && !sec.classList.contains('collapsed')) sec.querySelector('.sec-head').click();
+      })()`);
+      await sleep(900);
+      const entry = await page.evaluate(`(() => {
+        const btn = document.querySelector('#btnPaintTop');
+        const sec = document.querySelector('#slotPanel .slot-sec[data-sec="image"]');
+        return { collapsed: !!sec?.classList.contains('collapsed'), hasBtn: !!btn?.offsetParent, txt: (btn?.textContent || '').trim() };
+      })()`);
+      check('图片段收起时，标题行仍有「绘制」入口', entry.collapsed && entry.hasBtn, `按钮文字「${entry.txt}」`);
+      await page.evaluate("document.querySelector('#btnPaintTop').click()");
       await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '画师版里打开绘制', timeout: 30000 });
       const info = await page.evaluate('window.__pfPaint.info()');
       check('画师版里能直接画（引擎挂上）', info.engine === 'klecks' && info.sheetOpen, `engine=${info.engine}`);
