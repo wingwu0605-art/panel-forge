@@ -912,6 +912,38 @@ async function openPaint(slotId = state.selectedId) {
   perfDone('paint', t0);
 }
 
+/** 把某一格的图单独导成文件（画好的作品 / AI 生成图 / 拖进来的照片都走这里） */
+async function exportSlotImage(slotId = state.selectedId) {
+  const im = slotId ? state.images[slotId] : null;
+  if (!im) { toast('这一格还没有图'); return; }
+  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
+  try {
+    const blob = im.blob instanceof Blob ? im.blob : await (await fetch(im.href)).blob();
+    const ext = /png/.test(blob.type) ? 'png' : 'jpg';
+    downloadBlob(blob, `${state.tpl?.id || 'page'}-第${slot?.order ?? '?'}格.${ext}`);
+    toast('已导出这一格的图');
+  } catch (e) {
+    toast('导出失败：' + e.message);
+  }
+}
+
+/** 绘制页里「导出」：把当前画面按格子形状裁好存成 PNG（两种引擎都支持） */
+async function exportPaintImage() {
+  const slot = state.tpl?.slots?.find((s) => s.id === paintSlotId);
+  try {
+    let raw = null;
+    if (paintEngine === 'klecks' && paintHost) raw = await paintHost.exportPNG();
+    else if (painter) raw = await painter.toBlob();
+    if (!raw) { toast('还没有可导出的内容'); return; }
+    const out = slot ? await clipToSlot(raw, slot) : raw;
+    downloadBlob(out, `${state.tpl?.id || 'page'}-第${slot?.order ?? '?'}格-绘制.png`);
+    toast('已导出这一格的绘制图');
+  } catch (e) {
+    console.error('[paint] 导出失败', e);
+    toast('导出失败：' + e.message);
+  }
+}
+
 function closePaint() {
   if (paintHost) { paintHost.destroy(); paintHost = null; }
   if (painter) { painter.destroy(); painter = null; }
@@ -1001,6 +1033,7 @@ function bindPaintUI() {
   });
   $('#paintColor')?.addEventListener('input', (ev) => { painter?.setColor(ev.target.value); });
   $('#paintUndo')?.addEventListener('click', () => { if (painter?.undo()) syncPaintMeta(); });
+  $('#paintExport')?.addEventListener('click', () => { exportPaintImage(); });
   $('#paintCancel')?.addEventListener('click', closePaint);
   $('#paintDone')?.addEventListener('click', () => { finishPaint(); });
   $('#paintSheet')?.addEventListener('pointerdown', (ev) => { if (ev.target.id === 'paintStage') closePaint(); });
@@ -1471,6 +1504,7 @@ function bindUI() {
     renderStage(); renderSlotPanel(); toast('已移除');
   });
   $('#btnUrl').addEventListener('click', importByUrl);
+  $('#btnExportSlot')?.addEventListener('click', () => exportSlotImage());
   $('#zoom').addEventListener('input', (ev) => {
     const img = state.images[state.selectedId];
     if (!img) return;
@@ -1662,6 +1696,12 @@ function bindUI() {
       const list = candsOf(state.selectedId);
       list.splice(Number(del.dataset.del), 1);
       renderCands();
+      return;
+    }
+    const edit = ev.target.closest('[data-edit]');
+    if (edit) {
+      ev.stopPropagation();
+      applyCandAndEdit(Number(edit.dataset.edit));
       return;
     }
     const b = ev.target.closest('.cand');
@@ -2635,7 +2675,25 @@ function renderCands() {
     <button class="cand" data-i="${i}" title="点一下用这张">
       <img src="${escapeHtml(href)}" alt="候选 ${i + 1}">
       <span class="del" data-del="${i}" title="删掉这张">×</span>
+      <span class="edit" data-edit="${i}" title="用这张进画布继续画（AI 出稿 → 手改）">✎</span>
     </button>`).join('');
+}
+
+/** 候选图 → 直接用这张进画布（AI 出稿、画师接手的那一步） */
+async function applyCandAndEdit(i) {
+  const sid = state.selectedId;
+  const list = sid ? candsOf(sid) : [];
+  const href = list[i];
+  if (!href) return;
+  try {
+    const asset = await imageAsset(href, { name: 'ai' });
+    commit();
+    state.images[sid] = asset;
+    renderStage(); renderSlotPanel(); refreshScript();
+    await openPaint(sid);
+  } catch (e) {
+    toast('这张图打不开：' + e.message);
+  }
 }
 
 function applyCand(i) {

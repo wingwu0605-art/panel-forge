@@ -934,6 +934,110 @@ const scenarios = [
       await page.evaluate('window.__pfPaint.close()');
     },
   },
+
+  {
+    name: 'paint-save-export',
+    title: '⑩ 绘制：草稿保存 + 单独导出 + 图可再编辑',
+    async run(page, shot, { check }) {
+      await page.viewport(1200, 900);
+      await page.goto('/?perf=1&fresh=1&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+
+      // 拦下载：把 a[download] 的 blob 地址记下来，后面读回真实字节
+      await page.evaluate(`(() => {
+        window.__dl = [];
+        const orig = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function () {
+          if (this.download) { window.__dl.push({ name: this.download, href: this.href }); return; }
+          return orig.call(this);
+        };
+      })()`);
+
+      // 塞一张图进中心那格 → 走「图片段 → 导出这一格的图」
+      const seeded = await page.evaluate(`(async () => {
+        const before = [...document.querySelectorAll('#canvas svg image[data-slot]')].map((e) => e.dataset.slot);
+        const c = document.createElement('canvas');
+        c.width = 900; c.height = 1200;
+        const g = c.getContext('2d');
+        g.fillStyle = '#2f6bff'; g.fillRect(0, 0, 900, 1200);
+        g.fillStyle = '#fff'; g.beginPath(); g.arc(450, 500, 220, 0, 7); g.fill();
+        const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
+        const canvas = document.querySelector('#canvas');
+        const r = canvas.getBoundingClientRect();
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'base.jpg', { type: 'image/jpeg' }));
+        canvas.dispatchEvent(new DragEvent('drop', {
+          dataTransfer: dt, bubbles: true, cancelable: true,
+          clientX: r.left + r.width * 0.5, clientY: r.top + r.height * 0.5,
+        }));
+        await new Promise((res) => setTimeout(res, 1400));
+        const after = [...document.querySelectorAll('#canvas svg image[data-slot]')].map((e) => e.dataset.slot);
+        return { fresh: after.filter((s) => !before.includes(s))[0] || null };
+      })()`);
+      check('图落进一格', !!seeded.fresh, seeded.fresh || '没有');
+
+      // ① 图片段「导出这一格的图」
+      await page.evaluate("document.querySelector('#btnExportSlot')?.click()");
+      await sleep(700);
+      const dl1 = await page.evaluate(`(async () => {
+        const d = window.__dl[window.__dl.length - 1];
+        if (!d) return { err: '没有触发下载' };
+        const b = await (await fetch(d.href)).blob();
+        return { name: d.name, bytes: b.size, type: b.type };
+      })()`);
+      check('「导出这一格的图」给出了文件', !dl1.err && dl1.bytes > 1000,
+        dl1.err ? dl1.err : `${dl1.name} · ${Math.round(dl1.bytes / 1024)}KB · ${dl1.type}`);
+
+      // ② 进画布 → 绘制页「导出」
+      await page.evaluate("document.querySelector('#btnPaintTop').click()");
+      await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '绘制页打开', timeout: 30000 });
+      await sleep(1500);
+      const before = await page.evaluate('window.__dl.length');
+      await page.evaluate("document.querySelector('#paintExport').click()");
+      await page.waitFor(`window.__dl.length > ${before}`, { label: '绘制页导出', timeout: 20000 });
+      const dl2 = await page.evaluate(`(async () => {
+        const d = window.__dl[window.__dl.length - 1];
+        const b = await (await fetch(d.href)).blob();
+        const bmp = await createImageBitmap(b);
+        return { name: d.name, bytes: b.size, w: bmp.width, h: bmp.height };
+      })()`);
+      check('绘制页「导出」按格子形状给了 PNG', /-绘制\.png$/.test(dl2.name) && dl2.bytes > 1000,
+        `${dl2.name} · ${dl2.w}×${dl2.h}`);
+      await shot('paint-export');
+
+      // ③ 完成 → 草稿保存（刷新后还在，且能再次进画布编辑）
+      await page.evaluate('window.__pfPaint.finish()');
+      await page.waitFor("document.querySelector('#paintSheet')?.hidden !== false", { label: '关闭', timeout: 20000 });
+      await sleep(1600);   // 等 queueSave 落盘（1.2s 防抖）
+      await page.goto('/?perf=1&tpl=ref-4band-2col');   // 注意：不带 fresh=1，要恢复草稿
+      await page.ready();
+      await page.waitFor("document.querySelectorAll('#canvas svg image[data-slot]').length >= 1", { label: '草稿里的图回来', timeout: 15000 });
+      const persisted = await page.evaluate(`(async () => {
+        const el = document.querySelector('#canvas svg image[data-slot="${seeded.fresh}"]');
+        if (!el) return { err: '这一格没回来' };
+        const b = await (await fetch(el.getAttribute('href'))).blob();
+        const bmp = await createImageBitmap(b);
+        return { bytes: b.size, w: bmp.width, h: bmp.height };
+      })()`);
+      check('画完的草稿刷新后还在（IndexedDB 保存）', !persisted.err && persisted.bytes > 1000,
+        persisted.err || `${persisted.w}×${persisted.h} · ${Math.round(persisted.bytes / 1024)}KB`);
+
+      // ④ 保存下来的图能再次进画布编辑（AI 图 / 照片 / 画完的图都走同一条路）
+      await page.evaluate("window.__pfPaint.open(document.querySelector('#canvas svg image[data-slot]').dataset.slot)");
+      await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '再次编辑', timeout: 30000 });
+      await sleep(1200);
+      const reedit = await page.evaluate(`(async () => {
+        const f = document.querySelector('.paint-frame');
+        const w = f.contentWindow;
+        const layers = w.__pfKlecks?.embed?.klApp?.klCanvas?.getLayers?.()?.length
+          ?? w.__pfKlecks?.embed?.klApp?.klCanvas?.layers?.length ?? null;
+        return { layers, engine: window.__pfPaint.info().engine };
+      })()`);
+      check('保存的图能作为底稿再次进画布', reedit.engine === 'klecks' && (reedit.layers === null || reedit.layers >= 1),
+        `图层数 ${reedit.layers}`);
+      await page.evaluate('window.__pfPaint.close()');
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */

@@ -332,10 +332,12 @@
             <div class="slot-thumb" id="slotThumb"><span class="muted small">空格子</span></div>
             <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
             <button class="btn wide" id="btnPaint" title="按这一格的形状铺开画布，直接画（笔画出不了格子）">绘制这一格</button>
+            <p class="muted small" style="margin:6px 0 0">「绘制」会把上面这张图当底稿放进画布 —— 可以在上面描线、擦、覆盖；画完自动裁成格子形状贴回来。AI 生成的图、你自己拖进来的照片都是同一套流程。</p>
             <div class="row2">
               <button class="btn tiny" id="btnUrl">用图片链接</button>
               <button class="btn tiny danger" id="btnRemoveImage">移除图片</button>
             </div>
+            <button class="btn tiny wide" id="btnExportSlot" title="把这一格的图单独存成一张图（PNG / JPG）">导出这一格的图</button>
             <label class="field"><span>缩放 <b id="zoomVal">100%</b></span>
               <input type="range" id="zoom" min="50" max="400" value="100">
             </label>
@@ -620,6 +622,7 @@
       <b id="paintTitle">绘制</b>
       <span id="paintSub">—</span>
     </div>
+    <button class="btn tiny" id="paintExport" title="把这一格现在的画面导成 PNG（按格子形状裁好）">导出</button>
     <button class="btn tiny primary" id="paintDone">完成</button>
   </div>
   <div class="paint-stage" id="paintStage"></div>
