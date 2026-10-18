@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "license": "SEE LICENSE IN LICENSE",
   "description": "PanelForge 分镜坊 — 中日韩漫画分镜模板库 + 镂空填充网页编辑器 + 剧情匹配 API",
   "scripts": {
     "start": "node server.mjs",

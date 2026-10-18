@@ -881,6 +881,48 @@ const scenarios = [
       }
     },
   },
+
+  {
+    name: 'painter-mode',
+    title: '⑨ 画师版入口（?mode=artist）：AI 收起、绘制可用',
+    async run(page, shot, { check }) {
+      await page.viewport(1200, 900);
+      await page.goto('/?perf=1&fresh=1&mode=artist&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+      await sleep(400);
+
+      const st = await page.evaluate(`(() => {
+        const vis = (sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return 'missing';
+          return getComputedStyle(el).display === 'none' || el.getBoundingClientRect().height === 0 ? 'hidden' : 'visible';
+        };
+        return {
+          mode: document.body.dataset.mode || '',
+          title: document.title,
+          aiCard: vis('.card.ai'),
+          aiGen: vis('.ai-gen'),
+          aiPrompts: vis('#btnAiPrompts'),
+          paintBtn: vis('#btnPaint'),
+          browse: vis('.card.browse'),
+          canvas: vis('#canvas svg'),
+        };
+      })()`);
+      check('body 进入 artist 模式 + 标题换了', st.mode === 'artist' && /画师版/.test(st.title), st.title);
+      check('AI 界面全部收起', st.aiCard === 'hidden' && st.aiGen === 'hidden' && st.aiPrompts === 'hidden',
+        `AI 导演=${st.aiCard} / 每格 AI=${st.aiGen} / AI 优化=${st.aiPrompts}`);
+      check('画布与绘制入口照常可用', st.canvas === 'visible' && st.paintBtn === 'visible',
+        `画布=${st.canvas} / 绘制=${st.paintBtn}`);
+      await shot('painter-mode');
+
+      // 画师版里绘制必须能用（这是这个入口存在的意义）
+      await page.evaluate("window.__pfPaint.open('p1')");
+      await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '画师版里打开绘制', timeout: 30000 });
+      const info = await page.evaluate('window.__pfPaint.info()');
+      check('画师版里能直接画（引擎挂上）', info.engine === 'klecks' && info.sheetOpen, `engine=${info.engine}`);
+      await page.evaluate('window.__pfPaint.close()');
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */

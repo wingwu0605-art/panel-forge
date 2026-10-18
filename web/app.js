@@ -134,6 +134,18 @@ const compactMQ = window.matchMedia('(max-width:1024px)');
 /** ?dbg=1：底栏换成一行动调试信息（排查多页 / 面板问题时用） */
 const DBG = new URLSearchParams(location.search).get('dbg') === '1';
 
+/**
+ * 画师版入口：`?mode=artist`，或构建时注入 `window.PF_PAINTER`（见 site/painter.html）。
+ * 同一份源码产出两个独立网页：AI 版（index.html）和画师版（painter.html）。
+ * 画师版里 AI 相关界面全部收起（规则匹配、分镜、绘制都在）。
+ */
+const ARTIST = window.PF_PAINTER === true
+  || new URLSearchParams(location.search).get('mode') === 'artist';
+if (ARTIST) {
+  document.body.dataset.mode = 'artist';
+  document.title = 'PanelForge 画师版 · 分镜与绘制';
+}
+
 /* ------------------------------------------------------------------ *
  * ?perf=1：性能浮层
  * 只在这个参数下存在；用来量「拖动 / 缩放」热路径到底花了多少时间，

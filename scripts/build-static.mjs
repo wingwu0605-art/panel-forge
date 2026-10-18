@@ -49,6 +49,21 @@ if (!html.includes('PF_STATIC')) {
   html = html.replace(/(\.\/(?:styles\.css|app\.js))(\?v=[\w-]*)?(?=")/g, `$1?v=${v}`);
 }
 await writeFile(path.join(site, 'index.html'), html, 'utf8');
+
+/* ---------------- 画师版入口：同一份源码、独立网页 ---------------- */
+/* 和 index.html 唯一的区别是 pre-set 了 window.PF_PAINTER（AI 界面全部收起）。
+   这样两个版本共用一个源码库，部署成两个 URL：/panel-forge/ 和 /panel-forge/painter.html */
+{
+  let painter = html;
+  if (painter.includes('<script>window.PF_STATIC = true;</script>')) {
+    painter = painter.replace('<script>window.PF_STATIC = true;</script>',
+      '<script>window.PF_STATIC = true; window.PF_PAINTER = true;</script>');
+  } else {
+    painter = painter.replace('</head>', '<script>window.PF_STATIC = true; window.PF_PAINTER = true;</script>\n</head>');
+  }
+  painter = painter.replace(/<title>[^<]*<\/title>/, '<title>PanelForge 画师版 · 分镜与绘制</title>');
+  await writeFile(path.join(site, 'painter.html'), painter, 'utf8');
+}
 await writeFile(path.join(site, '.nojekyll'), '', 'utf8');
 
 /* ---------------- 模板一览（替代服务端的 /api/sheet） ---------------- */
