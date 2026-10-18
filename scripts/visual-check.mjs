@@ -348,6 +348,40 @@ const scenarios = [
       const afterClick = await page.evaluate((src) => { const probe = eval(src); return { grid: probe('#bubGrid'), collapsed: document.querySelector('#bubbleDock')?.classList.contains('collapsed') }; }, PROBE);
       check('编辑页里点标题不会把气泡内容收没', afterClick.grid.height > 40, `grid height=${afterClick.grid?.height}`);
       await shot('mobile-bubble-after-head-click');
+
+      // 第 4 个模块：「分镜」——景别/节拍/画面/台词/构图 + 中英提示词都在这一栏
+      const segs = await page.evaluate("[...document.querySelectorAll('#editSeg button')].map((b) => b.dataset.m)");
+      check('编辑页有四个模块（说什么/图片/分镜/气泡）', ['text', 'image', 'board', 'bubble'].every((m) => segs.includes(m)), segs.join(' / '));
+      await page.evaluate("document.querySelector('#editSeg button[data-m=\\\"board\\\"]')?.click()");
+      await sleep(600);
+      const boardMod = await page.evaluate((src) => {
+        const probe = eval(src);
+        const sec = (k) => probe(`#slotPanel .slot-sec[data-sec="${k}"]`);
+        return {
+          mod: document.querySelector('#railRight')?.dataset.mod,
+          board: sec('board'), text: sec('text'), image: sec('image'),
+          rows: document.querySelectorAll('#slotBoard > b').length,
+          prompts: document.querySelectorAll('#slotBoardPrompts .bp-pre').length,
+          dock: probe('#bubbleDock'),
+        };
+      }, PROBE);
+      check('切到分镜模块后 data-mod=board', boardMod.mod === 'board', `data-mod=${boardMod.mod}`);
+      check('分镜这一段显示了', boardMod.board.display !== 'none' && boardMod.board.height > 60, `height=${boardMod.board?.height}px`);
+      check('分镜这一栏带中英提示词', boardMod.rows >= 4 && boardMod.prompts >= 2, `${boardMod.rows} 行 / ${boardMod.prompts} 段提示词`);
+      check('分镜模块下其余两段不占位', boardMod.text.display === 'none' && boardMod.image.display === 'none');
+      check('分镜模块下气泡面板不占位', boardMod.dock.display === 'none');
+      await shot('mobile-board');
+
+      // 图片模块：分镜这一段必须让位
+      await page.evaluate("document.querySelector('#editSeg button[data-m=\\\"image\\\"]')?.click()");
+      await sleep(600);
+      const imageMod = await page.evaluate((src) => {
+        const probe = eval(src);
+        return { board: probe('#slotPanel .slot-sec[data-sec="board"]'), image: probe('#slotPanel .slot-sec[data-sec="image"]') };
+      }, PROBE);
+      check('图片模块下分镜让位、图片出现', imageMod.board.display === 'none' && imageMod.image.height > 60,
+        `board=${imageMod.board.display} / image=${imageMod.image?.height}px`);
+      await shot('mobile-image');
     },
   },
 
@@ -362,27 +396,53 @@ const scenarios = [
 
       const secs = await page.evaluate(() => [...document.querySelectorAll('#slotPanel .slot-sec')].map((s) => s.dataset.sec));
       check('三段都在（说什么 / 分镜 / 图片）', ['text', 'board', 'image'].every((k) => secs.includes(k)), secs.join(', '));
-      await shot('secs-open');
 
-      // 收起「这一格的分镜」
+      // 默认状态：分镜收起（查资料用，最占地方），说什么 / 图片展开
+      const initState = await page.evaluate((src) => {
+        const probe = eval(src);
+        const one = (k) => {
+          const sec = document.querySelector(`#slotPanel .slot-sec[data-sec="${k}"]`);
+          return {
+            collapsed: sec?.classList.contains('collapsed'),
+            body: probe(`#slotPanel .slot-sec[data-sec="${k}"] .sec-body`),
+            sum: (sec?.querySelector('.sec-sum')?.textContent || '').trim(),
+          };
+        };
+        return { text: one('text'), board: one('board'), image: one('image') };
+      }, PROBE);
+      check('「这一格的分镜」默认收起', initState.board.collapsed === true && initState.board.body.height === 0,
+        `height=${initState.board.body.height}`);
+      check('收起时标题行给出小结', initState.board.sum !== '', `「${initState.board.sum}」`);
+      check('说什么 / 图片默认展开', initState.text.collapsed === false && initState.image.collapsed === false);
+      await shot('secs-default');
+
+      // 点开「这一格的分镜」
       await page.evaluate("document.querySelector('#slotPanel .slot-sec[data-sec=\\\"board\\\"] .sec-head')?.click()");
-      await sleep(800);
+      await sleep(900);
+      const opened = await page.evaluate((src) => {
+        const probe = eval(src);
+        return { body: probe('#slotPanel .slot-sec[data-sec="board"] .sec-body'),
+                 collapsed: document.querySelector('#slotPanel .slot-sec[data-sec="board"]')?.classList.contains('collapsed'),
+                 expanded: document.querySelector('#slotPanel .slot-sec[data-sec="board"] .sec-head')?.getAttribute('aria-expanded'),
+                 prompts: document.querySelectorAll('#slotBoardPrompts .bp-pre').length };
+      }, PROBE);
+      check('点开能展开（含中英提示词）', opened.collapsed === false && opened.body.height > 60 && opened.prompts >= 2,
+        `height=${opened.body.height} / ${opened.prompts} 段提示词`);
+      check('展开状态与 aria 一致', opened.expanded === 'true');
+      await shot('secs-board-open');
+
+      // 再收起来
+      await page.evaluate("document.querySelector('#slotPanel .slot-sec[data-sec=\\\"board\\\"] .sec-head')?.click()");
+      await sleep(900);
       const folded = await page.evaluate((src) => {
         const probe = eval(src);
         return { body: probe('#slotPanel .slot-sec[data-sec="board"] .sec-body'),
                  collapsed: document.querySelector('#slotPanel .slot-sec[data-sec="board"]')?.classList.contains('collapsed'),
                  expanded: document.querySelector('#slotPanel .slot-sec[data-sec="board"] .sec-head')?.getAttribute('aria-expanded') };
       }, PROBE);
-      check('收起后 body 高度归零', folded.body.height === 0, `height=${folded.body.height}`);
-      check('收起状态与 aria 一致', folded.collapsed === true && folded.expanded === 'false');
+      check('再点能收起，body 高度归零', folded.collapsed === true && folded.body.height === 0, `height=${folded.body.height}`);
+      check('收起状态与 aria 一致（收起）', folded.expanded === 'false');
       await shot('secs-board-collapsed');
-
-      // 再展开
-      await page.evaluate("document.querySelector('#slotPanel .slot-sec[data-sec=\\\"board\\\"] .sec-head')?.click()");
-      await sleep(900);
-      const reopened = await page.evaluate((src) => eval(src)('#slotPanel .slot-sec[data-sec="board"] .sec-body'), PROBE);
-      check('再点能展开回来', reopened.height > 40, `height=${reopened.height}`);
-      await shot('secs-board-reopened');
     },
   },
 

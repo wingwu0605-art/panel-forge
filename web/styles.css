@@ -1444,9 +1444,10 @@ html[data-vt="accent"]::view-transition-new(root){animation:fadeIn .35s var(--ea
   .edit-head .icon-btn{width:34px;height:34px;background:var(--fill-2);color:var(--label)}
   .edit-head .icon-btn:disabled{opacity:.35}
   .edit-head .btn.sm{height:32px;padding:0 14px;font-size:14px}
-  .edit-seg button{height:30px;font-size:13px}
+  .edit-seg button{height:30px;font-size:13px;white-space:nowrap;padding:0 2px}
 
-  /* 编辑页里：不显示右栏原来的标签、标题行、分段折叠头；按模块显示内容 */
+  /* 编辑页里：不显示右栏原来的标签、标题行、分段折叠头；按模块显示内容
+     —— 模块有四个：说什么 / 图片 / 分镜 / 气泡，一次只显示一个 */
   body[data-view="edit"] #tabs,
   body[data-view="edit"] #tabScript,
   body[data-view="edit"] #tabExport,
@@ -1458,9 +1459,14 @@ html[data-vt="accent"]::view-transition-new(root){animation:fadeIn .35s var(--ea
   body[data-view="edit"] .slot-sec{margin-top:0}
   body[data-view="edit"] .slot-sec.collapsed > .sec-body{height:auto;opacity:1;visibility:visible;overflow:visible}
   body[data-view="edit"] .rail.right[data-mod="text"]  .slot-sec[data-sec="image"],
+  body[data-view="edit"] .rail.right[data-mod="text"]  .slot-sec[data-sec="board"],
   body[data-view="edit"] .rail.right[data-mod="image"] .slot-sec[data-sec="text"],
+  body[data-view="edit"] .rail.right[data-mod="image"] .slot-sec[data-sec="board"],
+  body[data-view="edit"] .rail.right[data-mod="board"] .slot-sec[data-sec="text"],
+  body[data-view="edit"] .rail.right[data-mod="board"] .slot-sec[data-sec="image"],
   body[data-view="edit"] .rail.right[data-mod="bubble"] #tabSlot,
   body[data-view="edit"] .rail.right:not([data-mod="bubble"]) .bubble-dock{display:none !important}
+  body[data-view="edit"] .rail.right[data-mod="board"] #tabSlot{padding-top:12px}
   body[data-view="edit"] .rail.right[data-mod="bubble"] .bubble-dock{padding-top:14px}
   body[data-view="edit"] .bubble-dock .bub-head{border-top:0;padding-top:0}
   body[data-view="edit"] .bubble-dock .bub-head > b,

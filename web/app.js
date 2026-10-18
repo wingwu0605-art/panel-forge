@@ -220,10 +220,10 @@ const THEME_NAME = { auto: '跟随系统', light: '浅色', dark: '深色' };
 /* ================================================================== *
  * 启动
  * ================================================================== */
-init().catch((e) => {
-  console.error(e);
-  toast('初始化失败：' + e.message);
-});
+// 注意：真正的 init() 调用放在文件最末尾（见底部）——
+// 模块里的 const/let 是「先声明后初始化」，如果在文件中间就调 init()，
+// 它同步执行到的 bindUI() 会读到还没初始化的常量（TDZ），
+// 以前这些读取都被 try/catch 吞掉了，表现是「折叠状态记不住」这种软故障。
 
 /** 列表里挑第一个能用的直连实现：浏览器直连失败（CORS）再退回服务端 */
 async function directFirst(name, body) {
@@ -1748,9 +1748,10 @@ function makePlaceholder(slot) {
 /* ================================================================== *
  * 右栏：格子
  * ================================================================== */
-/** 小框折叠：内联样式驱动，保证真的塌下去 */
-/* ---------------- 格子面板：「这一格说什么」/「图片」两段各自折叠 ---------------- */
+/* ---------------- 格子面板：「这一格说什么」/「这一格的分镜」/「图片」三段各自折叠 ---------------- */
 const SLOT_SEC_KEY = 'pf.slotsec';
+/** 默认展开哪些段：「分镜」默认收起（它是查资料用的，日常最占地方） */
+const SLOT_SEC_OPEN = { text: true, image: true, board: false };
 function initSlotSections() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SLOT_SEC_KEY) || '{}') || {}; } catch { /* ignore */ }
@@ -1762,7 +1763,8 @@ function initSlotSections() {
       animateFold(sec, body, open, { instant: !animate });
       head.setAttribute('aria-expanded', open ? 'true' : 'false');
     };
-    apply(saved[key] !== false, false);
+    // 用户手动开关过的以记录为准，没动过的按上面这张默认表
+    apply(typeof saved[key] === 'boolean' ? saved[key] : (SLOT_SEC_OPEN[key] !== false), false);
     head.addEventListener('click', () => {
       const open = sec.classList.contains('collapsed');
       apply(open, true);
@@ -3942,3 +3944,11 @@ function syncSecSummary() {
   const edited = !!state.promptEdits?.[id];
   $('#secImageSum').textContent = [img ? '已填图' : '空', nc ? `${nc} 张候选` : '', edited ? '提示词已手改' : ''].filter(Boolean).join(' · ');
 }
+
+/* ================================================================== *
+ * 真正启动（必须留在文件最后：这时上面所有 const 都已初始化完成）
+ * ================================================================== */
+init().catch((e) => {
+  console.error(e);
+  toast('初始化失败：' + e.message);
+});
