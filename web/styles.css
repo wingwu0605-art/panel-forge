@@ -723,8 +723,9 @@ body.pf-dragging .bubble-dock{
 }
 body.pf-dragging .canvas svg{box-shadow:none}
 
-/* ?perf=1：性能浮层（量拖动/缩放热路径用，平时不存在） */.perf-hud{
-  position:fixed;left:10px;bottom:46px;z-index:400;pointer-events:none;
+/* ?perf=1：性能浮层（量拖动/缩放热路径用，平时不存在） */
+.perf-hud{
+  position:fixed;left:10px;bottom:calc(var(--tabbar-h, 0px) + 14px);z-index:400;pointer-events:none;
   padding:8px 10px;border-radius:10px;
   background:rgba(20,20,22,.86);color:#e8e8ea;
   font:11.5px/1.55 ui-monospace,Consolas,monospace;white-space:pre;
