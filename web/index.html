@@ -109,9 +109,13 @@
           <select id="ratio">
             <option value="auto">自动</option>
             <option value="page">页漫（A4/B5）</option>
-            <option value="scroll">条漫（竖屏滚动）</option>
-            <option value="wide">横版 / 跨页</option>
-            <option value="square">方形</option>
+            <option value="a4">A4 竖 · 1:1.41</option>
+            <option value="p34">3:4</option>
+            <option value="strip">9:16 条漫</option>
+            <option value="tall">1:2 竖长</option>
+            <option value="scroll">长条滚动</option>
+            <option value="wide">16:9 横版 / 跨页</option>
+            <option value="square">1:1 方形</option>
           </select>
         </label>
       </div>
@@ -441,9 +445,41 @@
     </div>
 
     <div class="tab-body hidden" id="tabExport">
+      <!-- 页面画幅：改的是整页的宽高比，格子会按比例重排（不是只改导出） -->
+      <div class="kv kv-size" id="pageSizeKv"></div>
+      <label class="field"><span>页面画幅</span>
+        <select id="pageRatio">
+          <option value="keep">跟随模板</option>
+          <option value="a4">A4 竖 · 1:1.41</option>
+          <option value="p34">3:4</option>
+          <option value="p45">4:5</option>
+          <option value="strip">9:16 条漫</option>
+          <option value="wide">16:9 横版</option>
+          <option value="square">1:1 方形</option>
+          <option value="tall">1:2 竖长</option>
+          <option value="custom">自定义…</option>
+        </select>
+      </label>
+      <div class="row2 hidden" id="customSizeRow">
+        <label class="field"><span>页宽 px</span><input type="number" id="pageW" min="200" max="8000" step="10" value="1000"></label>
+        <label class="field"><span>页高 px</span><input type="number" id="pageH" min="200" max="12000" step="10" value="1414"></label>
+      </div>
+      <label class="switch block" title="不拉伸格子：等比缩放后居中留白（版面比例不变）"><input type="checkbox" id="chkFitPage"> 等比留白（不拉伸格子）</label>
+      <div class="row2">
+        <button class="btn tiny primary" id="btnApplySize">应用到这一页</button>
+        <button class="btn tiny" id="btnResetSize">恢复模板画幅</button>
+      </div>
+
       <label class="field"><span>导出宽度 <b id="wVal">1600px</b></span>
         <input type="range" id="exportW" min="600" max="4000" step="100" value="1600">
       </label>
+      <div class="chips size-chips" id="sizeChips">
+        <button class="fchip" data-w="1080">1080</button>
+        <button class="fchip" data-w="1600">1600</button>
+        <button class="fchip" data-w="2048">2048</button>
+        <button class="fchip" data-w="3000">3000</button>
+        <button class="fchip" data-w="4000">4000</button>
+      </div>
       <label class="switch block"><input type="checkbox" id="chkOutlineExport" checked> 无框模板保留虚线轮廓</label>
       <div class="export-actions">
         <button class="btn primary wide" id="btnPng">导出 PNG（整页）</button>

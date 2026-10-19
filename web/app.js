@@ -61,7 +61,9 @@ const state = {
   items: [],          // 轻量模板列表
   filtered: [],
   cultureTab: 'all',
-  tpl: null,          // 完整模板
+  tpl: null,          // 完整模板（可能已被改过画幅）
+  tplBase: null,      // 原始模板（画幅重排的推导基准，永远不动）
+  pageSize: null,     // 本页自定义画幅 {w,h,mode}；null = 跟随模板
   images: {},         // slotId -> {href,iw,ih,zoom,panX,panY,mode,name}
   selectedId: null,
   hoverId: null,
@@ -343,6 +345,11 @@ async function init() {
       state.pageIdx = Math.min(draft.pageIdx || 0, draft.pages.length - 1);
       const pg = state.pages[state.pageIdx];
       if (pg?.tplId) await selectTemplate(pg.tplId, { silent: true });
+      // 这一页改过画幅就重排回来（草稿里存的是 {w,h,mode}）
+      if (pg?.size) {
+        state.tpl = deriveTpl(state.tplBase, pg.size.w, pg.size.h, pg.size.mode || 'stretch');
+        state.pageSize = { ...pg.size };
+      }
       state.images = rehydrateImages(pg?.images || {});
       state.bubbles = (pg?.bubbles || []).map((b) => ({ ...b }));
       state.lines = { ...(pg?.lines || {}) };
@@ -801,6 +808,8 @@ async function selectTemplate(id, opts = {}) {
     }
   }
   state.tpl = tpl;
+  state.tplBase = JSON.parse(JSON.stringify(tpl));   // 画幅重排的基准，之后不再动
+  state.pageSize = null;
   state.pageEnter = true;
   if (state.aiPlan && state.aiPlan.template?.id !== tpl.id) { state.aiPlan = null; state.aiDecision = null; }
   state.bubbles = [];
@@ -821,6 +830,7 @@ async function selectTemplate(id, opts = {}) {
   renderStage();
   renderSlotPanel();
   renderExportKv();
+  syncSizeUI();
   renderBubbles();
   $$('.tpl').forEach((el) => el.classList.toggle('on', el.dataset.id === tpl.id));
   refreshScript();
@@ -1281,6 +1291,144 @@ function bindPanelSheet() {
     toast('已恢复默认面板布局');
   });
 }
+
+/* ================================================================== *
+ * 页面画幅：改整页宽高比（格子按比例重排，不是只改导出尺寸）
+ * - 几何永远从「原始模板」重新推导，反复改不会叠误差
+ * - 拉伸铺满（默认）：格子填满新画幅，格子自身比例会变
+ * - 等比留白：等比缩放后居中，格子比例不变，边上留白
+ * ================================================================== */
+const RATIO_PRESETS = {
+  a4: [1, Math.SQRT2], p34: [3, 4], p45: [4, 5], strip: [9, 16],
+  wide: [16, 9], square: [1, 1], tall: [1, 2],
+};
+
+const r2 = (v) => Math.round(v * 100) / 100;
+
+/** 从原始模板推导出目标画幅下的几何 */
+function deriveTpl(base, W, H, mode) {
+  const sx = W / base.page.w;
+  const sy = H / base.page.h;
+  const k = mode === 'fit' ? Math.min(sx, sy) : null;
+  const kx = k ?? sx;
+  const ky = k ?? sy;
+  const offX = k ? (W - base.page.w * k) / 2 : 0;
+  const offY = k ? (H - base.page.h * k) / 2 : 0;
+  const tpl = JSON.parse(JSON.stringify(base));
+  const page = { w: Math.round(W), h: Math.round(H) };
+  tpl.page = { ...base.page, ...page, kind: 'custom' };
+  const kg = Math.min(kx, ky);
+  tpl.margin = Math.round(base.margin * kg);
+  tpl.gutter = Math.round(base.gutter * kg);
+  const area = page.w * page.h;
+  for (const s of tpl.slots) {
+    s.poly = s.poly.map(([x, y]) => [r2(x * kx + offX), r2(y * ky + offY)]);
+    s.x = r2(s.x * kx + offX);
+    s.y = r2(s.y * ky + offY);
+    s.w = r2(s.w * kx);
+    s.h = r2(s.h * ky);
+    s.aspect = s.h ? r2(s.w / s.h) : s.aspect;
+    if (s.area != null) s.area = r2((s.w * s.h / area) * 100);
+  }
+  return tpl;
+}
+
+/** 把某一页改到目标画幅；w/h 省略时按预设比例算（保持原页宽） */
+function applyPageSize(w, h, mode = 'stretch') {
+  const base = state.tplBase;
+  if (!base) { toast('还没载入模板'); return; }
+  const cur = state.tpl?.page || base.page;
+  let W = Number(w);
+  let H = Number(h);
+  if (!(W > 0) || !(H > 0)) return;
+  W = clamp(W, 200, 8000);
+  H = clamp(H, 200, 12000);
+
+  // 气泡是用户内容，按「当前画幅 → 目标画幅」整体映射
+  const bsx = W / cur.w;
+  const bsy = H / cur.h;
+  const bk = mode === 'fit' ? Math.min(bsx, bsy) : null;
+  const bkx = bk ?? bsx;
+  const bky = bk ?? bsy;
+  const bOffX = bk ? (W - cur.w * bk) / 2 : 0;
+  const bOffY = bk ? (H - cur.h * bk) / 2 : 0;
+  for (const b of state.bubbles) {
+    b.x = r2(b.x * bkx + bOffX);
+    b.y = r2(b.y * bky + bOffY);
+  }
+
+  state.tpl = deriveTpl(base, W, H, mode);
+  state.pageSize = { w: Math.round(W), h: Math.round(H), mode };
+  commit();
+  renderStage();
+  renderSlotPanel();
+  renderBubbles();
+  renderScript();
+  renderExportKv(); syncSizeUI();
+  savePage();
+  queueSave();
+}
+
+/** 恢复成模板自带的画幅 */
+function resetPageSize() {
+  if (!state.tplBase) return;
+  const base = state.tplBase;
+  const cur = state.tpl?.page || base.page;
+  for (const b of state.bubbles) {
+    b.x = r2(b.x * (base.page.w / cur.w));
+    b.y = r2(b.y * (base.page.h / cur.h));
+  }
+  state.tpl = JSON.parse(JSON.stringify(base));
+  state.pageSize = null;
+  commit();
+  renderStage();
+  renderSlotPanel();
+  renderBubbles();
+  renderScript();
+  renderExportKv(); syncSizeUI();
+  savePage();
+  queueSave();
+  syncSizeUI();
+}
+
+/** 画幅/尺寸这几处 UI 跟着当前状态走 */
+function syncSizeUI() {
+  const sel = $('#pageRatio');
+  const pg = state.tpl?.page;
+  const sz = state.pageSize;
+  if ($('#pageSizeKv') && pg) {
+    const ratio = (pg.w / pg.h).toFixed(2);
+    const long = Math.max(pg.w, pg.h);
+    $('#pageSizeKv').innerHTML = `
+      <div><span>页面尺寸</span><b>${pg.w} × ${pg.h} px</b></div>
+      <div><span>宽高比</span><b>${ratio} : 1${sz ? (sz.mode === 'fit' ? ' · 等比留白' : ' · 拉伸铺满') : ' · 模板原样'}</b></div>
+      <div><span>导出后</span><b>${state.exportWidth} × ${Math.round((state.exportWidth * pg.h) / pg.w)} px</b></div>
+      <div><span>长边</span><b>${long} px（模板坐标）</b></div>`;
+  }
+  if (sel && sz) {
+    const hit = Object.entries(RATIO_PRESETS).find(([, [a, b]]) =>
+      Math.abs(pg.w / pg.h - a / b) < 0.01);
+    sel.value = hit ? hit[0] : 'custom';
+  } else if (sel) {
+    sel.value = 'keep';
+  }
+  const row = $('#customSizeRow');
+  if (row) row.classList.toggle('hidden', sel?.value !== 'custom');
+  if ($('#pageW') && pg) $('#pageW').value = pg.w;
+  if ($('#pageH') && pg) $('#pageH').value = pg.h;
+  if ($('#chkFitPage')) $('#chkFitPage').checked = sz?.mode === 'fit';
+  $$('#sizeChips .fchip').forEach((c) => c.classList.toggle('on', Number(c.dataset.w) === state.exportWidth));
+}
+
+/** ?dbg=1 用的调试钩子：测试和排查画幅/格位时方便 */
+window.__pfSize = () => ({
+  w: state.tpl?.page?.w || 0,
+  h: state.tpl?.page?.h || 0,
+  mode: state.pageSize?.mode || null,
+  custom: !!state.pageSize,
+  exportWidth: state.exportWidth,
+  slots: (state.tpl?.slots || []).map((s) => ({ id: s.id, x: s.x, y: s.y, w: s.w, h: s.h })),
+});
 
 function renderStage() {
   if (!state.tpl) return;
@@ -2038,8 +2186,40 @@ function bindUI() {
   $('#exportW').addEventListener('input', (ev) => {
     state.exportWidth = Number(ev.target.value);
     $('#wVal').textContent = state.exportWidth + 'px';
-    renderExportKv();
+    renderExportKv(); syncSizeUI();
   });
+  // 导出宽度预设
+  $('#sizeChips')?.addEventListener('click', (ev) => {
+    const c = ev.target.closest('[data-w]');
+    if (!c) return;
+    state.exportWidth = Number(c.dataset.w);
+    $('#exportW').value = String(state.exportWidth);
+    $('#wVal').textContent = state.exportWidth + 'px';
+    renderExportKv(); syncSizeUI();
+  });
+  // 页面画幅
+  $('#pageRatio')?.addEventListener('change', (ev) => {
+    const v = ev.target.value;
+    const cur = state.tpl?.page;
+    $('#customSizeRow').classList.toggle('hidden', v !== 'custom');
+    if (v === 'keep') { resetPageSize(); return; }
+    if (v === 'custom') {
+      if (cur) { $('#pageW').value = Math.round(cur.w); $('#pageH').value = Math.round(cur.h); }
+      return;
+    }
+    const p = RATIO_PRESETS[v];
+    if (!p || !cur) return;
+    const W = Math.round(cur.w);
+    // 记住目标画幅：下一次「按规则匹配 / 让 AI 排戏」会优先挑同等画幅的模板
+    state.wantRatio = v;
+    applyPageSize(W, Math.round((W * p[1]) / p[0]), $('#chkFitPage').checked ? 'fit' : 'stretch');
+  });
+  $('#btnApplySize')?.addEventListener('click', () => {
+    applyPageSize(Number($('#pageW').value), Number($('#pageH').value),
+      $('#chkFitPage').checked ? 'fit' : 'stretch');
+  });
+  $('#btnResetSize')?.addEventListener('click', () => resetPageSize());
+  $('#chkFitPage')?.addEventListener('change', () => toast('点「应用到这一页」生效'));
   $('#chkOutlineExport').addEventListener('change', (ev) => { state.outlineExport = ev.target.checked; });
   $('#btnPng').addEventListener('click', exportPNG);
   $('#btnSvg').addEventListener('click', exportSVG);
@@ -2726,7 +2906,8 @@ async function runMatch() {
     const res = await api.match({
       plot,
       culture: $('#culture').value,
-      ratio: $('#ratio').value === 'auto' ? 'auto' : $('#ratio').value,
+      // 「自动」时如果这一页已经改过画幅，就按当前画幅挑模板（从一开始就对齐目标尺寸）
+      ratio: $('#ratio').value !== 'auto' ? $('#ratio').value : (state.wantRatio || 'auto'),
       limit: 8,
     });
     state.analysis = res.analysis;
@@ -3420,6 +3601,7 @@ function currentPageSnapshot() {
     slotAiMode: state.slotAiMode,
     paint: clonePaint(state.paint),
     under: { ...state.under },
+    size: state.pageSize ? { ...state.pageSize } : null,   // 本页画幅（改过才存）
   };
 }
 /** 笔画对象要深拷一层（pts 是扁平数组），否则撤销会把旧的笔画改掉 */
@@ -3450,6 +3632,14 @@ async function switchPage(i) {
   state.pageIdx = i;
   const pg = state.pages[i];
   await selectTemplate(pg.tplId, { silent: true });
+  // 这一页可能改过画幅：selectTemplate 已把 base 换成原模板，这里重排回来
+  if (pg.size) {
+    const sz = pg.size;
+    const tpl = deriveTpl(state.tplBase, sz.w, sz.h, sz.mode || 'stretch');
+    // 气泡存的是改画幅之后的坐标，直接用（不再二次缩放）
+    state.tpl = tpl;
+    state.pageSize = { ...sz };
+  }
   state.images = rehydrateImages(pg.images || {});
   state.under = rehydrateImages(pg.under || {});
   state.paint = clonePaint(pg.paint || {});

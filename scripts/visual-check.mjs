@@ -1346,6 +1346,96 @@ const scenarios = [
         `${back.lang} · ${back.match}`);
     },
   },
+
+  {
+    name: 'page-size',
+    title: '⑮ 页面画幅 / 导出尺寸（几何重排，不是只改导出）',
+    async run(page, shot, { check }) {
+      await page.viewport(1200, 900);
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+      // 打开导出面板
+      await page.evaluate(`(() => {
+        const t = [...document.querySelectorAll('#tabs button')].find((b) => /导出|Export/.test(b.textContent));
+        t?.click();
+      })()`);
+      await sleep(400);
+
+      const state = `(() => {
+        const g = window.__pfSize();
+        const vb = (document.querySelector('#canvas svg')?.getAttribute('viewBox') || '').split(/\\s+/).map(Number);
+        const kv = (document.querySelector('#pageSizeKv')?.textContent || '').replace(/\\s+/g, ' ').trim();
+        // 每个格子的 bbox 都要落在页面里（重排不能把格子推出去）
+        const inside = g.slots.every((s) => s.x >= -1 && s.y >= -1
+          && s.x + s.w <= g.w + 1 && s.y + s.h <= g.h + 1);
+        return { w: g.w, h: g.h, mode: g.mode, custom: g.custom, vb: [vb[2], vb[3]],
+          kv, slots: g.slots.length, inside };
+      })()`;
+
+      const a4 = await page.evaluate(state);
+      check('模板原样：A4 1000×1414', Math.abs(a4.w - 1000) < 2 && Math.abs(a4.h - 1414) < 2, `${a4.w}×${a4.h}`);
+
+      // 换成 9:16
+      await page.evaluate(`(() => {
+        const s = document.querySelector('#pageRatio');
+        s.value = 'strip';
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+      await sleep(900);
+      const strip = await page.evaluate(state);
+      check('改成 9:16：页面真的变高', strip.h > a4.h && Math.abs(strip.w - 1000) < 2, `${strip.w}×${strip.h}`);
+      check('格子全部落在页面内（重排不越界）', strip.inside && strip.slots === a4.slots, `${strip.slots} 格`);
+      check('导出尺寸跟着画幅走', /1600 × 2845|1600 × 2844/.test(strip.kv), strip.kv.slice(0, 80));
+
+      // 自定义方形 + 等比留白
+      await page.evaluate(`(() => {
+        const s = document.querySelector('#pageRatio');
+        s.value = 'custom';
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelector('#pageW').value = '1200';
+        document.querySelector('#pageH').value = '1200';
+        document.querySelector('#chkFitPage').checked = true;
+        document.querySelector('#btnApplySize').click();
+      })()`);
+      await sleep(900);
+      const square = await page.evaluate(state);
+      check('自定义 1200×1200 + 等比留白：格子仍在页面内', square.w === 1200 && square.h === 1200 && square.inside,
+        `${square.w}×${square.h}`);
+      check('留白模式写进了状态', /等比留白/.test(square.kv), square.kv.slice(0, 90));
+      await shot('page-size-square');
+
+      // 反复改不叠误差：回到 A4 预设应与原模板一致
+      await page.evaluate(`(() => {
+        const s = document.querySelector('#pageRatio');
+        s.value = 'a4';
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+      await sleep(900);
+      const backA4 = await page.evaluate(state);
+      check('再次切 A4：尺寸回到 1:1.41（推导不叠误差）',
+        Math.abs(backA4.w / backA4.h - 1 / Math.SQRT2) < 0.01, `${backA4.w}×${backA4.h}`);
+
+      // 恢复模板画幅
+      await page.evaluate("document.querySelector('#btnResetSize').click()");
+      await sleep(800);
+      const reset = await page.evaluate(state);
+      check('「恢复模板画幅」回到 1000×1414',
+        Math.abs(reset.w - 1000) < 2 && Math.abs(reset.h - 1414) < 2, `${reset.w}×${reset.h}`);
+
+      // 画幅会被记住（改一次 → 落盘 → 刷新还在）
+      await page.evaluate(`(() => {
+        const s = document.querySelector('#pageRatio');
+        s.value = 'strip';
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+      await sleep(500);
+      await page.waitFor("window.__pfSaveBusy !== true", { label: '等落盘', timeout: 30000 });
+      await page.goto('/?tpl=ref-4band-2col');   // 不带 fresh=1，走草稿恢复
+      await page.ready();
+      const restored = await page.evaluate(state);
+      check('改过的画幅刷新后还在', restored.h > 1700 && Math.abs(restored.w - 1000) < 2, `${restored.w}×${restored.h}`);
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */
