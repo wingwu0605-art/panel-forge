@@ -3337,6 +3337,8 @@ async function idbGet(key) {
 function queueSave() {
   dirty = true;
   clearTimeout(saveTimer);
+  // 给自动化测试一个可等待的「保存中」标记（固定 sleep 在慢机器上会抖）
+  window.__pfSaveBusy = true;
   saveTimer = setTimeout(saveDraft, 1200);
 }
 
@@ -3366,6 +3368,7 @@ async function saveDraft() {
     perf.lastSaveBytes = JSON.stringify(meta).length + blobBytes;
     perfDone('save', t0);
   }
+  window.__pfSaveBusy = false;
 }
 
 async function loadDraft() {

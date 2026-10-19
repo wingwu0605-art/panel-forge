@@ -1009,10 +1009,12 @@ const scenarios = [
       // ③ 完成 → 草稿保存（刷新后还在，且能再次进画布编辑）
       await page.evaluate('window.__pfPaint.finish()');
       await page.waitFor("document.querySelector('#paintSheet')?.hidden !== false", { label: '关闭', timeout: 20000 });
-      await sleep(1600);   // 等 queueSave 落盘（1.2s 防抖）
+      // 等草稿真正落盘（用应用暴露的 __pfSaveBusy，别用固定 sleep：慢机器上会抖）
+      await page.waitFor("window.__pfSaveBusy !== true", { label: '等草稿落盘', timeout: 30000 });
+      await sleep(300);
       await page.goto('/?perf=1&tpl=ref-4band-2col');   // 注意：不带 fresh=1，要恢复草稿
       await page.ready();
-      await page.waitFor("document.querySelectorAll('#canvas svg image[data-slot]').length >= 1", { label: '草稿里的图回来', timeout: 15000 });
+      await page.waitFor("document.querySelectorAll('#canvas svg image[data-slot]').length >= 1", { label: '草稿里的图回来', timeout: 30000 });
       const persisted = await page.evaluate(`(async () => {
         const el = document.querySelector('#canvas svg image[data-slot="${seeded.fresh}"]');
         if (!el) return { err: '这一格没回来' };

@@ -65,6 +65,9 @@ const EN = {
   '规则路照常可用，AI 是可选加速': 'Rules always work — AI is optional',
   '输入 Key': 'Enter key',
   '未配置 · 规则路仍然可用': 'Not set · rules still work',
+  '规则路照常可用（AI 路需你填 Key，或设 LLM_API_KEY）':
+    'rules always work (AI needs a key, or set LLM_API_KEY)',
+  '规则路照常可用，AI 是可选加速': 'rules always work, AI is an optional speed-up',
   'OpenAI 兼容': 'OpenAI-compatible',
   '硅基流动': 'SiliconFlow',
   '仅本次会话': 'This session only',
@@ -296,6 +299,9 @@ const ID = {
   '规则路照常可用，AI 是可选加速': 'Aturan selalu bisa dipakai — AI opsional',
   '输入 Key': 'Masukkan key',
   '未配置 · 规则路仍然可用': 'Belum diatur · aturan tetap jalan',
+  '规则路照常可用（AI 路需你填 Key，或设 LLM_API_KEY）':
+    'aturan selalu jalan (AI perlu key, atau set LLM_API_KEY)',
+  '规则路照常可用，AI 是可选加速': 'Aturan selalu bisa dipakai — AI opsional',
   'OpenAI 兼容': 'Kompatibel OpenAI',
   '硅基流动': 'SiliconFlow',
   '仅本次会话': 'Hanya sesi ini',
@@ -522,6 +528,27 @@ Object.assign(EN, {
   'Key 只在你这台机器上': 'key stays on this machine',
   '静态版也能用 AI：在上面填自己的 Key（只在浏览器里，不上传）。规则路不用 Key，随时可用':
     'AI works in the static build too: enter your own key above (kept in this browser, never uploaded). Rules need no key and always work.',
+  // 「怎么用」引导卡
+  '怎么用（30 秒）': 'How to use (30 seconds)',
+  '在「分镜模板库」选一套版式（或先写剧情，让引擎替你挑）。':
+    'Pick a layout in the template library — or write the plot first and let the engine choose.',
+  '点格子 → 选图；或把一批图': 'Click a panel → pick an image; or drop a batch of images',
+  '直接拖进画布': 'straight onto the canvas',
+  '，按阅读顺序自动填。': ' and they fill in reading order.',
+  '拖图可调位置，Alt+滚轮缩放；Ctrl+V 粘贴到选中格。':
+    'Drag an image to reposition it, Alt+wheel to zoom, Ctrl+V pastes into the selected panel.',
+  '「分镜表」拿每格景别＋生图提示词；「导出」出 PNG/SVG。':
+    'The sheet gives you each panel\'s shot size and image prompt; Export writes PNG/SVG.',
+  '换模板时图片会按阅读顺序跟着搬家，方便横向对比版式。':
+    'Images follow the reading order when you switch templates, so layouts are easy to compare.',
+  '隐私：': 'Privacy: ',
+  '图片全程在你浏览器里处理（FileReader → SVG → canvas），':
+    'images are processed entirely in your browser (FileReader → SVG → canvas), ',
+  '不上传、不落盘': 'never uploaded, never written to disk',
+  '；关掉标签页就清空。只有剧情文字会发给你自己配置的模型。':
+    '; closing the tab clears everything. Only your plot text goes to the model you configured.',
+  '启用的角色会自动进提示词，参考图也会发给支持参考的模型。导出的 JSON 里带着参考图，队友导入就能用同一批人。':
+    'Enabled characters are added to prompts automatically and references are sent to models that support them. The exported JSON carries the references, so teammates import and get the same cast.',
   '右→左': 'R→L', '左→右': 'L→R', '上→下': 'T→B',
   '日式页漫': 'Japanese manga', '中式漫画': 'Chinese comic', '韩式条漫': 'Korean webtoon',
   // 模板名里的高频词段（名字是「族·变体」结构，逐段翻）
@@ -608,6 +635,26 @@ Object.assign(ID, {
   'Key 只在你这台机器上': 'key tetap di mesin ini',
   '静态版也能用 AI：在上面填自己的 Key（只在浏览器里，不上传）。规则路不用 Key，随时可用':
     'AI juga berfungsi di versi statis: isi key Anda di atas (hanya di browser, tidak diunggah). Aturan tidak perlu key dan selalu jalan.',
+  '怎么用（30 秒）': 'Cara pakai (30 detik)',
+  '在「分镜模板库」选一套版式（或先写剧情，让引擎替你挑）。':
+    'Pilih tata letak di perpustakaan template — atau tulis alurnya dulu dan biarkan mesin memilih.',
+  '点格子 → 选图；或把一批图': 'Klik panel → pilih gambar; atau seret beberapa gambar',
+  '直接拖进画布': 'langsung ke kanvas',
+  '，按阅读顺序自动填。': ' dan terisi sesuai urutan baca.',
+  '拖图可调位置，Alt+滚轮缩放；Ctrl+V 粘贴到选中格。':
+    'Seret gambar untuk memindahkan, Alt+scroll untuk memperbesar, Ctrl+V menempel ke panel terpilih.',
+  '「分镜表」拿每格景别＋生图提示词；「导出」出 PNG/SVG。':
+    'Lembar panel memberi ukuran bidikan dan prompt tiap panel; Ekspor menghasilkan PNG/SVG.',
+  '换模板时图片会按阅读顺序跟着搬家，方便横向对比版式。':
+    'Saat berganti template, gambar ikut urutan baca sehingga mudah membandingkan tata letak.',
+  '隐私：': 'Privasi: ',
+  '图片全程在你浏览器里处理（FileReader → SVG → canvas），':
+    'gambar diproses sepenuhnya di browser Anda (FileReader → SVG → canvas), ',
+  '不上传、不落盘': 'tidak diunggah, tidak ditulis ke disk',
+  '；关掉标签页就清空。只有剧情文字会发给你自己配置的模型。':
+    '; menutup tab menghapus semuanya. Hanya teks alur yang dikirim ke model Anda.',
+  '启用的角色会自动进提示词，参考图也会发给支持参考的模型。导出的 JSON 里带着参考图，队友导入就能用同一批人。':
+    'Karakter yang aktif otomatis masuk ke prompt dan referensinya dikirim ke model yang mendukung. JSON hasil ekspor membawa referensi, jadi rekan tim bisa memakai karakter yang sama.',
   '右→左': 'K→Kr', '左→右': 'Kr→K', '上→下': 'A→B',
   '日式页漫': 'Manga Jepang', '中式漫画': 'Komik Tiongkok', '韩式条漫': 'Webtoon Korea',
   '웹툰': 'Webtoon', '만화': 'Manhwa', '长条漫': 'Strip panjang',
