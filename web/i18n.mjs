@@ -549,6 +549,44 @@ Object.assign(EN, {
     '; closing the tab clears everything. Only your plot text goes to the model you configured.',
   '启用的角色会自动进提示词，参考图也会发给支持参考的模型。导出的 JSON 里带着参考图，队友导入就能用同一批人。':
     'Enabled characters are added to prompts automatically and references are sent to models that support them. The exported JSON carries the references, so teammates import and get the same cast.',
+  // 画布/编辑页提示
+  '静态版': 'Static build',
+  '先在「分镜模板库」选一套版式，或做一次': 'First pick a layout in the template library, or run a',
+  '剧情匹配': 'plot match',
+  '点击格子选图 · 拖图到格子 · 批量拖入自动按顺序填充 · Ctrl+V 粘贴':
+    'Click a panel to pick an image · drag images onto panels · drop a batch to fill in order · Ctrl+V pastes',
+  '（未填，写剧情或让 AI 排戏）': '(empty — write the plot or let AI direct)',
+  '（无）': '(none)',
+  '空': 'Empty',
+  '双方位置与距离': 'Positions and distance',
+  '避免': 'Avoid',
+  '已自动放在生图提示词': 'already placed at the start of the image prompt',
+  '最前面': 'start',
+  '；用别的工具出图时也可单独复制。常规格：按景别正常构图': '; you can also copy it separately when using other tools. Regular panel: compose by shot size',
+  // 导出面板
+  '画幅比': 'Aspect ratio',
+  '整页占比': 'Share of page',
+  '导出像素': 'Export pixels',
+  '建议出图': 'Suggested size',
+  '输出尺寸': 'Output size',
+  '格数 / 已填': 'Panels / filled',
+  '画风': 'Art style',
+  'PNG 由浏览器本地栅格化，图片以原始分辨率嵌入；导出前建议把「镂空」关掉。':
+    'PNG is rasterised locally by the browser with images at full resolution — turn "Hollow" off before exporting.',
+  '关掉 AI 后，左栏的 AI 面板、每格的生图按钮和候选图会一起收起来；想用随时打开。':
+    'With AI off, the AI panel, per-panel generate buttons and candidate strip are hidden together; turn it back on anytime.',
+  '硅基流动 SiliconFlow': 'SiliconFlow',
+  '删除气泡': 'Delete bubble',
+  '当前：填满裁切': 'Now: cover (cropped)',
+  '当前：完整显示': 'Now: contain (whole image)',
+  '视图': 'View',
+  '格号开关': 'Panel numbers',
+  '镂空预览': 'Hollow preview',
+  '快捷键表': 'Shortcut list',
+  '在输入框/文本域里打字时，单键快捷键不生效（避免误触）。': 'Single-key shortcuts are disabled while typing in a field (to avoid accidents).',
+  // 每格的点子/节拍名（会显示在格子上）
+  '摆开架势': 'Opening stance', '近方格': 'Approach panel', '冲击瞬间': 'Impact moment',
+  '受击/反应': 'Hit / reaction', '反击再起': 'Counterattack', '通用镜头': 'Generic shot',
   '右→左': 'R→L', '左→右': 'L→R', '上→下': 'T→B',
   '日式页漫': 'Japanese manga', '中式漫画': 'Chinese comic', '韩式条漫': 'Korean webtoon',
   // 模板名里的高频词段（名字是「族·变体」结构，逐段翻）
@@ -655,6 +693,41 @@ Object.assign(ID, {
     '; menutup tab menghapus semuanya. Hanya teks alur yang dikirim ke model Anda.',
   '启用的角色会自动进提示词，参考图也会发给支持参考的模型。导出的 JSON 里带着参考图，队友导入就能用同一批人。':
     'Karakter yang aktif otomatis masuk ke prompt dan referensinya dikirim ke model yang mendukung. JSON hasil ekspor membawa referensi, jadi rekan tim bisa memakai karakter yang sama.',
+  '静态版': 'Versi statis',
+  '先在「分镜模板库」选一套版式，或做一次': 'Pilih tata letak di perpustakaan template, atau jalankan',
+  '剧情匹配': 'pencocokan alur',
+  '点击格子选图 · 拖图到格子 · 批量拖入自动按顺序填充 · Ctrl+V 粘贴':
+    'Klik panel untuk memilih gambar · seret gambar ke panel · seret banyak gambar untuk mengisi berurutan · Ctrl+V menempel',
+  '（未填，写剧情或让 AI 排戏）': '(kosong — tulis alurnya atau biarkan AI menyusun)',
+  '（无）': '(tidak ada)',
+  '空': 'Kosong',
+  '双方位置与距离': 'Posisi dan jarak',
+  '避免': 'Hindari',
+  '已自动放在生图提示词': 'sudah diletakkan di awal prompt gambar',
+  '最前面': 'awal',
+  '；用别的工具出图时也可单独复制。常规格：按景别正常构图': '; bisa juga disalin saat memakai alat lain. Panel biasa: komposisi sesuai ukuran bidikan',
+  '画幅比': 'Rasio aspek',
+  '整页占比': 'Porsi halaman',
+  '导出像素': 'Piksel ekspor',
+  '建议出图': 'Ukuran saran',
+  '输出尺寸': 'Ukuran keluaran',
+  '格数 / 已填': 'Panel / terisi',
+  '画风': 'Gaya gambar',
+  'PNG 由浏览器本地栅格化，图片以原始分辨率嵌入；导出前建议把「镂空」关掉。':
+    'PNG dirasterisasi lokal oleh browser dengan gambar resolusi penuh — matikan "Kosong" sebelum mengekspor.',
+  '关掉 AI 后，左栏的 AI 面板、每格的生图按钮和候选图会一起收起来；想用随时打开。':
+    'Dengan AI nonaktif, panel AI, tombol buat gambar, dan kandidat ikut disembunyikan; bisa diaktifkan lagi kapan saja.',
+  '硅基流动 SiliconFlow': 'SiliconFlow',
+  '删除气泡': 'Hapus balon',
+  '当前：填满裁切': 'Sekarang: penuh (dipotong)',
+  '当前：完整显示': 'Sekarang: utuh',
+  '视图': 'Tampilan',
+  '格号开关': 'Nomor panel',
+  '镂空预览': 'Pratinjau kosong',
+  '快捷键表': 'Daftar pintasan',
+  '在输入框/文本域里打字时，单键快捷键不生效（避免误触）。': 'Pintasan satu tombol nonaktif saat mengetik di kolom input.',
+  '摆开架势': 'Sikap pembuka', '近方格': 'Panel mendekat', '冲击瞬间': 'Momen dampak',
+  '受击/反应': 'Terkena / reaksi', '反击再起': 'Serangan balik', '通用镜头': 'Bidikan umum',
   '右→左': 'K→Kr', '左→右': 'Kr→K', '上→下': 'A→B',
   '日式页漫': 'Manga Jepang', '中式漫画': 'Komik Tiongkok', '韩式条漫': 'Webtoon Korea',
   '웹툰': 'Webtoon', '만화': 'Manhwa', '长条漫': 'Strip panjang',
@@ -698,6 +771,8 @@ const EN_PATTERNS = [
   [/（(\d+) ?格）$/, ' ($1 panels)'],
   [/^(\d+)×(\d+) (\d+)格$/, '$1×$2 · $3 panels'],
   [/^(\d+)格$/, '$1 panels'],
+  [/^编辑第 (\d+) 格$/, 'Edit panel $1'],
+  [/^导出中 (\d+)\/(\d+)…$/, 'Exporting $1/$2…'],
   [/^浏览器直连 · (.+) · (.+)（Key 只在你这台机器上）$/, 'Browser direct · $1 · $2 (key stays on this machine)'],
 ];
 const ID_PATTERNS = [
@@ -722,6 +797,7 @@ const ID_PATTERNS = [
   [/（(\d+) ?格）$/, ' ($1 panel)'],
   [/^(\d+)×(\d+) (\d+)格$/, '$1×$2 · $3 panel'],
   [/^(\d+)格$/, '$1 panel'],
+  [/^编辑第 (\d+) 格$/, 'Edit panel $1'],
   [/^浏览器直连 · (.+) · (.+)（Key 只在你这台机器上）$/, 'Langsung dari browser · $1 · $2 (key tetap di mesin ini)'],
 ];
 
