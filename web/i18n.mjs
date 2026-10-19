@@ -498,6 +498,37 @@ Object.assign(EN, {
   '常规格': 'Regular panel', '横幅格': 'Banner panel', '交代关系': 'Context',
   '戏路': 'genres', '关键词': 'keywords', '节拍': 'beats', '场景族': 'scene families', '基调': 'tones',
   '戏路 ·': 'genres ·', '关键词 ·': 'keywords ·', '节拍 ·': 'beats ·', '场景族 ·': 'scenes ·', '基调 ·': 'tones ·',
+  // 顶栏状态 / 导航 / 阅读顺序
+  '静态态': 'Static',
+  '离线可用': 'Offline ready',
+  'AI 接入说明': 'AI setup',
+  '全部模板一览': 'All templates',
+  '阅读顺序': 'Reading order',
+  '填你自己的模型 API：AI 会在规则筛出的合法版式里': 'Plug in your own model API: from the layouts the rules allow, AI will',
+  '自己挑一套并逐格排戏': 'pick one and direct panel by panel',
+  '（画面内容＋台词）。Key 只存在本机浏览器与本地服务之间，不写盘、不外传。':
+    ' (visual content + dialogue). Your key never leaves this browser and your local service — never written to disk, never shared.',
+  '未配置 · 规则路仍然可用': 'Not set · rules still work',
+  '例：18岁剑客，黑短发，左眉有疤，深色高领外套，银色长刀':
+    'e.g. 18-year-old swordsman, short black hair, scar over the left eyebrow, dark high-collar coat, silver longsword',
+  '（AI 路需你填 Key，或设 LLM_API_KEY）': ' (AI needs a key, or set LLM_API_KEY)',
+  // AI 状态行（JS 动态写入，含变量，用整句/正则）
+  '就绪': 'Ready',
+  '待填 Key': 'Key needed',
+  '规则路照常可用': 'rules always work',
+  '规则路仍然可用': 'rules still work',
+  '默认模型': 'default model',
+  '浏览器直连': 'Browser direct',
+  'Key 只在你这台机器上': 'key stays on this machine',
+  '静态版也能用 AI：在上面填自己的 Key（只在浏览器里，不上传）。规则路不用 Key，随时可用':
+    'AI works in the static build too: enter your own key above (kept in this browser, never uploaded). Rules need no key and always work.',
+  '右→左': 'R→L', '左→右': 'L→R', '上→下': 'T→B',
+  '日式页漫': 'Japanese manga', '中式漫画': 'Chinese comic', '韩式条漫': 'Korean webtoon',
+  // 模板名里的高频词段（名字是「族·变体」结构，逐段翻）
+  '웹툰': 'Webtoon', '만화': 'Manhwa', '長条漫': 'Long strip', '长条漫': 'Long strip',
+  '少年漫': 'Shonen', '青年漫': 'Seinen', '少女漫': 'Shojo', '竖屏': 'Vertical',
+  '三栏并置': 'Three columns', '国风': 'Chinese style', '对峙': 'Standoff',
+  '长条漫·竖屏': 'Long strip · vertical',
   // 气泡类型
   '椭圆对话泡': 'Round bubble', '圆角对话泡': 'Rounded bubble', '双线对话泡': 'Double-line bubble',
   '云朵思考泡': 'Thought cloud', '虚框内心泡': 'Inner monologue', '尖角喊叫泡': 'Shout balloon',
@@ -555,6 +586,33 @@ Object.assign(ID, {
   '戏路': 'genre', '关键词': 'kata kunci', '节拍': 'ketukan', '场景族': 'keluarga adegan',
   '基调': 'nada',
   '戏路 ·': 'genre ·', '关键词 ·': 'kata kunci ·', '节拍 ·': 'ketukan ·', '场景族 ·': 'adegan ·', '基调 ·': 'nada ·',
+  '静态态': 'Statis',
+  '离线可用': 'Bisa offline',
+  'AI 接入说明': 'Panduan AI',
+  '全部模板一览': 'Semua template',
+  '阅读顺序': 'Urutan baca',
+  '填你自己的模型 API：AI 会在规则筛出的合法版式里': 'Pakai API model Anda: dari tata letak yang lolos aturan, AI akan',
+  '自己挑一套并逐格排戏': 'memilih satu dan menyusun per panel',
+  '（画面内容＋台词）。Key 只存在本机浏览器与本地服务之间，不写盘、不外传。':
+    ' (isi gambar + dialog). API key hanya tersimpan di browser ini dan layanan lokal — tidak ditulis ke disk, tidak dikirim keluar.',
+  '未配置 · 规则路仍然可用': 'Belum diatur · aturan tetap jalan',
+  '例：18岁剑客，黑短发，左眉有疤，深色高领外套，银色长刀':
+    'contoh: pendekar 18 tahun, rambut hitam pendek, bekas luka di alis kiri, mantel kerah tinggi gelap, pedang panjang perak',
+  '（AI 路需你填 Key，或设 LLM_API_KEY）': ' (AI perlu key, atau set LLM_API_KEY)',
+  '就绪': 'Siap',
+  '待填 Key': 'Perlu key',
+  '规则路照常可用': 'aturan selalu jalan',
+  '规则路仍然可用': 'aturan tetap jalan',
+  '默认模型': 'model bawaan',
+  '浏览器直连': 'Langsung dari browser',
+  'Key 只在你这台机器上': 'key tetap di mesin ini',
+  '静态版也能用 AI：在上面填自己的 Key（只在浏览器里，不上传）。规则路不用 Key，随时可用':
+    'AI juga berfungsi di versi statis: isi key Anda di atas (hanya di browser, tidak diunggah). Aturan tidak perlu key dan selalu jalan.',
+  '右→左': 'K→Kr', '左→右': 'Kr→K', '上→下': 'A→B',
+  '日式页漫': 'Manga Jepang', '中式漫画': 'Komik Tiongkok', '韩式条漫': 'Webtoon Korea',
+  '웹툰': 'Webtoon', '만화': 'Manhwa', '长条漫': 'Strip panjang',
+  '少年漫': 'Shonen', '青年漫': 'Seinen', '少女漫': 'Shojo', '竖屏': 'Vertikal',
+  '三栏并置': 'Tiga kolom', '国风': 'Gaya Tiongkok', '对峙': 'Konfrontasi',
   '椭圆对话泡': 'Balon bulat', '圆角对话泡': 'Balon sudut bulat', '双线对话泡': 'Balon dua garis',
   '云朵思考泡': 'Awan pikiran', '虚框内心泡': 'Monolog batin', '尖角喊叫泡': 'Balon teriakan',
   '爆炸冲击泡': 'Balon ledakan', '重描边方泡': 'Kotak tebal', '旁白框': 'Kotak narasi',
@@ -589,6 +647,11 @@ const EN_PATTERNS = [
   [/^本地规则引擎 v([\d.]+)：/, 'Local rule engine v$1:'],
   [/^(\d+)格 · (.+) · 左→右 · 上→下$/, '$1 panels · $2 · L→R · T→B'],
   [/^(\d+)格 · (.+) · 右→左 · 上→下$/, '$1 panels · $2 · R→L · T→B'],
+  // 模板名里的「（8 格）」「2×2 四格」这类
+  [/（(\d+) ?格）$/, ' ($1 panels)'],
+  [/^(\d+)×(\d+) (\d+)格$/, '$1×$2 · $3 panels'],
+  [/^(\d+)格$/, '$1 panels'],
+  [/^浏览器直连 · (.+) · (.+)（Key 只在你这台机器上）$/, 'Browser direct · $1 · $2 (key stays on this machine)'],
 ];
 const ID_PATTERNS = [
   [/^(\d+) 套模板 · (\d+) 种格型$/, '$1 template · $2 jenis panel'],
@@ -609,6 +672,10 @@ const ID_PATTERNS = [
   [/^本地规则引擎 v([\d.]+)：/, 'Mesin aturan lokal v$1:'],
   [/^(\d+)格 · (.+) · 左→右 · 上→下$/, '$1 panel · $2 · K→Kr · A→B'],
   [/^(\d+)格 · (.+) · 右→左 · 上→下$/, '$1 panel · $2 · Kr→K · A→B'],
+  [/（(\d+) ?格）$/, ' ($1 panel)'],
+  [/^(\d+)×(\d+) (\d+)格$/, '$1×$2 · $3 panel'],
+  [/^(\d+)格$/, '$1 panel'],
+  [/^浏览器直连 · (.+) · (.+)（Key 只在你这台机器上）$/, 'Langsung dari browser · $1 · $2 (key tetap di mesin ini)'],
 ];
 
 const DICTS = { en: EN, id: ID };
@@ -620,7 +687,7 @@ const TITLE = {
 };
 
 /** 把一条原文翻成目标语言；翻不了就原样返回 */
-export function translate(text, lang) {
+export function translate(text, lang, depth = 0) {
   if (!text || lang === 'zh') return text;
   const dict = DICTS[lang];
   if (!dict) return text;
@@ -629,6 +696,27 @@ export function translate(text, lang) {
   if (dict[raw]) return text.replace(raw, dict[raw]);
   for (const [re, rep] of PATTERNS[lang] || []) {
     if (re.test(raw)) return text.replace(raw, raw.replace(re, rep));
+  }
+  // 「8 格 · A4 · 右→左 · 上→下 · 日式页漫」这类**多段信息行**：
+  // 按「 · 」切开逐段翻再拼回去。必须排在 sep/tail 之前，否则会被 tail 提前截断
+  // （tail 只会翻最后一段，结果就变成半中半英）。
+  if (depth < 3 && /·/.test(raw)) {
+    const parts = raw.split(/\s*·\s*/);
+    if (parts.length > 1) {
+      const done = parts.map((p) => translate(p, lang, depth + 1).trim());
+      if (done.some((p, i) => p !== parts[i].trim())) return text.replace(raw, done.join(' · '));
+    }
+  }
+  // 「阅读顺序：右→左」这种 标签：值
+  if (depth < 3) {
+    const kv = raw.match(/^([^：:|]{1,16})[：:]\s*(.+)$/);
+    if (kv) {
+      const label = translate(kv[1], lang, depth + 1).trim();
+      const value = translate(kv[2], lang, depth + 1).trim();
+      if (label !== kv[1].trim() || value !== kv[2].trim()) {
+        return text.replace(raw, `${label}: ${value}`);
+      }
+    }
   }
   // 「· 交代关系」「| 旁白」这种把分隔符和正文放在同一个文本节点里的写法：
   // 拆出分隔符，翻剩下的部分再拼回去
