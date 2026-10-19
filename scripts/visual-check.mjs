@@ -142,8 +142,9 @@ class Page {
 
   /** 等应用启动完成：模板数与版式都就位 */
   async ready() {
+    // 用语言无关的 body[data-ready]（界面文案会随语言变，不能再靠中文串判就绪）
     await this.waitFor(
-      "!!document.querySelector('#statTpl')?.textContent?.includes('套模板') && !!document.querySelector('#canvas svg, #stage svg')",
+      "(document.body.dataset.ready === '1' || !!document.querySelector('#statTpl')?.textContent?.includes('套模板')) && !!document.querySelector('#canvas svg, #stage svg')",
       { timeout: 20000, label: '应用启动' },
     );
     await sleep(450); // 让入场动画落定，截图才稳定
@@ -1271,6 +1272,76 @@ const scenarios = [
       await page.ready();
       const viaUrl = await page.evaluate("document.documentElement.dataset.ui || ''");
       check('?ui=ios26 链接可直接预览', viaUrl === 'ios26');
+    },
+  },
+
+  {
+    name: 'i18n',
+    title: '⑭ 语言切换：English / Bahasa Indonesia（术语表也翻）',
+    async run(page, shot, { check }) {
+      await page.viewport(1200, 900);
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1');
+      await page.evaluate("localStorage.removeItem('pf.lang.v1')");
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+
+      const sample = `(() => {
+        const t = (sel) => (document.querySelector(sel)?.textContent || '').replace(/\\s+/g, ' ').trim();
+        return {
+          lang: document.documentElement.lang,
+          btn: t('#btnLang'),
+          title: document.title,
+          match: t('#btnMatch'),
+          tab: t('#tabs button'),
+          name: t('#langName'),
+          count: t('#listCount'),
+          chips: [...document.querySelectorAll('#facetBar .fchip')].slice(0, 3).map((x) => x.textContent.replace(/\\d+/g, '').trim()),
+          cardMeta: t('.tpl .mt'),
+        };
+      })()`;
+
+      const zh = await page.evaluate(sample);
+      check('默认中文 + 语言按钮显示「中文」', zh.lang === 'zh-CN' && zh.btn === '中文', `${zh.lang} / ${zh.btn}`);
+
+      // English
+      await page.evaluate(`document.querySelector('#langSeg button[data-lang="en"]').click()`);
+      await sleep(1100);
+      const en = await page.evaluate(sample);
+      check('English：按钮 / 标题 / 主行动都翻了',
+        en.btn === 'English' && /Match by rules/.test(en.match) && /storyboard/i.test(en.title),
+        `${en.btn} · ${en.match}`);
+      check('English：术语表也翻了（格数 / 戏路）',
+        /panel/i.test(en.cardMeta) && en.chips.some((c) => /panel|Dialogue/i.test(c)),
+        `卡片「${en.cardMeta}」· chip「${en.chips.join('/')}」`);
+      await shot('i18n-en');
+
+      // 印尼语
+      await page.evaluate(`document.querySelector('#langSeg button[data-lang="id"]').click()`);
+      await sleep(1100);
+      const id = await page.evaluate(sample);
+      check('Bahasa Indonesia：按钮 / 主行动翻了',
+        id.btn === 'Bahasa Indonesia' && /Cocokkan/.test(id.match), `${id.btn} · ${id.match}`);
+      check('Bahasa Indonesia：术语表也翻了',
+        /panel/i.test(id.cardMeta) && id.chips.some((c) => /panel|Dialog/i.test(c)),
+        `卡片「${id.cardMeta}」· chip「${id.chips.join('/')}」`);
+      await shot('i18n-id');
+
+      // 记忆 + 链接参数 + 切回中文干净恢复
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+      const persisted = await page.evaluate("localStorage.getItem('pf.lang.v1')");
+      check('语言记住了', persisted === 'id', String(persisted));
+
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1&lang=en');
+      await page.ready();
+      const viaUrl = await page.evaluate("document.documentElement.lang");
+      check('?lang=en 链接可直接分享', viaUrl === 'en', viaUrl);
+
+      await page.evaluate(`document.querySelector('#langSeg button[data-lang="zh"]').click()`);
+      await sleep(1000);
+      const back = await page.evaluate(sample);
+      check('切回中文能干净恢复', back.lang === 'zh-CN' && /按规则匹配/.test(back.match) && back.btn === '中文',
+        `${back.lang} · ${back.match}`);
     },
   },
 ];

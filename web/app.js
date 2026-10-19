@@ -5,6 +5,7 @@
 import { renderTemplateSVG, imageAttrs } from './lib/svg.mjs';
 import { createCellPainter, localPoly } from './paint.mjs';
 import { createKlecksHost } from './paint-host.mjs';
+import { installI18n, setLang as setI18nLang, getLang, stats as i18nStats } from './i18n.mjs';
 import { pointInPoly } from './lib/geometry.mjs';
 import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble, bubbleThumb } from './lib/bubbles.mjs';
 
@@ -122,6 +123,8 @@ const ACCENTS = [
 const ACCENT_KEY = 'pf.accent';
 /** 界面风格：classic（默认）/ ios26（液态玻璃皮肤）；改皮肤只动 data-ui，不动组件 */
 const UI_KEY = 'pf.ui.v1';
+/** 界面语言：zh（源语言）/ en / id */
+const LANG_KEY = 'pf.lang.v1';
 const MOTION_KEY = 'pf.motion';
 const sysDarkMQ = window.matchMedia('(prefers-color-scheme: dark)');
 const sysReduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -261,6 +264,9 @@ async function directFirst(name, body) {
 }
 
 async function init() {
+  // 语言必须最先装：initChrome 里的外观面板会读 getLang()，
+  // 那时若 i18n 还没装，读到的默认值 'zh' 会把已存的语言偏好写回成 null（刷新后记不住）。
+  installI18n(new URLSearchParams(location.search).get('lang') || store.get(LANG_KEY) || 'zh');
   initChrome();
   initPerfHud();
   bindUI();
@@ -360,6 +366,8 @@ async function init() {
   }
   // 放在最后：匹配 / 恢复草稿都会改写底栏，dbg 要压在这些之后才有意义
   if (DBG) showDbgLine();
+  // 语言无关的「启动完成」标记：自动化测试用它判就绪（文案会随语言变）
+  document.body.dataset.ready = '1';
 }
 
 /** 排查多页 / 面板问题用：页数、当前页、页签数、模板、选中格、视图、模块、分镜格数、角色 */
@@ -4159,6 +4167,37 @@ function initTheme() {
     withTransition('ui', () => setUi(b.dataset.ui));
   }));
 
+  // 语言：中文（源语言）/ English / Bahasa Indonesia
+  const LANG_LABEL = { zh: '中文', en: 'English', id: 'Bahasa Indonesia' };
+  const setLang = (lang) => {
+    const id = setI18nLang(lang);      // i18n 内部会立刻把整页重翻一遍
+    $('#langName').textContent = LANG_LABEL[id] || id;
+    const tb = $('#btnLang');
+    if (tb) {
+      tb.textContent = LANG_LABEL[id] || id;   // 按钮上就是当前语言本身（不是地球图标/国旗）
+      tb.setAttribute('aria-expanded', pop.classList.contains('open') ? 'true' : 'false');
+    }
+    $$('#langSeg button').forEach((b) => b.classList.toggle('on', b.dataset.lang === id));
+    store.set(LANG_KEY, id === 'zh' ? null : id);
+  };
+  const rebuildAll = () => {
+    renderList(); renderSlotPanel(); renderScript(); renderBubbles(); renderPageTabs(); renderCands(); renderChars();
+  };
+  $$('#langSeg button').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.lang === getLang()) return;
+    // 用中文原文重建动态块（模板库/右栏/气泡/页签），i18n 的 observer 会把新节点翻掉
+    setI18nLang('zh');
+    rebuildAll();
+    setLang(b.dataset.lang);
+    rebuildAll();
+  }));
+  // 顶栏那个低调的语言按钮：点开外观面板（语言选项就在里面）
+  $('#btnLang')?.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    open(!pop.classList.contains('open'));
+    setLang(getLang());                 // 顺手同步一下 aria-expanded
+  });
+
   // 减弱动态效果
   const chk = $('#chkReduceMotion');
   chk.checked = root.dataset.motion === 'reduced';
@@ -4181,6 +4220,17 @@ function initTheme() {
   setAccent(accent);
   // 皮肤：URL 上的 ?ui= 优先（方便发给别人看），否则用记住的
   setUi(new URLSearchParams(location.search).get('ui') || store.get(UI_KEY) || 'classic');
+  // 语言按钮的初始高亮（语言本身在 init 开头已经装好了）
+  setLang(getLang());
+  // 另一个标签页改了语言：跟着变（storage 事件只在"别的"标签页触发）
+  addEventListener('storage', (ev) => {
+    if (ev.key !== LANG_KEY && ev.key !== null) return;
+    const want = store.get(LANG_KEY) || 'zh';
+    if (want === getLang()) return;
+    rebuildAll();
+    setLang(want);
+    rebuildAll();
+  });
 }
 
 /* ================================================================== *

@@ -41,6 +41,12 @@
   </div>
   <div class="pop-label"><span>强调色</span><b id="accentName">蓝色</b></div>
   <div class="swatches" id="swatches"></div>
+  <div class="pop-label"><span>语言</span><b id="langName">中文</b></div>
+  <div class="seg ui-seg" id="langSeg">
+    <button type="button" data-lang="zh">中文</button>
+    <button type="button" data-lang="en">English</button>
+    <button type="button" data-lang="id">Bahasa Indonesia</button>
+  </div>
   <div class="pop-label"><span>界面风格</span><b id="uiName">经典</b></div>
   <div class="seg ui-seg" id="uiSeg">
     <button type="button" data-ui="classic">经典</button>
@@ -72,6 +78,8 @@
     <a class="btn ghost sm" id="lnkSheet" href="/api/sheet" target="_blank" rel="noreferrer">全部模板接触表</a>
     <a class="btn ghost sm" id="lnkTools" href="/api/ai-tools.json" target="_blank" rel="noreferrer">AI 工具定义</a>
   </nav>
+  <!-- 语言：常驻但低调（显示当前语言本身，点开外观面板里的完整列表） -->
+  <button class="lang-btn" id="btnLang" type="button" title="界面语言" aria-haspopup="dialog" aria-expanded="false">中文</button>
   <button class="icon-btn" id="btnTheme" type="button" title="外观与配色" aria-label="外观与配色" aria-haspopup="dialog" aria-expanded="false"></button>
   <button class="icon-btn" id="btnMore" type="button" title="更多" aria-label="更多" aria-expanded="false">
     <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="10" r="1.6" fill="currentColor"/><circle cx="10" cy="10" r="1.6" fill="currentColor"/><circle cx="15.5" cy="10" r="1.6" fill="currentColor"/></svg>
