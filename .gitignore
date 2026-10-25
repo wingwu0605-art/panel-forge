@@ -28,3 +28,5 @@ desktop.ini
 *.log
 
 out/dom*.html
+out/*.js
+out/*.log
