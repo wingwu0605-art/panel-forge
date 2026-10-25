@@ -1,0 +1,21 @@
+{
+  "appId": "art.wingwu.panelforge",
+  "appName": "PanelForge",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true,
+    "backgroundColor": "#0b0b0f"
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0b0b0f"
+    }
+  }
+}

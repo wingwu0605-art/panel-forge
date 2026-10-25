@@ -1,0 +1,27 @@
+{
+  "name": "panelforge-native",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PanelForge 原生壳（Capacitor · Android 起步）",
+  "type": "module",
+  "scripts": {
+    "sync-site": "node scripts/sync-site.mjs",
+    "add:android": "npx cap add android",
+    "sync": "npm run sync-site && npx cap sync android",
+    "open": "npx cap open android",
+    "build:debug": "npm run sync && cd android && ./gradlew assembleDebug",
+    "run": "npm run sync && npx cap run android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.2",
+    "@capacitor/share": "^6.0.3",
+    "@capacitor/status-bar": "^6.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "typescript": "^7.0.2"
+  }
+}

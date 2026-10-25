@@ -1897,3 +1897,41 @@ html[data-lang="id"] .stage-bar{gap:8px;padding-left:10px}
 .prompt-prefix{margin:0 0 6px}
 .prompt-prefix #prefixPeek{font-size:11px;color:var(--label-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52%}
 #slotPrompt.readonly{color:var(--label-2);background:var(--fill-2);cursor:default}
+
+/* =====================================================================
+ * 原生壳性能档（body[data-shell="android"] 等）
+ *
+ * WebView 里最贵的两样东西：实时模糊（backdrop-filter）和复合弹簧动效。
+ * 壳里换成：
+ *   1) 不用 backdrop-filter，改成实心材质 —— 少一层全屏重绘
+ *   2) 弹簧曲线换成短缓动、动画压到 180ms —— 只动 transform/opacity
+ *   3) 画布 / dock 提层单独合成，滚动拖动不牵连整页
+ * 视觉差异很小，但 WebView 上掉帧会明显变少。
+ * ===================================================================== */
+body[data-shell]{
+  --blur:none;
+  --spring:cubic-bezier(.2,.8,.2,1);
+  --spring-soft:cubic-bezier(.2,.8,.2,1);
+  --material:var(--bg-elev);
+  --material-thick:var(--bg-elev);
+  overscroll-behavior:none;
+}
+body[data-shell] *,
+body[data-shell] *::before,
+body[data-shell] *::after{
+  -webkit-backdrop-filter:none !important;
+  backdrop-filter:none !important;
+  animation-duration:.18s !important;
+  animation-delay:0ms !important;
+}
+/* 热区提层：画布和气泡 dock 单独合成 */
+body[data-shell] .stage,
+body[data-shell] #canvas,
+body[data-shell] .paint-stage,
+body[data-shell] .bubble-dock{
+  will-change:transform;
+  contain:layout paint;
+}
+/* 卡片不需要两层阴影 */
+body[data-shell] .card,
+body[data-shell] .sc-card{box-shadow:var(--shadow-1),inset 0 0 0 .5px var(--card-border)}

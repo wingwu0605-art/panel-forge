@@ -159,6 +159,27 @@ if (ARTIST) {
   document.title = 'PanelForge 画师版 · 分镜与绘制';
 }
 
+/**
+ * 原生壳（Capacitor / WebView）检测。
+ * 壳里和浏览器里的性能预算不一样：WebView 的 backdrop-filter 很贵、弹簧动效更容易掉帧，
+ * 所以壳里走一套更省的性能档（见 styles.css 的 body[data-shell]），并开启分享出口。
+ * 优先级：?shell= 参数 → Capacitor 平台 → UA 标记。
+ */
+const SHELL = (() => {
+  const q = new URLSearchParams(location.search).get('shell');
+  if (q) return q;
+  try {
+    const cap = window.Capacitor;
+    if (cap?.isNativePlatform?.()) return cap.getPlatform?.() || 'native';
+  } catch { /* ignore */ }
+  if (/PanelForgeShell/i.test(navigator.userAgent || '')) return 'android';
+  return '';
+})();
+if (SHELL) {
+  document.body.dataset.shell = SHELL;
+  document.documentElement.lang = document.documentElement.lang || 'zh-CN';
+}
+
 /* ------------------------------------------------------------------ *
  * ?perf=1：性能浮层
  * 只在这个参数下存在；用来量「拖动 / 缩放」热路径到底花了多少时间，
@@ -379,6 +400,8 @@ async function init() {
   }
   // 放在最后：匹配 / 恢复草稿都会改写底栏，dbg 要压在这些之后才有意义
   if (DBG) showDbgLine();
+  // 原生壳：接上「接收分享」的通道（浏览器里是空操作）
+  initShareIn();
   // 语言无关的「启动完成」标记：自动化测试用它判就绪（文案会随语言变）
   document.body.dataset.ready = '1';
 }
@@ -1067,8 +1090,90 @@ async function setPaintPaper(on) {
   toast(on ? '画布改成白底（导出不透明 PNG）' : '画布改成透明（导出带透明通道）');
 }
 
+/**
+ * 把一张图「送出去」：原生壳里走系统分享面板，浏览器里走 Web Share，都没有就下载。
+ * 这是手机上把这一格交给别的绘画 App（绘世界 / Procreate / 概念…）的唯一可靠通道。
+ */
+async function shareOrDownload(blob, name, title = 'PanelForge 分镜') {
+  const file = new File([blob], name, { type: blob.type || 'image/png' });
+  // ① 原生壳：Capacitor Filesystem 写到缓存，再用 Share 打开系统面板
+  try {
+    const cap = window.Capacitor;
+    if (cap?.isNativePlatform?.() && cap.Plugins?.Filesystem && cap.Plugins?.Share) {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result).split(',')[1] || '');
+        r.onerror = () => rej(new Error('读文件失败'));
+        r.readAsDataURL(blob);
+      });
+      await cap.Plugins.Filesystem.writeFile({ path: name, data: b64, directory: 'CACHE', recursive: true });
+      const { uri } = await cap.Plugins.Filesystem.getUri({ path: name, directory: 'CACHE' });
+      await cap.Plugins.Share.share({ title, files: [uri] });
+      toast('已打开系统分享面板');
+      return true;
+    }
+  } catch (e) {
+    if (!/cancel/i.test(String(e?.message || ''))) console.warn('[share] 原生分享不可用', e);
+  }
+  // ② 浏览器：Web Share Level 2（iOS Safari 15+ / Chrome Android）
+  try {
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title });
+      return true;
+    }
+  } catch { /* 用户取消或平台不支持 */ }
+  // ③ 兜底：下载
+  downloadBlob(blob, name);
+  toast('已下载（这个环境不支持直接分享）');
+  return false;
+}
+
+/**
+ * 壳里：取走别的 App 分享进来的图片，填进当前选中的格子（没选中就第一空格）。
+ * 这是「画完在别的 App 里 → 分享回 PanelForge → 自动回到对应格子」的那一半。
+ */
+async function pullSharedImage() {
+  const plugin = window.Capacitor?.Plugins?.ShareTarget;
+  if (!plugin?.getPending) return false;
+  try {
+    const r = await plugin.getPending();
+    if (!r?.data) return false;
+    const bin = atob(r.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: r.mime || 'image/png' });
+    const slots = state.tpl?.slots || [];
+    const target = state.selectedId
+      || slots.find((s) => !state.images[s.id])?.id
+      || slots[0]?.id;
+    if (!target) { toast('收到一张图，但还没有版式：先选一套分镜'); return false; }
+    commit();
+    state.images[target] = await imageAsset(blob, { name: 'shared.png' });
+    state.selectedId = target;
+    const order = slots.find((s) => s.id === target)?.order ?? '?';
+    renderStage(); renderSlotPanel(); renderScript(); 
+    queueSave();
+    toast(`收到分享的图，已填入第 ${order} 格`);
+    return true;
+  } catch (e) {
+    console.warn('[share-in] 读分享图失败', e);
+    return false;
+  }
+}
+
+/** 壳里挂上：启动时取一次，回到前台时再取一次（分享进来时 App 可能已经在后台） */
+function initShareIn() {
+  // 调试/自动化钩子：浏览器里也能手动触发一次「取分享图」
+  window.__pfPullSharedImage = pullSharedImage;
+  if (!SHELL) return;
+  const app = window.Capacitor?.Plugins?.App;
+  if (!app?.addListener) return;
+  setTimeout(() => { pullSharedImage(); }, 1200);
+  app.addListener('appStateChange', ({ isActive }) => { if (isActive) pullSharedImage(); });
+}
+
 /** 绘制页里「导出」：把当前画面按格子形状裁好存成 PNG（两种引擎都支持） */
-async function exportPaintImage() {
+async function exportPaintImage(mode = 'download') {
   const slot = state.tpl?.slots?.find((s) => s.id === paintSlotId);
   try {
     let raw = null;
@@ -1076,7 +1181,9 @@ async function exportPaintImage() {
     else if (painter) raw = await painter.toBlob();
     if (!raw) { toast('还没有可导出的内容'); return; }
     const out = slot ? await clipToSlot(raw, slot) : raw;
-    downloadBlob(out, `${state.tpl?.id || 'page'}-第${slot?.order ?? '?'}格-绘制.png`);
+    const name = `${state.tpl?.id || 'page'}-第${slot?.order ?? '?'}格-绘制.png`;
+    if (mode === 'share') { await shareOrDownload(out, name, `第 ${slot?.order ?? '?'} 格`); return; }
+    downloadBlob(out, name);
     toast('已导出这一格的绘制图');
   } catch (e) {
     console.error('[paint] 导出失败', e);
@@ -1174,6 +1281,8 @@ function bindPaintUI() {
   $('#paintColor')?.addEventListener('input', (ev) => { painter?.setColor(ev.target.value); });
   $('#paintUndo')?.addEventListener('click', () => { if (painter?.undo()) syncPaintMeta(); });
   $('#paintExport')?.addEventListener('click', () => { exportPaintImage(); });
+  // 分享：手机上把这一格直接交给别的绘画 App（原生壳走 Capacitor Share，浏览器走 Web Share）
+  $('#paintShare')?.addEventListener('click', () => { exportPaintImage('share'); });
   // 白底 / 透明：用户自己选，记在本机
   $('#paintPaper')?.addEventListener('click', () => { setPaintPaper(!paintPaperOn()); });
   $('#paintCancel')?.addEventListener('click', closePaint);

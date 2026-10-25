@@ -1590,6 +1590,44 @@ const scenarios = [
   },
 
   {
+    name: 'shell-profile',
+    title: '⑳ 原生壳性能档 + 分享出口（Android WebView 预算）',
+    async run(page, shot, { check }) {
+      await page.viewport(430, 900);
+      await page.goto('/?perf=1&fresh=1&shell=android&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const st = await page.evaluate(`(() => {
+        const cs = (sel, p) => { const el = document.querySelector(sel); return el ? getComputedStyle(el)[p] : ''; };
+        return {
+          shell: document.body.dataset.shell || '',
+          blur: cs('.topbar', 'backdropFilter') || cs('.topbar', 'webkitBackdropFilter') || 'none',
+          anim: cs('.card', 'animationDuration'),
+          willChange: cs('#canvas', 'willChange'),
+          shareBtn: !!document.querySelector('#paintShare'),
+          hook: typeof window.__pfPullSharedImage,
+        };
+      })()`);
+      check('壳标识生效（body[data-shell=android]）', st.shell === 'android', st.shell || '(无)');
+      check('壳里关掉实时模糊（WebView 上最贵的一层）', st.blur === 'none', st.blur || 'none');
+      check('壳里动画压到 180ms', /^0\.18s$/.test(st.anim), st.anim);
+      check('画布热区提层（will-change: transform）', /transform/.test(st.willChange), st.willChange || 'auto');
+      check('绘制页顶栏有「分享」（交给别的 App）', st.shareBtn === true);
+      check('接收分享的钩子已装上', st.hook === 'function', st.hook);
+
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+      const web = await page.evaluate(`(() => ({
+        shell: document.body.dataset.shell || '',
+        blur: (getComputedStyle(document.querySelector('.topbar')).backdropFilter || 'none'),
+      }))()`);
+      check('浏览器模式不受影响（仍用毛玻璃）',
+        web.shell === '' && /blur\(22px\)/.test(web.blur), web.blur);
+      await shot('shell-profile');
+    },
+  },
+
+  {
     name: 'prompt-source',
     title: '⑱ 提示词三源共存（规则 / AI / 自己写）+ 开头词保留 + 手机分镜表不重叠',
     async run(page, shot, { check }) {
