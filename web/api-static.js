@@ -115,7 +115,7 @@ export function createStaticApi() {
         const a = analyzePlot(plot, {});
         const intent = body.intent || (!plot.trim() ? (t.intents[0] || 'daily') : undefined);
         return {
-          pages: [{ pageIndex: 1, segment: plot, analysis: a, templateScore: null, plan: buildPlan(t, a, { pageWidth, intent }) }],
+          pages: [{ pageIndex: 1, segment: plot, analysis: a, templateScore: null, plan: buildPlan(t, a, { pageWidth, intent, plot }) }],
           analysis: a,
           segmentCount: 1,
         };
@@ -182,7 +182,7 @@ export function createStaticApi() {
       }
 
       const tpl = getTemplate(decision.pick);
-      const plan = buildPlan(tpl, m.analysis, { pageWidth, llmPanels: decision.panels });
+      const plan = buildPlan(tpl, m.analysis, { pageWidth, llmPanels: decision.panels, plot });
 
       return {
         ok: true,
@@ -211,7 +211,7 @@ export function createStaticApi() {
       const plot = String(body.plot || '');
       const pageWidth = clamp(body.pageWidth, 400, 4000, 1600);
       const a = analyzePlot(plot, {});
-      const plan = buildPlan(tpl, a, { pageWidth, llmPanels: body.llmPanels || null });
+      const plan = buildPlan(tpl, a, { pageWidth, llmPanels: body.llmPanels || null, plot });
       const cfg = cfgFrom(body.llm);
 
       try {
@@ -255,7 +255,7 @@ export function createStaticApi() {
 
       const pageWidth = clamp(body.pageWidth, 400, 4000, 1600);
       const a = analyzePlot(plot, {});
-      const plan = buildPlan(tpl, a, { pageWidth });
+      const plan = buildPlan(tpl, a, { pageWidth, plot });
       const cfg = cfgFrom(body.llm);
 
       try {

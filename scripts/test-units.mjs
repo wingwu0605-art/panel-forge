@@ -4,6 +4,9 @@
  */
 import { fitImageSize } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
+import { splitClauses, assignSegments, buildPlan } from '../lib/matcher.mjs';
+import { TEMPLATES } from '../lib/library.mjs';
+import { analyzePlot } from '../lib/matcher.mjs';
 
 let pass = 0, fail = 0;
 const eq = (label, got, want) => {
@@ -77,6 +80,37 @@ ok('空内容也有推荐（按景别）', !!pickBubbleForText('', { role: 'reac
 ok('挑出来的类型都是真的存在', ['砰！', '你！', '小声……', '心想', '三年前', '电话', '旁白', '好', '长句子'.repeat(3)]
   .every((t) => BUBBLE_IDS.includes(pickBubbleForText(t).type)));
 
+
+console.log('\n原文切分：规则模式也要把文章内容落到每格');
+const plot = '雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋，两人在积水里僵持。';
+const parts = splitClauses(plot);
+ok('按句号/分号切开', parts.length === 2, parts.length + ' 句');
+const seg = assignSegments(parts, 6);
+ok('句子不够时按逗号切细，尽量填满', seg.filter(Boolean).length >= 5, seg.filter(Boolean).length + '/6 格有内容');
+ok('切分保持原顺序、不丢句子', seg.join('').includes('雨夜的屋顶上')
+  && seg.join('').includes('两人在积水里僵持'), seg.join(' / '));
+ok('不编造内容：拼回去等于原文（去掉标点）', (() => {
+  const strip = (x) => x.replace(/[，。；、,\s]/g, '');
+  return strip(seg.join('')) === strip(plot);
+})(), seg.join(''));
+
+const longer = '第一幕：雨夜屋顶，他拔刀。第二幕：敌人偷袭。第三幕：反手斩断刀锋。第四幕：积水僵持。第五幕：收刀。第六幕：转身离开。第七幕：天亮。';
+const seg7 = assignSegments(splitClauses(longer), 3);
+ok('句子比格子多时按字数合并，且一格不漏', seg7.length === 3 && seg7.every(Boolean), seg7.map((x) => x.length).join('/'));
+
+const tpl = TEMPLATES.find((t) => t.id === 'jp-shonen-3tier') || TEMPLATES[0];
+const a = analyzePlot(plot, {});
+const plan = buildPlan(tpl, a, { pageWidth: 1600, plot });
+const withContent = plan.panels.filter((x) => x.content);
+ok('buildPlan 把原文写进每格 content', withContent.length >= 2,
+  plan.panels.map((x) => (x.content ? '有' : '空')).join(''));
+ok('提示词里出现原文（中文版）', plan.panels[0].promptZh.includes('雨夜的屋顶上'), plan.panels[0].promptZh.slice(0, 60));
+ok('提示词里出现原文（英文版 subject）', plan.panels[0].promptEn.includes('subject:'), plan.panels[0].promptEn.slice(-90));
+ok('可复制的提示词里不再有 {{占位符}}', !/\{\{/.test(JSON.stringify(plan.panels)), '');
+ok('没分到内容的格子用节拍提示兜底（不留空）',
+  plan.panels.filter((x) => !x.content).every((x) => x.promptZh.includes('画面：')), '');
+
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
+
 
 process.exit(fail ? 1 : 0);

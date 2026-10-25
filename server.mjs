@@ -204,7 +204,7 @@ const routes = [
     const plot = String(body.plot || '');
     const pageWidth = clampNum(body.pageWidth, 400, 4000, 1600);
     const a = analyzePlot(plot, {});
-    const plan = buildPlan(tpl, a, { pageWidth, llmPanels: body.llmPanels || null });
+    const plan = buildPlan(tpl, a, { pageWidth, llmPanels: body.llmPanels || null, plot });
     const cfg = readLlmConfig(body.llm || {});
 
     try {
@@ -256,7 +256,7 @@ const routes = [
     const pageWidth = clampNum(body.pageWidth, 400, 4000, 1600);
     const a = analyzePlot(plot, {});
     // 先用规则引擎搭骨架（形状前缀/画幅/负面词都按模板算好），再用 AI 的内容覆盖
-    const plan = buildPlan(tpl, a, { pageWidth });
+    const plan = buildPlan(tpl, a, { pageWidth, plot });
     const cfg = readLlmConfig(body.llm || {});
 
     try {
@@ -411,7 +411,7 @@ const routes = [
 
     // ③ 用选中模板 + AI 排戏结果生成分镜表
     const tpl = getTemplate(decision.pick);
-    const plan = buildPlan(tpl, m.analysis, { pageWidth, llmPanels: decision.panels });
+    const plan = buildPlan(tpl, m.analysis, { pageWidth, llmPanels: decision.panels, plot });
 
     return {
       ok: true,
@@ -488,7 +488,7 @@ const routes = [
       // 没给剧情就用模板自身的第一个戏路当节拍骨架
       const intent = body.intent || (!plot.trim() ? (tpl.intents[0] || 'daily') : undefined);
       return {
-        pages: [{ pageIndex: 1, segment: plot, analysis: a, templateScore: null, plan: buildPlan(tpl, a, { pageWidth, intent }) }],
+        pages: [{ pageIndex: 1, segment: plot, analysis: a, templateScore: null, plan: buildPlan(tpl, a, { pageWidth, intent, plot }) }],
         analysis: a,
         segmentCount: 1,
       };
