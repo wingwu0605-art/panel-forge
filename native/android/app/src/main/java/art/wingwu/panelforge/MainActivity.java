@@ -20,6 +20,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ShareTargetPlugin.class);
+        registerPlugin(SaveImagePlugin.class);
         super.onCreate(savedInstanceState);
         handleShareIntent(getIntent());
     }

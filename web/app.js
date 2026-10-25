@@ -1063,7 +1063,7 @@ async function exportSlotImage(slotId = state.selectedId) {
   try {
     const blob = im.blob instanceof Blob ? im.blob : await (await fetch(im.href)).blob();
     const ext = /png/.test(blob.type) ? 'png' : 'jpg';
-    downloadBlob(blob, `${state.tpl?.id || 'page'}-第${slot?.order ?? '?'}格.${ext}`);
+    await exportBlob(blob, `${state.tpl?.id || 'page'}-第${slot?.order ?? '?'}格.${ext}`);
     toast('已导出这一格的图');
   } catch (e) {
     toast('导出失败：' + e.message);
@@ -1096,37 +1096,56 @@ async function setPaintPaper(on) {
  */
 async function shareOrDownload(blob, name, title = 'PanelForge 分镜') {
   const file = new File([blob], name, { type: blob.type || 'image/png' });
+  const cap = window.Capacitor;
+  const native = !!cap?.isNativePlatform?.();
   // ① 原生壳：Capacitor Filesystem 写到缓存，再用 Share 打开系统面板
-  try {
-    const cap = window.Capacitor;
-    if (cap?.isNativePlatform?.() && cap.Plugins?.Filesystem && cap.Plugins?.Share) {
-      const b64 = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(String(r.result).split(',')[1] || '');
-        r.onerror = () => rej(new Error('读文件失败'));
-        r.readAsDataURL(blob);
-      });
-      await cap.Plugins.Filesystem.writeFile({ path: name, data: b64, directory: 'CACHE', recursive: true });
-      const { uri } = await cap.Plugins.Filesystem.getUri({ path: name, directory: 'CACHE' });
+  if (native && cap.Plugins?.Filesystem && cap.Plugins?.Share) {
+    try {
+      const b64 = await blobToBase64(blob);
+      // 文件名带中文时 Filesystem 在部分机型上会失败，统一转成 ASCII 安全名
+      const safe = `pf-${Date.now()}.png`;
+      await cap.Plugins.Filesystem.writeFile({ path: safe, data: b64, directory: 'CACHE', recursive: true });
+      const { uri } = await cap.Plugins.Filesystem.getUri({ path: safe, directory: 'CACHE' });
       await cap.Plugins.Share.share({ title, files: [uri] });
       toast('已打开系统分享面板');
       return true;
+    } catch (e) {
+      const msg = String(e?.message || e);
+      console.warn('[share] 原生分享失败', e);
+      // 用户主动取消不算错误，不弹提示
+      if (!/cancel/i.test(msg)) toast(`分享没成功（${msg.slice(0, 40)}），已改存相册`);
     }
-  } catch (e) {
-    if (!/cancel/i.test(String(e?.message || ''))) console.warn('[share] 原生分享不可用', e);
   }
   // ② 浏览器：Web Share Level 2（iOS Safari 15+ / Chrome Android）
-  try {
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title });
-      return true;
-    }
-  } catch { /* 用户取消或平台不支持 */ }
-  // ③ 兜底：下载
+  if (!native) {
+    try {
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title });
+        return true;
+      }
+    } catch { /* 用户取消或平台不支持 */ }
+  }
+  // ③ 兜底：壳里存相册（WebView 不支持下载），浏览器里下载
+  if (await saveToGallery(blob, name)) return false;
   downloadBlob(blob, name);
-  toast('已下载（这个环境不支持直接分享）');
+  toast(native ? '当前环境既不支持分享也不支持下载：请用「导出」' : '已下载');
   return false;
 }
+
+/** 壳里排查分享/导出问题用：把这些能力的存在情况打出来 */
+window.__pfShareDebug = () => {
+  const cap = window.Capacitor;
+  return {
+    shell: SHELL || null,
+    isNative: !!cap?.isNativePlatform?.(),
+    plugins: cap?.Plugins ? Object.keys(cap.Plugins) : [],
+    hasSaveImage: !!cap?.Plugins?.SaveImage?.save,
+    hasShare: !!cap?.Plugins?.Share?.share,
+    hasFilesystem: !!cap?.Plugins?.Filesystem?.writeFile,
+    hasShareTarget: !!cap?.Plugins?.ShareTarget?.getPending,
+    webShare: typeof navigator.canShare === 'function',
+  };
+};
 
 /**
  * 壳里：取走别的 App 分享进来的图片，填进当前选中的格子（没选中就第一空格）。
@@ -1183,7 +1202,7 @@ async function exportPaintImage(mode = 'download') {
     const out = slot ? await clipToSlot(raw, slot) : raw;
     const name = `${state.tpl?.id || 'page'}-第${slot?.order ?? '?'}格-绘制.png`;
     if (mode === 'share') { await shareOrDownload(out, name, `第 ${slot?.order ?? '?'} 格`); return; }
-    downloadBlob(out, name);
+    await exportBlob(out, name);
     toast('已导出这一格的绘制图');
   } catch (e) {
     console.error('[paint] 导出失败', e);
@@ -3924,7 +3943,7 @@ async function exportAllPages() {
       URL.revokeObjectURL(url);
       const png = await new Promise((res) => canvas.toBlob(res, 'image/png'));
       const safe = String(pageLabel(state.pages[i], i)).replace(/[\\/:*?"<>|]/g, '_');
-      downloadBlob(png, `${String(i + 1).padStart(2, '0')}-${safe}.png`);
+      await exportBlob(png, `${String(i + 1).padStart(2, '0')}-${safe}.png`);
       n++;
       await new Promise((r) => setTimeout(r, 260));
     }
@@ -4189,8 +4208,8 @@ async function exportPNG() {
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
     URL.revokeObjectURL(url);
-    canvas.toBlob((b) => {
-      downloadBlob(b, `${state.tpl.id}-${w}px.png`);
+    canvas.toBlob(async (b) => {
+      await exportBlob(b, `${state.tpl.id}-${w}px.png`);
       toast(`已导出 PNG ${w}×${h}`);
     }, 'image/png');
   } catch (e) {
@@ -4553,6 +4572,45 @@ function downloadBlob(blob, name) {
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/** blob → base64（不带 dataURL 前缀），给原生插件用 */
+function blobToBase64(blob) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const s = String(r.result || '');
+      const i = s.indexOf(',');
+      res(i >= 0 ? s.slice(i + 1) : s);
+    };
+    r.onerror = () => rej(new Error('读图片失败'));
+    r.readAsDataURL(blob);
+  });
+}
+
+/**
+ * 有原生「存相册」插件就走它（Android WebView 不支持 <a download>，网页那套会静默失败）。
+ * 返回 true = 已存进相册；false = 交给调用方退回下载。
+ */
+async function saveToGallery(blob, name) {
+  const plugin = window.Capacitor?.Plugins?.SaveImage;
+  if (!plugin?.save) return false;
+  try {
+    const data = await blobToBase64(blob);
+    const r = await plugin.save({ data, name, mime: blob.type || 'image/png' });
+    toast(`已存到相册：${r?.path || 'Pictures/PanelForge'}`);
+    return true;
+  } catch (e) {
+    console.warn('[save] 相册保存失败', e);
+    toast('存相册失败：' + (e?.message || e));
+    return false;
+  }
+}
+
+/** 导出（能存相册就存相册，否则下载） */
+async function exportBlob(blob, name) {
+  if (await saveToGallery(blob, name)) return;
+  downloadBlob(blob, name);
 }
 
 function downloadText(text, name, mime = 'text/plain;charset=utf-8') {
