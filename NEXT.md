@@ -21,6 +21,20 @@
 - ⚠️ 历史包袱：本仓库早期是 MIT 且在 GitHub 公开过 —— **已经按 MIT 拿到的副本收不回来**，
   新许可只对之后的版本生效。要「干净」，得从新仓库 / 新版本号开始。
 
+## 〇之二、仓库已转私有（2026-10）
+
+- 可见性：**private**；开源许可（MIT → 非商业 → 专有）的演进史在 git 历史里。
+- **线上 GitHub Pages 已随私有化停用**（Free 账号的 Pages 只支持公开仓库）。
+  原地址 `https://wingwu0605-art.github.io/panel-forge/` 不再可用。
+- `.github/workflows/pages.yml` 已删除（Pages 不可用，留着每次 push 都会失败）；
+  需要恢复时从历史里取回：`git show <旧提交>:.github/workflows/pages.yml > .github/workflows/pages.yml`
+- 想重新上线，三条路（详见当轮对话）：
+  1. 升级 GitHub Pro（约 $4/月）→ 私有仓库也能发 Pages，URL 不变
+  2. 换免费托管（Cloudflare Pages / Vercel / Netlify）→ 连私有仓库，构建命令
+     `node scripts/build-static.mjs`，输出目录 `site`；URL 会变
+  3. Actions 构建后把 `site/` 推到另一个**公开**仓库发布（源码私有、产物公开）
+- 提醒：闭源只藏源码，藏不住产物 —— 前端代码一定会发到浏览器。
+
 ## 一、跑起来（Windows，node 不在 PATH）
 
 ```powershell

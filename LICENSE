@@ -1,89 +1,69 @@
-PanelForge 分镜坊 · 非商业许可 v1.0
-PanelForge — Source-Available, Non-Commercial License v1.0
+PanelForge 分镜坊 · 专有许可（All Rights Reserved）
 
-Copyright (c) 2026 PanelForge 作者（下称「作者」）。保留所有未明示授予的权利。
-
-────────────────────────────────────────────────────────────────
-一、定义
-
-1. 「本软件」指本仓库中的全部源代码、构建产物、138 套分镜模板数据、图形与文档。
-2. 「产出物」指你使用本软件生成或导出的内容，包括但不限于：分镜页图片（PNG / SVG）、
-   分镜表（Markdown / JSON）、你自己绘制的图画，以及据此创作的作品。
+Copyright (c) 2026 PanelForge 作者。保留所有权利。
+Copyright (c) 2026 the PanelForge author. All rights reserved.
 
 ────────────────────────────────────────────────────────────────
-二、授予：可以免费、非商业地使用本软件
+一、这不是开源许可
 
-在不违反第四条的条件下，任何人可以免费使用、复制、修改、合并、发布、分发本软件，
-用于任意非商业目的。
+本仓库自 2026 年 10 月起转为**闭源专有项目**。未经作者事先书面授权，
+任何人不得使用、复制、修改、翻译、汇编、发行、出租、出售、再许可，
+或以任何形式利用本软件及其源代码的全部或实质性部分。
 
-────────────────────────────────────────────────────────────────
-三、产出物：完全归你，可以商用
-
-用本软件生成的「产出物」归你所有。你可以把它用于任何目的，**包括商业目的**
-——出版、连载、接稿、出售、印刷、周边、课程、商用稿件等，都无需向作者付费。
-署名不是必须的（愿意标注「用 PanelForge 分镜坊制作」我们很高兴，但不强制）。
-
-本许可不对「产出物」主张任何权利。
+本许可不授予任何明示或默示的权利。作者保留全部未明确授予的权利。
 
 ────────────────────────────────────────────────────────────────
-四、禁止：把「本软件本身」商业化
+二、你仍然可以用它的产出物做商业项目（这一点不变）
 
-不得将本软件或其**实质部分**用于商业目的，包括但不限于：
+用本软件**生成或导出**的内容——分镜页图片（PNG / SVG）、分镜表（Markdown / JSON）、
+你自己绘制的图画、以及据此创作的作品——**归你所有**，可以用于任何目的，
+**包括商业目的**（出版、连载、接稿、出售、印刷、周边、商用稿件等），
+无需向作者付费，也无需署名。
 
-  a) 出售、出租本软件或其实质部分；
-  b) 以付费订阅、付费下载、SaaS / 托管服务的形式提供本软件；
-  c) 将本软件捆绑进付费产品或付费服务（含硬件、课程、会员、素材包）提供；
-  d) 把本软件的模板库 / 素材单独或打包作为付费商品分发；
-  e) fork 本软件后收费分发。
-
-⚠️ 注意区分：**「用本软件的产出物去做商业活动」不属于本条禁止范围**（见第三条）。
-本条禁止的是对「软件本身」的商业开发、分发与托管。
+这条只适用于**已经合法获得使用资格**的人（作者授权的用户或作者本人）；
+它不构成对你使用本软件本身的授权。
 
 ────────────────────────────────────────────────────────────────
-五、第三方组件不适用本许可
+三、授权方式
+
+需要商业使用、团队使用、二次开发或私有部署，请联系作者取得书面授权。
+授权范围、期限、费用由双方另行约定。
+
+────────────────────────────────────────────────────────────────
+四、第三方组件不适用本许可（它们的开源许可必须保留）
 
 本软件内含的第三方组件各自适用其原许可，本许可不改变它们，也不能被解释为限制它们：
 
   · Klecks（web/klecks/）—— MIT，Copyright (c) bitbof
   · perfect-freehand（web/vendor/perfect-freehand.mjs）—— MIT，Copyright (c) Steve Ruiz
 
-因此：任何人仍可依这些组件的原许可（MIT）**单独提取并使用它们**，包括用于商业用途。
-本许可的限制只作用于作者原创的这部分代码与模板数据。
+详见 THIRD-PARTY-NOTICES.md。**这两部分是 MIT，任何人仍可按 MIT 单独使用它们**
+——这是 MIT 的性质，闭源改变不了。本许可的专有条款只作用于作者原创的部分：
+模板数据、渲染与排版内核、AI 编排流程、界面与交互实现。
 
 ────────────────────────────────────────────────────────────────
-六、无担保与责任限制
+五、无担保与责任限制
 
-本软件按「现状」提供，不附带任何明示或默示的担保，包括但不限于适销性、
-特定用途适用性与不侵权的担保。在任何情况下，作者均不对因使用或无法使用本软件
-而产生的任何索赔、损害或其他责任负责。
-
-────────────────────────────────────────────────────────────────
-七、终止
-
-违反第四条即自动终止本许可授予。
-你停止违规使用并以书面方式联系作者后，作者可自行决定是否恢复授权。
-授权终止后，你**仍可依第三条**继续使用此前已生成的产出物。
+本软件按「现状」提供，不附带任何明示或默示的担保。在任何情况下，
+作者均不对因使用或无法使用本软件而产生的任何索赔、损害或其他责任负责。
 
 ────────────────────────────────────────────────────────────────
-八、其他
+六、终止
 
-1. 本许可适用于本软件的当前版本及后续版本。作者保留在未来版本中变更许可的权利。
-2. 依某一版本许可已经获得的授权，对该版本持续有效。
-3. 本许可不授予商标权。不得使用作者的名义、名称或标识进行背书或宣传。
+任何违反本许可的使用即刻自动终止，且不因此免除违反者的赔偿责任。
 
 ────────────────────────────────────────────────────────────────
-English summary（仅为方便阅读，以上中文正文为准 / the Chinese text governs）
+English summary（仅为方便阅读，中文正文为准 / the Chinese text governs）
 
-You may use, copy, modify and distribute this software for any NON-COMMERCIAL purpose.
-You may NOT sell, sublicense, host as a paid service, bundle into a paid product, or
-otherwise commercially exploit the software itself or any substantial part of it.
+This is proprietary, closed-source software. All rights are reserved. No permission is
+granted to use, copy, modify, distribute, sublicense or commercially exploit the software
+or any substantial part of it without the author's prior written permission.
 
-Outputs you create with the software — exported storyboard pages, images, scripts, and
-artwork — are entirely yours and MAY be used commercially without payment or attribution.
-This license claims no rights over such outputs.
+Outputs you create with an authorized copy of the software — exported storyboard pages,
+images, scripts and artwork — are entirely yours and may be used commercially, free of
+charge and without attribution.
 
 Bundled third-party components (Klecks, perfect-freehand) remain under their own MIT
-licenses and are not restricted by this license.
+licenses and are not affected by this license.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL THE
-AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE.
+No warranty of any kind is provided.
