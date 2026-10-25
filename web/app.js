@@ -1274,6 +1274,75 @@ function initShareIn() {
   app.addListener('appStateChange', ({ isActive }) => { if (isActive) pullSharedImage(); });
 }
 
+/**
+ * 把这一格做成「给别的 App 画」的画布：包围盒尺寸 + 白底（或已有底图）+ 形状参考。
+ * 形状参考 = 多边形外面压 12% 灰 + 边界虚线。回填时按同一个多边形裁切，外面的灰会被裁掉，
+ * 所以它既能告诉你边界在哪，又不会污染成图。
+ */
+async function cellSheetBlob(slot, workSide = 2048) {
+  const scale = workSide / Math.max(slot.w, slot.h);
+  const w = Math.max(1, Math.round(slot.w * scale));
+  const h = Math.max(1, Math.round(slot.h * scale));
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+
+  const im = state.images[slot.id];
+  if (im?.href) {
+    try {
+      const img = await loadImgEl(im.href);
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      if (iw && ih) {
+        const k = Math.max(w / iw, h / ih);         // cover，和画布里的语义一致
+        const dw = iw * k, dh = ih * k;
+        ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+      }
+    } catch { /* 底图读不出来就画白纸 */ }
+  }
+
+  const pts = (slot.poly || []).map(([x, y]) => [(x - slot.x) * scale, (y - slot.y) * scale]);
+  if (pts.length >= 3) {
+    const veil = new Path2D();
+    veil.rect(0, 0, w, h);
+    pts.forEach(([x, y], i) => (i ? veil.lineTo(x, y) : veil.moveTo(x, y)));
+    veil.closePath();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fill(veil, 'evenodd');
+
+    const edge = new Path2D();
+    pts.forEach(([x, y], i) => (i ? edge.lineTo(x, y) : edge.moveTo(x, y)));
+    edge.closePath();
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    ctx.lineWidth = Math.max(2, w / 500);
+    ctx.setLineDash([w / 90, w / 150]);
+    ctx.stroke(edge);
+    ctx.setLineDash([]);
+  }
+  return await new Promise((res) => cv.toBlob(res, 'image/png'));
+}
+
+/** 「用其他 App 画」：不经过我们的画布，直接把这一格交给别的绘画 App */
+async function openExternalPaint() {
+  const slot = state.tpl?.slots?.find((s) => s.id === state.selectedId);
+  if (!slot) { toast('先选一个格子'); return; }
+  try {
+    const blob = await cellSheetBlob(slot);
+    const name = `${state.tpl?.id || 'page'}-第${slot.order}格-底图.png`;
+    const targets = await nativeShareTargets(true);
+    if (targets?.length) { openSharePicker(targets, blob, name); return; }
+    // 壳里没有直跳能力，或者根本在浏览器里：存相册/下载，让人自己去 App 里导入
+    await exportBlob(blob, name);
+    toast('已导出底图（含形状参考）：用别的 App 打开它，画完分享回 PanelForge 即可');
+  } catch (e) {
+    console.error('[external] 失败', e);
+    toast('导出底图失败：' + e.message);
+  }
+}
+
 /** 绘制页里「导出」：把当前画面按格子形状裁好存成 PNG（两种引擎都支持） */
 async function exportPaintImage(mode = 'download') {
   const slot = state.tpl?.slots?.find((s) => s.id === paintSlotId);
@@ -1387,6 +1456,8 @@ function bindPaintUI() {
   $('#paintShare')?.addEventListener('click', () => { exportPaintImage('share'); });
   // 白底 / 透明：用户自己选，记在本机
   $('#paintPaper')?.addEventListener('click', () => { setPaintPaper(!paintPaperOn()); });
+  // 用其他 App 画：不进我们的画布，直接从格子这一栏把底图交给外部绘画 App
+  $('#btnExternalPaint')?.addEventListener('click', () => { openExternalPaint(); });
   $('#paintCancel')?.addEventListener('click', closePaint);
   $('#paintDone')?.addEventListener('click', () => { finishPaint(); });
   $('#paintSheet')?.addEventListener('pointerdown', (ev) => { if (ev.target.id === 'paintStage') closePaint(); });

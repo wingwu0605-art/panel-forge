@@ -357,6 +357,8 @@
             <div class="slot-thumb" id="slotThumb"><span class="muted small">空格子</span></div>
             <button class="btn primary wide" id="btnPickImage">选图片填入此格</button>
             <button class="btn wide" id="btnPaint" title="按这一格的形状铺开画布，直接画（笔画出不了格子）">绘制这一格</button>
+            <!-- 不进我们的画布，直接交给手机上的其它绘画 App；画完分享回来会按格子形状裁好 -->
+            <button class="btn wide" id="btnExternalPaint" title="把这一格的底图（带形状参考）交给手机上别的绘画 App，画完分享回来自动填进这一格">用其他 App 画</button>
             <p class="muted small" style="margin:6px 0 0">「绘制」会把上面这张图当底稿放进画布 —— 可以在上面描线、擦、覆盖；画完自动裁成格子形状贴回来。AI 生成的图、你自己拖进来的照片都是同一套流程。</p>
             <div class="row2">
               <button class="btn tiny" id="btnUrl">用图片链接</button>
