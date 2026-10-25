@@ -183,6 +183,11 @@ const EN = {
 
   // ---- 气泡 dock ----
   '气泡': 'Bubbles',
+  '样式': 'Style',
+  '点下面的气泡就能换样式': 'Click a bubble below to restyle it',
+  '配这段字': 'fits this line',
+  '已经是这个样式了': 'Already this style',
+  '样式换成': 'Style changed to',
   '推荐': 'Suggested',
   '常用': 'Frequent',
   '清空': 'Clear',
@@ -419,6 +424,11 @@ const ID = {
   '导出空模板（镂空 SVG）': 'Ekspor template kosong (SVG)',
 
   '气泡': 'Balon',
+  '样式': 'Gaya',
+  '点下面的气泡就能换样式': 'Klik balon di bawah untuk mengganti gaya',
+  '配这段字': 'cocok untuk teks ini',
+  '已经是这个样式了': 'Sudah gaya ini',
+  '样式换成': 'Gaya diganti ke',
   '推荐': 'Saran',
   '常用': 'Sering',
   '清空': 'Kosongkan',

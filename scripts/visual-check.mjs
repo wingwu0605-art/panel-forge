@@ -1484,6 +1484,54 @@ const scenarios = [
       check('画师版：分镜表仍可查看', artist.bodyHidden === false && artist.rows > 0, `${artist.rows} 行`);
     },
   },
+
+  {
+    name: 'paint-mobile',
+    title: '⑰ 手机上的绘制页：画布占满屏宽 + 工具列可达',
+    async run(page, shot, { check }) {
+      await page.viewport(430, 900);
+      await page.goto('/?perf=1&fresh=1&tpl=ref-4band-2col&slot=p1');
+      await page.ready();
+      await page.evaluate("document.querySelector('#btnPaintTop').click()");
+      await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '绘制页打开', timeout: 30000 });
+      await sleep(3200);
+
+      const info = await page.evaluate(`(() => {
+        const f = document.querySelector('.paint-frame');
+        const d = f.contentDocument, w = f.contentWindow;
+        const app = w.__pfKlecks?.embed?.klApp;
+        const c = d.querySelector('canvas');
+        const r = app?.mobileUi?.controlsEl?.getBoundingClientRect();
+        return {
+          viewport: d.documentElement.clientWidth,
+          canvasW: c?.clientWidth || 0,
+          canvasH: c?.clientHeight || 0,
+          mobileVisible: !!app?.mobileUi?.isVisible,
+          drawerOpen: !!app?.mobileUi?.toolspaceIsOpen,
+          columnW: r ? Math.round(r.width) : 0,
+          fit: Number(app?.easel?.targetTransform?.scale || 0),
+        };
+      })()`);
+      check('画布占满手机屏宽（不再只剩 159px）', info.canvasW >= info.viewport - 4,
+        `${info.canvasW}/${info.viewport} px`);
+      check('缩放比例够用（> 0.2，之前只有 0.10）', info.fit > 0.2, info.fit.toFixed(3));
+      check('Klecks 手机界面可见 + 工具栏抽屉默认收起',
+        info.mobileVisible && info.drawerOpen === false, `工具列 ${info.columnW}px`);
+      await shot('paint-mobile');
+
+      // 手机工具列里要有可点的工具（笔刷入口在列里，完整工具栏由 Klecks 自己的折叠钮拉出）
+      const tools = await page.evaluate(`(() => {
+        const d = document.querySelector('.paint-frame').contentDocument;
+        const col = document.querySelector('.paint-frame').contentWindow.__pfKlecks.embed.klApp.mobileUi.controlsEl;
+        const btns = col ? [...col.querySelectorAll('button,[role=button],svg')].length : 0;
+        const hit = col ? col.getBoundingClientRect() : null;
+        return { btns, w: hit ? Math.round(hit.width) : 0, h: hit ? Math.round(hit.height) : 0 };
+      })()`);
+      check('手机工具列里有可点的工具（不是空白列）', tools.btns >= 4 && tools.w > 20,
+        `${tools.btns} 个控件 · ${tools.w}×${tools.h}px`);
+      await page.evaluate('window.__pfPaint.close()');
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */

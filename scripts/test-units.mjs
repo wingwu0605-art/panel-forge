@@ -3,6 +3,7 @@
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
 import { fitImageSize } from '../lib/llm-core.mjs';
+import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
 
 let pass = 0, fail = 0;
 const eq = (label, got, want) => {
@@ -55,5 +56,27 @@ ok('空尺寸回默认', typeof fitImageSize('openai', '', GI) === 'string');
 ok('坏尺寸回默认', fitImageSize('openai', 'abc', GI) === '1024x1024');
 ok('× 与 * 也认', fitImageSize('openai', '1792×1024', GI) === '1536x1024');
 
+
+console.log('\n气泡库：种类够多，且能按内容挑');
+ok('气泡种类 ≥ 30', BUBBLE_IDS.length >= 30, BUBBLE_IDS.length + ' 种');
+ok('每种都有中文名与提示', BUBBLE_IDS.every((id) => BUBBLES[id].zh && BUBBLES[id].hintZh));
+ok('每种都能渲染出非空 SVG', BUBBLE_IDS.every((id) => {
+  const svg = bubbleSVG({ type: id, x: 10, y: 10, w: 200, h: 120, text: '测试' }, {});
+  return svg.length > 40 && svg.includes('<path') || svg.includes('<rect') || svg.includes('<ellipse');
+}));
+eq('拟声词 → 拟声牌', pickBubbleForText('砰！').type, 'note-sign');
+eq('感叹号/喊叫 → 喊叫泡', pickBubbleForText('你竟敢拦我！').type, 'burst-spike');
+eq('低语 → 波纹泡', pickBubbleForText('小声说：别出声……').type, 'whisper-wavy');
+eq('心里想 → 思考泡', pickBubbleForText('心想：也许还有机会').type, 'thought-dashed');
+eq('回忆 → 回忆框', pickBubbleForText('三年前的那个夏天').type, 'note-flashback');
+eq('电话 → 屏幕泡', pickBubbleForText('电话那头：喂？').type, 'note-phone');
+eq('旁白 → 旁白框', pickBubbleForText('旁白：第二天清晨').type, 'narration-box');
+eq('短句 → 胶囊泡', pickBubbleForText('好').type, 'talk-capsule');
+eq('长句 → 椭圆泡', pickBubbleForText('那就这样子吧，我们明天在门口见，别迟到了').type, 'talk-ellipse');
+ok('空内容也有推荐（按景别）', !!pickBubbleForText('', { role: 'reaction' }).type);
+ok('挑出来的类型都是真的存在', ['砰！', '你！', '小声……', '心想', '三年前', '电话', '旁白', '好', '长句子'.repeat(3)]
+  .every((t) => BUBBLE_IDS.includes(pickBubbleForText(t).type)));
+
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
+
 process.exit(fail ? 1 : 0);

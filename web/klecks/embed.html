@@ -80,7 +80,31 @@ window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '�
   // Klecks 的自动适配只在「画布 ≤ 视口 1/4」时才触发，所以这里手动适配。
   // easel 是它内部的缩放/平移管理器（TS private，运行时可达）；改名了也只是适配失效，不影响画画。
   // 它布局完成的时间点不确定，所以前面几秒多试几次（手机上尤其要命：不定就只看到画布一角）。
+  // 手机上 Klecks 本来就有「手机界面」（宽度 < collapseThreshold 时启用），但它默认把
+  // 工具栏抽屉**打开**，430px 屏上画布只剩 159px。这里做两件事：
+  //   1) 抽屉默认收起 —— 画布占满屏宽（430 而不是 159）
+  //   2) 把它的手机工具列显式打开 —— 左边一条 36px 的竖列，笔刷/工具都能点
+  // 需要完整工具栏时点左上角那个小箭头，抽屉会从左侧滑出。
+  const fitMobileUi = () => {
+    try {
+      const app = window.__pfKlecks.embed?.klApp;
+      if (!app) return false;
+      if (!(app.uiWidth < app.collapseThreshold)) return true;   // 宽屏走桌面布局
+      const mui = app.mobileUi;
+      if (!mui) return false;
+      if (mui.toolspaceIsOpen) {
+        mui.toolspaceIsOpen = false;
+        app.updateCollapse?.();
+        window.dispatchEvent(new Event('resize'));
+      }
+      mui.setIsVisible?.(true);
+      mui.update?.();
+      return true;
+    } catch { return false; }
+  };
+
   const fit = () => {
+    fitMobileUi();
     try { window.__pfKlecks.embed?.klApp?.easel?.fitTransform(true); } catch { /* ignore */ }
   };
   let tries = 0;

@@ -7,7 +7,7 @@ import { createCellPainter, localPoly } from './paint.mjs';
 import { createKlecksHost } from './paint-host.mjs';
 import { installI18n, setLang as setI18nLang, getLang, stats as i18nStats } from './i18n.mjs';
 import { pointInPoly } from './lib/geometry.mjs';
-import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble, bubbleThumb } from './lib/bubbles.mjs';
+import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble, bubbleThumb, pickBubbleForText } from './lib/bubbles.mjs';
 
 /**
  * 双模式 API：
@@ -2172,10 +2172,18 @@ function bindUI() {
     state.lines[state.selectedId] = ev.target.value;
     saveLines();
     syncSuggest(); syncSecSummary();
+    // 句子变了 → 气泡推荐要跟着换（按内容挑气泡）
+    clearTimeout(lineBubTimer);
+    lineBubTimer = setTimeout(() => renderBubbles(), 260);
   });
   $('#btnBubbleFromLine').addEventListener('click', () => {
     const text = currentLine().trim();
-    addBubble(text ? 'talk-ellipse' : 'narration-box', { text });
+    const slot = state.tpl?.slots?.find((s) => s.id === state.selectedId);
+    const panel = currentPlanPanel();
+    // 按内容挑样式：喊叫用尖角/放射，低语用波纹，心里想的用思考泡，旁白用旁白框…
+    const pick = pickBubbleForText(text, { role: panel?.role || slot?.role, beat: panel?.beat });
+    addBubble(pick.type, { text });
+    if (text) toast(`按内容选「${BUBBLES[pick.type]?.zh || pick.type}」· ${pick.why}`);
     if (document.body.dataset.view === 'edit') setEditMod('bubble');
     if (!text) toast('已加一个空气泡，用上面的「文字」填内容');
   });
@@ -4149,6 +4157,7 @@ function selectedBubble() {
   return state.bubbles.find((b) => b.id === state.selBubble) || null;
 }
 
+let lineBubTimer = 0;
 function renderBubbles() {
   const grid = $('#bubGrid');
   if (!grid) return;
@@ -4158,27 +4167,73 @@ function renderBubbles() {
   const slot = state.tpl.slots?.find((s) => s.id === state.selectedId);
   const role = panel?.role || slot?.role;
   const beat = panel?.beat || '';
+  const sel = selectedBubble();
 
   let ids;
+  let matched = null;
   if (state.bubTab === 'rec') {
-    ids = recommendBubbles({ role, beat, n: 8 });
+    const pick = pickBubbleForText(currentLine().trim(), { role, beat });
+    matched = pick;
+    ids = [pick.type, ...pick.alternatives, ...recommendBubbles({ role, beat, n: 8 })];
+    ids = [...new Set(ids)].slice(0, 8);
   } else {
     const used = Object.entries(state.bubUse).sort((a, b) => b[1] - a[1]).map(([k]) => k);
     ids = [...new Set([...used, 'talk-ellipse', 'narration-box', 'burst-spike', 'thought-cloud', 'caption-tab'])].slice(0, 8);
   }
 
-  grid.innerHTML = ids.map((id) => `
-    <div class="bub-item" data-id="${id}" title="${escapeHtml(BUBBLES[id]?.hintZh || '')}">
+  grid.innerHTML = ids.map((id) => {
+    const on = sel && sel.type === id;
+    const best = matched && matched.type === id;
+    return `
+    <div class="bub-item${on ? ' on' : ''}${best ? ' best' : ''}" data-id="${id}"
+         title="${escapeHtml(BUBBLES[id]?.hintZh || '')}${best ? ' · ' + escapeHtml(matched.why) : ''}">
       ${bubbleThumb(id, 92)}
-      <span>${escapeHtml(BUBBLES[id]?.zh || id)}</span>
-    </div>`).join('');
+      <span>${escapeHtml(BUBBLES[id]?.zh || id)}${best ? ' · 配这段字' : ''}</span>
+    </div>`;
+  }).join('');
 
   stagger(grid, '.bub-item');
   grid.querySelectorAll('.bub-item').forEach((el) => {
-    el.addEventListener('click', () => addBubble(el.dataset.id));
+    // 已经选中一个气泡时，点下面的样式 = 换样式（不新建）
+    el.addEventListener('click', () => {
+      if (selectedBubble()) { setBubbleType(el.dataset.id); return; }
+      addBubble(el.dataset.id);
+    });
   });
 
   renderBubbleInspector();
+}
+
+/** 把选中的气泡换成另一种样式：保留文字、中心位置，尺寸按新样式的默认比例重算 */
+function setBubbleType(type) {
+  const b = selectedBubble();
+  const def = BUBBLES[type];
+  if (!b || !def) return false;
+  if (b.type === type) { toast('已经是这个样式了'); return false; }
+  commit();
+  const page = state.tpl.page;
+  const scale = page.w / 1000;
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  const ratio = def.w / def.h;
+  // 尺寸：按新样式比例、面积接近原来（避免换个样式后字全挤在一起）
+  const area = b.w * b.h;
+  let w = Math.sqrt(area * ratio);
+  let h = w / ratio;
+  if (w > page.w * 0.9) { w = page.w * 0.9; h = w / ratio; }
+  b.type = type;
+  b.tail = def.tail || 'none';
+  b.w = Math.round(w);
+  b.h = Math.round(h);
+  b.x = Math.round(clamp(cx - b.w / 2, 0, page.w - b.w));
+  b.y = Math.round(clamp(cy - b.h / 2, 0, page.h - b.h));
+  b.baseW = b.w; b.baseH = b.h;
+  state.bubUse[type] = (state.bubUse[type] || 0) + 1;
+  try { localStorage.setItem('pf.bub.use', JSON.stringify(state.bubUse)); } catch { /* ignore */ }
+  renderStage();
+  renderBubbles();
+  toast(`样式换成「${def.zh}」`);
+  return true;
 }
 
 function renderBubbleInspector() {
@@ -4186,6 +4241,8 @@ function renderBubbleInspector() {
   const b = selectedBubble();
   box.classList.toggle('hidden', !b);
   if (!b) return;
+  const tn = $('#bubTypeName');
+  if (tn) tn.textContent = BUBBLES[b.type]?.zh || b.type;
   $('#opVal').textContent = Math.round((b.opacity ?? 1) * 100) + '%';
   $('#bubOpacity').value = Math.round((b.opacity ?? 1) * 100);
   const sc = Math.round(((b.w / (b.baseW || b.w)) || 1) * 100);
