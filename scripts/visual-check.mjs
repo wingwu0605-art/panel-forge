@@ -1436,6 +1436,54 @@ const scenarios = [
       check('改过的画幅刷新后还在', restored.h > 1700 && Math.abs(restored.w - 1000) < 2, `${restored.w}×${restored.h}`);
     },
   },
+
+  {
+    name: 'script-tab',
+    title: '⑯ 「分镜表」标签可达 + AI 切原文入口（AI 关掉时收起）',
+    async run(page, shot, { check }) {
+      await page.viewport(1400, 980);
+      await page.goto('/?fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const probe = `(() => {
+        const tab = [...document.querySelectorAll('#tabs button')].find((b) => b.dataset.tab === 'script');
+        const body = document.querySelector('#tabScript');
+        const vis = (sel) => { const el = document.querySelector(sel); return !!(el && el.offsetParent); };
+        return {
+          hasTab: !!tab, tabText: (tab?.textContent || '').trim(),
+          bodyHidden: body ? body.classList.contains('hidden') : true,
+          inlineNone: body ? body.style.display === 'none' : true,
+          split: vis('#btnAiSplit'), prompts: vis('#btnAiPrompts'),
+          rows: document.querySelectorAll('#scriptList > *').length,
+        };
+      })()`;
+
+      check('桌面上有「分镜表」标签（以前根本点不到）', (await page.evaluate(probe)).hasTab);
+      await page.evaluate(`(() => {
+        [...document.querySelectorAll('#tabs button')].find((b) => b.dataset.tab === 'script').click();
+      })()`);
+      await sleep(600);
+      const opened = await page.evaluate(probe);
+      check('点开后面板真的显示（不再被 style="display:none" 卡死）',
+        opened.bodyHidden === false && opened.inlineNone === false);
+      check('「AI 切原文」和「AI 优化提示词」都在', opened.split && opened.prompts,
+        `切原文=${opened.split} 优化=${opened.prompts}`);
+      check('分镜表有内容（逐格行）', opened.rows > 0, `${opened.rows} 行`);
+      await shot('script-tab-open');
+
+      // 画师版：AI 关掉，这两个按钮应当收起，但分镜表本身还能看
+      await page.goto('/?fresh=1&mode=artist&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+      await page.evaluate(`(() => {
+        [...document.querySelectorAll('#tabs button')].find((b) => b.dataset.tab === 'script').click();
+      })()`);
+      await sleep(600);
+      const artist = await page.evaluate(probe);
+      check('画师版：AI 切原文随 AI 开关收起', artist.split === false && artist.prompts === false,
+        `切原文=${artist.split} 优化=${artist.prompts}`);
+      check('画师版：分镜表仍可查看', artist.bodyHidden === false && artist.rows > 0, `${artist.rows} 行`);
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */

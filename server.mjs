@@ -18,7 +18,7 @@ import { matchTemplates, planStory, analyzePlot, buildPlan, RULES_VERSION, RULE_
 import { INTENTS, ROLES, STYLE_PACKS, COMMON_NEGATIVE, SCENES, TONES, DIRECTIVES, NEGATORS, VOCAB_STATS, BEAT_EN } from './lib/taxonomy.mjs';
 import { PAGE_PRESETS } from './lib/geometry.mjs';
 import { aiTools, systemPrompt, openapiSpec } from './lib/aidocs.mjs';
-import { readLlmConfig, llmStatus, testLlm, aiDecide, optimizePrompts, generateImage } from './lib/llm.mjs';
+import { readLlmConfig, llmStatus, testLlm, aiDecide, aiSplitPanels, optimizePrompts, generateImage } from './lib/llm.mjs';
 import { SHAPES, SHAPE_IDS, classifyShape, prefixSnippet, shapeSummary } from './lib/shapes.mjs';
 import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble } from './lib/bubbles.mjs';
 
@@ -239,6 +239,64 @@ const routes = [
         code: err.code || 'LLM_ERROR',
         hint: err.hint,
         fallback: { note: '规则版提示词已经在每格里（promptEn / promptShort），可以直接用' },
+      };
+    }
+  }],
+
+  // AI 切原文：版式已定，让模型把源文本切成 N 格（逐格内容＋台词＋英文提示词）
+  // 与 /api/ai/decide 的区别：这里不让模型挑模板，只做切分 → 长剧本/小说也切得准
+  ['POST', /^\/api\/ai\/split$/, async (req) => {
+    const body = await readBody(req);
+    const tpl = body.templateId ? getTemplate(body.templateId) : null;
+    if (!tpl) return { __status: 400, error: '需要 templateId：先选一套版式再让 AI 切原文' };
+
+    const plot = String(body.plot || '').trim();
+    if (!plot) return { __status: 400, error: '缺少 plot 字段（源文本）' };
+
+    const pageWidth = clampNum(body.pageWidth, 400, 4000, 1600);
+    const a = analyzePlot(plot, {});
+    // 先用规则引擎搭骨架（形状前缀/画幅/负面词都按模板算好），再用 AI 的内容覆盖
+    const plan = buildPlan(tpl, a, { pageWidth });
+    const cfg = readLlmConfig(body.llm || {});
+
+    try {
+      const r = await aiSplitPanels({
+        plot, plan, cfg,
+        characterSheet: body.characterSheet ? String(body.characterSheet).slice(0, 600) : '',
+        note: body.note ? String(body.note).slice(0, 400) : '',
+      });
+      let applied = 0;
+      for (const p of plan.panels) {
+        const o = r.panels[p.id];
+        if (!o) continue;
+        if (o.beat) p.beat = o.beat;
+        if (o.content) { p.content = o.content; p.beatHint = o.content; }
+        p.dialogue = o.dialogue || '';
+        if (o.prompt) {
+          p.promptEnRule = p.promptEnRule || p.promptEn;
+          p.promptEn = o.prompt;
+        }
+        p.aiOptimized = true;
+        applied++;
+      }
+      return {
+        ok: true, mode: 'ai-split',
+        templateId: tpl.id,
+        applied, total: plan.panels.length,
+        globalNotes: r.globalNotes,
+        quality: r.quality,
+        plan,
+        llm: r.llm,
+      };
+    } catch (err) {
+      return {
+        __status: err.code === 'NO_LLM_KEY' ? 400 : 502,
+        ok: false,
+        mode: 'ai-split',
+        error: String(err.message),
+        code: err.code || 'LLM_ERROR',
+        hint: err.hint,
+        fallback: { note: '规则引擎的分格仍然可用：点「按规则匹配」或直接看每格的规则版提示词' },
       };
     }
   }],

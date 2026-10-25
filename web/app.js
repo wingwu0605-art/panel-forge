@@ -32,6 +32,8 @@ async function makeApi() {
     plan: (body) => postJSON('/api/plan', body),
     aiDecide: async (body) => (await directFirst('aiDecide', body)) || postJSON('/api/ai/decide', body),
     prompts: async (body) => (await directFirst('prompts', body)) || postJSON('/api/ai/prompts', body),
+    // 版式已定，只让 AI 切原文（长剧本靠关键词切不准）
+    aiSplit: async (body) => (await directFirst('aiSplit', body)) || postJSON('/api/ai/split', body),
     llmStatus: () => getJSON('/api/llm/status'),
     llmTest: async (body) => (await directFirst('llmTest', body)) || postJSON('/api/llm/test', body),
     async imageGenerate(body) {
@@ -2101,6 +2103,7 @@ function bindUI() {
   $('#btnExportAll')?.addEventListener('click', exportAllPages);
   $('#charSheet').addEventListener('input', debounce(saveLlm, 400));
   $('#btnAiPrompts').addEventListener('click', runAiPrompts);
+  $('#btnAiSplit')?.addEventListener('click', runAiSplit);
 
   // 快捷键表
   $('#btnShortcuts').addEventListener('click', () => toggleShortcuts(true));
@@ -2259,8 +2262,8 @@ function onCanvasDblClick(ev) {
 }
 
 function activateTab(tab) {
-  if (name === 'script' && !document.querySelector('[data-tab="script"]')) name = 'slot';
   if (!tab) return;
+  if (tab === 'script' && !document.querySelector('[data-tab="script"]')) tab = 'slot';
   $$('#tabs button').forEach((x) => {
     const on = x.dataset.tab === tab;
     x.classList.toggle('on', on);
@@ -3802,6 +3805,48 @@ function copyShapePrefix() {
   const prefix = p?.shape?.prefixEn || slot?.shape?.prefixEn;
   if (!prefix) { toast('这一格没有形状词'); return; }
   copyText(prefix, '形状开头词已复制，粘到你提示词最前面');
+}
+
+async function runAiSplit() {
+  if (!state.tpl) { toast('先选一套版式'); return; }
+  const plot = $('#plot').value.trim();
+  if (!plot) { toast('先在左栏粘贴源文本'); return; }
+  const btn = $('#btnAiSplit');
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '切分中…';
+  $('#scriptHint').textContent = 'AI 正在把源文本切成每格…';
+  try {
+    saveLlm();
+    const res = await api.aiSplit({
+      plot,
+      templateId: state.tpl.id,
+      pageWidth: state.exportWidth,
+      characterSheet: state.charSheet,
+      note: $('#charSheet')?.value?.trim() ? '' : undefined,
+    });
+    if (!res.ok) {
+      $('#scriptHint').textContent = `${res.error || '切分失败'}${res.hint ? ' · ' + res.hint : ''}`;
+      toast(`切分失败：${res.code || res.error}`);
+      return;
+    }
+    // AI 的切分结果作为这一页的分镜（不再走规则引擎的节拍表）
+    state.aiPlan = { template: { id: state.tpl.id, name: state.tpl.name }, plan: res.plan, mode: 'ai-split' };
+    state.plan = { pages: [{ pageIndex: 1, segment: plot, analysis: state.analysis, templateScore: null, plan: res.plan }] };
+    renderScript();
+    renderSlotPanel();
+    const miss = res.quality?.missing?.length || 0;
+    $('#scriptHint').textContent = `${state.tpl.name} · 已切好 ${res.applied}/${res.total} 格`
+      + (miss ? ` · ${miss} 格模型没给（可用「AI 优化提示词」补）` : '')
+      + (res.globalNotes ? ` · ${res.globalNotes}` : '');
+    toast(`AI 切原文完成：${res.applied}/${res.total} 格`);
+  } catch (e) {
+    $('#scriptHint').textContent = '切分出错：' + e.message;
+    toast('切分失败：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
+  }
 }
 
 async function runAiPrompts() {

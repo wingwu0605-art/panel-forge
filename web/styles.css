@@ -822,6 +822,7 @@ body.paint-engine .paint-top{padding-top:calc(6px + env(safe-area-inset-top))}
 body[data-ai="off"] .ai-gen,
 body[data-ai="off"] #candStrip,
 body[data-ai="off"] #btnAiPrompts,
+body[data-ai="off"] #btnAiSplit,
 body[data-ai="off"] #btnMatchAi,
 body[data-ai="off"] #keySheet{display:none !important}
 /* 被面板管理隐藏的块 */

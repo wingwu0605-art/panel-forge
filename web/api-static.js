@@ -15,6 +15,7 @@ import { INTENTS, ROLES, STYLE_PACKS, COMMON_NEGATIVE, SCENES, TONES, DIRECTIVES
 import { PAGE_PRESETS } from './lib/geometry.mjs';
 import {
   aiDecide as aiDecideCore,
+  aiSplitPanels as aiSplitCore,
   optimizePrompts as optimizePromptsCore,
   testLlmWith,
   llmStatusOf,
@@ -238,6 +239,49 @@ export function createStaticApi() {
           quality: r.quality,
           plan,
           llm: r.llm,
+        };
+      } catch (err) {
+        return llmError(err, cfg);
+      }
+    },
+
+    /** AI 切原文：版式已定，让模型把源文本切成 N 格（逐格内容＋台词＋英文提示词） */
+    async aiSplit(body = {}) {
+      const tpl = body.templateId ? getTemplate(body.templateId) : null;
+      if (!tpl) return { ok: false, code: 'BAD_REQUEST', error: '需要 templateId：先选一套版式再让 AI 切原文' };
+
+      const plot = String(body.plot || '').trim();
+      if (!plot) return { ok: false, code: 'BAD_REQUEST', error: '缺少 plot 字段（源文本）' };
+
+      const pageWidth = clamp(body.pageWidth, 400, 4000, 1600);
+      const a = analyzePlot(plot, {});
+      const plan = buildPlan(tpl, a, { pageWidth });
+      const cfg = cfgFrom(body.llm);
+
+      try {
+        const r = await aiSplitCore({
+          plot, plan, cfg,
+          characterSheet: body.characterSheet ? String(body.characterSheet).slice(0, 600) : '',
+          note: body.note ? String(body.note).slice(0, 400) : '',
+        });
+        let applied = 0;
+        for (const p of plan.panels) {
+          const o = r.panels[p.id];
+          if (!o) continue;
+          if (o.beat) p.beat = o.beat;
+          if (o.content) { p.content = o.content; p.beatHint = o.content; }
+          p.dialogue = o.dialogue || '';
+          if (o.prompt) {
+            p.promptEnRule = p.promptEnRule || p.promptEn;
+            p.promptEn = o.prompt;
+          }
+          p.aiOptimized = true;
+          applied++;
+        }
+        return {
+          ok: true, mode: 'ai-split', templateId: tpl.id,
+          applied, total: plan.panels.length,
+          globalNotes: r.globalNotes, quality: r.quality, plan, llm: r.llm,
         };
       } catch (err) {
         return llmError(err, cfg);

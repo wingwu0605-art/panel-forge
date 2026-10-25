@@ -32,13 +32,22 @@ const mock = http.createServer(async (req, res) => {
     return;
   }
 
-  // 分支 A：提示词优化（brief 里有「格」）
+  // 分支 A：提示词优化（brief 里有「格」）——也用来应答「AI 切原文」（brief 同样是格清单）
   if (Array.isArray(brief['格'])) {
-    const panels = brief['格'].map((g) => ({
-      slotId: g.slotId,
-      prompt: `${g.shapePrefix}, mock optimized subject, mock style, ${g['画幅比']}`,
-      negative: 'mock negative, blurry',
-    }));
+    const isSplit = !!brief['源文本'];
+    const panels = brief['格'].map((g) => (isSplit
+      ? {
+        slotId: g.slotId,
+        beat: `切分${g.order}`,
+        content: `mock 切分内容：第 ${g.order} 格，源文本的对应片段`,
+        dialogue: g.order === 1 ? 'mock 切分台词' : '',
+        prompt: `${g.shapePrefix}, mock split subject, ${g['画幅比']}`,
+      }
+      : {
+        slotId: g.slotId,
+        prompt: `${g.shapePrefix}, mock optimized subject, mock style, ${g['画幅比']}`,
+        negative: 'mock negative, blurry',
+      }));
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({
       choices: [{ message: { content: JSON.stringify({ globalNotes: 'mock 一致性：同一张脸', panels }) } }],
@@ -140,6 +149,32 @@ try {
     op.map((p) => p.shape.id).join(','));
   check('负面词无重复', new Set(op[0].negative.split(',').map((s) => s.trim().toLowerCase())).size === op[0].negative.split(',').length);
   check('globalNotes 已回传', !!opt.globalNotes, opt.globalNotes);
+
+  // 5. AI 切原文（版式已定，只让模型切分）
+  const split = await fetch(PF + '/api/ai/split', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      plot: '第一幕：雨夜屋顶，他缓缓拔出刀。第二幕：敌人从背后偷袭。第三幕：他反手斩断刀锋。'.repeat(3),
+      templateId: 'jp-triangle-impact', characterSheet: '18岁剑客，黑短发', llm,
+    }),
+  }).then((r) => r.json());
+
+  const sp = split.plan?.panels || [];
+  check('POST /api/ai/split 返回 ok', split.ok === true, split.error || `${split.applied}/${split.total}`);
+  check('AI 切分覆盖每一格', split.applied === split.total && sp.length === split.total);
+  check('每格拿到 AI 的切分内容（不是规则版）', sp.every((p) => (p.content || '').includes('mock 切分内容')));
+  check('每格拿到 AI 给的英文提示词', sp.every((p) => p.promptEn.includes('mock split subject')));
+  check('提示词仍以形状开头词起头', sp.every((p) => p.promptEn.startsWith(p.shape.prefixEn)));
+  check('保留规则版提示词原文（可对照/回滚）', sp.every((p) => p.promptEnRule && p.promptEnRule !== p.promptEn));
+  check('台词按切分落到格子里', sp[0].dialogue === 'mock 切分台词' && sp[0].beat.startsWith('切分'));
+  check('缺 templateId 时明确报错', (await fetch(PF + '/api/ai/split', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ plot: 'x', llm }),
+  }).then((r) => r.json())).error?.includes('templateId') === true);
+  check('缺 plot 时明确报错', (await fetch(PF + '/api/ai/split', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ templateId: 'jp-triangle-impact', llm }),
+  }).then((r) => r.json())).error?.includes('plot') === true);
 } finally {
   await new Promise((r) => mock.close(r));
 }

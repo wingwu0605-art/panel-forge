@@ -297,6 +297,7 @@
     </div>
     <div class="tabs" id="tabs" role="tablist">
       <button data-tab="slot" class="on" role="tab" aria-selected="true">格子</button>
+      <button data-tab="script" role="tab" aria-selected="false">分镜表</button>
       <button data-tab="export" role="tab" aria-selected="false">导出</button>
     </div>
 
@@ -427,10 +428,11 @@
       </div>
     </div>
 
-    <div class="tab-body" id="tabScript" style="display:none">
+    <div class="tab-body hidden" id="tabScript">
       <div class="script-head">
         <b>逐格分镜表</b>
         <span style="display:flex;gap:6px">
+          <button class="btn tiny primary" id="btnAiSplit" title="版式已经定死：让 AI 把源文本切成每格，并直接给出每格的生图提示词（长剧本 / 小说也切得准）">AI 切原文</button>
           <button class="btn tiny" id="btnAiPrompts" title="用 AI 把每格压成高密度生图提示词（保留形状开头词）">AI 优化提示词</button>
           <button class="btn tiny" id="btnCopyAll">复制全部</button>
         </span>
