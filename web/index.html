@@ -374,13 +374,22 @@
             <div class="sub-label">AI 生成</div>
             <div class="prompt-box prompt-edit">
               <div class="prompt-head">
-                <span>生图提示词 · <b id="promptState">自动</b></span>
+                <span>生图提示词 · <b id="promptState">规则切分</b></span>
                 <span class="ph-acts">
-                  <button class="btn tiny hidden" id="btnPromptReset" title="丢掉手改，回到自动生成的提示词">恢复自动</button>
+                  <button class="btn tiny hidden" id="btnPromptReset" title="清掉自己的写法，回到自动">恢复自动</button>
                   <button class="btn tiny" id="btnCopyPrompt">复制</button>
                 </span>
               </div>
-              <textarea id="slotPrompt" rows="6" spellcheck="false" placeholder="写一段剧情并匹配后，这里会出现贴合这一格的提示词；也可以直接自己写"></textarea>
+              <!-- 三源共存：规则切分 / AI 生成 / 自己写，一键切换；开头词始终保留 -->
+              <div class="seg tiny-seg prompt-src" id="promptSrc" role="tablist" aria-label="提示词来源">
+                <button type="button" data-src="rule" class="on">规则切分</button>
+                <button type="button" data-src="ai">AI 生成</button>
+                <button type="button" data-src="mine">自己写</button>
+              </div>
+              <label class="switch block prompt-prefix" title="形状开头词（构图前缀）—— 自己写的时候也会自动保留在最前面">
+                <input type="checkbox" id="chkPrefix" checked> 带开头词 <span class="muted small" id="prefixPeek">—</span>
+              </label>
+              <textarea id="slotPrompt" rows="6" spellcheck="false" placeholder="写一段剧情并匹配后，这里会出现贴合这一格的提示词；也可以切到「自己写」"></textarea>
               <div class="neg-row">
                 <span>避免出现</span>
                 <input id="slotNegative" type="text" spellcheck="false" placeholder="text, watermark, extra fingers …">

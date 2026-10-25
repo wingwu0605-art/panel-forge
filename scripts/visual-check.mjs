@@ -1532,6 +1532,109 @@ const scenarios = [
       await page.evaluate('window.__pfPaint.close()');
     },
   },
+
+  {
+    name: 'prompt-source',
+    title: '⑱ 提示词三源共存（规则 / AI / 自己写）+ 开头词保留 + 手机分镜表不重叠',
+    async run(page, shot, { check }) {
+      await page.viewport(1400, 980);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+      await page.evaluate(`(() => {
+        document.querySelector('#plot').value = '雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋，两人在积水里僵持。';
+        document.querySelector('#btnMatch').click();
+      })()`);
+      await sleep(4500);
+
+      const st = `(() => {
+        const ta = document.querySelector('#slotPrompt');
+        const sent = (document.querySelector('#slotPromptSent')?.textContent || '');
+        return {
+          state: document.querySelector('#promptState')?.textContent || '',
+          value: (ta?.value || '').slice(0, 80),
+          readOnly: !!ta?.readOnly,
+          prefixOn: !!document.querySelector('#chkPrefix')?.checked,
+          sentStart: sent.slice(0, 40),
+          sent,
+        };
+      })()`;
+
+      const rule = await page.evaluate(st);
+      check('默认就是「规则切分」，且提示词里带着原文',
+        rule.state === '规则切分' && /雨夜的屋顶上|缓缓拔出刀|背后偷袭/.test(rule.sent),
+        rule.sent.slice(0, 70));
+      check('规则模式下文本框只读（避免误改自动结果）', rule.readOnly === true);
+
+      // 切「自己写」
+      await page.evaluate(`document.querySelector('#promptSrc [data-src="mine"]').click()`);
+      await sleep(500);
+      await page.evaluate(`(() => {
+        const ta = document.querySelector('#slotPrompt');
+        ta.value = 'he stands on the wet rooftop, rain, blade drawn';
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+      })()`);
+      await sleep(700);
+      const mine = await page.evaluate(st);
+      check('切到「自己写」后可以编辑', mine.readOnly === false && mine.state === '自己写');
+      check('自己写的内容 + 形状开头词一起进最终提示词（开头词没被丢掉）',
+        mine.sent.includes('he stands on the wet rooftop') && mine.sent.indexOf('he stands') > 30,
+        mine.sentStart);
+
+      // 关掉开头词
+      await page.evaluate(`(() => {
+        const c = document.querySelector('#chkPrefix');
+        c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+      await sleep(600);
+      const noPrefix = await page.evaluate(st);
+      check('关掉「带开头词」后提示词从自己的话开始',
+        noPrefix.sent.startsWith('he stands on the wet rooftop'), noPrefix.sentStart);
+
+      // 切回规则：规则版仍然在（三份共存，不是覆盖）
+      await page.evaluate(`document.querySelector('#promptSrc [data-src="rule"]').click()`);
+      await sleep(600);
+      const back = await page.evaluate(st);
+      check('切回「规则切分」规则版还在（三源共存）',
+        /雨夜的屋顶上|缓缓拔出刀|背后偷袭/.test(back.sent), back.sent.slice(0, 60));
+      await shot('prompt-source');
+
+      // 手机上的分镜表：卡片不重叠、底栏不压住最后一张卡
+      await page.viewport(430, 900);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+      await page.evaluate(`(() => {
+        document.body.dataset.view = 'sheet';
+        [...document.querySelectorAll('#tabs button')].find((b) => b.dataset.tab === 'script').click();
+      })()`);
+      await sleep(900);
+      const mob = await page.evaluate(`(() => {
+        const cards = [...document.querySelectorAll('#scriptList .sc-card')];
+        const r = cards.map((c) => c.getBoundingClientRect());
+        let overlap = 0;
+        for (let i = 0; i < r.length - 1; i++) if (r[i].bottom > r[i + 1].top + 1) overlap++;
+        const pr = cards[0]?.querySelector('.pr');
+        const cs = pr ? getComputedStyle(pr) : null;
+        const last = cards.at(-1)?.getBoundingClientRect();
+        const bar = document.querySelector('#tabbar')?.getBoundingClientRect();
+        return {
+          n: cards.length, overlap,
+          clamp: cs ? (cs.webkitLineClamp || cs.getPropertyValue('-webkit-line-clamp')) : '',
+          overflow: cs ? cs.overflow : '',
+          lastBottom: last ? Math.round(last.bottom) : 0,
+          barTop: bar ? Math.round(bar.top) : 0,
+          listPad: getComputedStyle(document.querySelector('#scriptList')).paddingBottom,
+        };
+      })()`);
+      check('手机分镜表：卡片之间没有重叠', mob.overlap === 0, `${mob.n} 张卡`);
+      // 注：Chrome 128+ 用 -webkit-line-clamp 时计算值报 flow-root，所以判 clamp + overflow，不判 display
+      check('提示词框按行截断（不再在字中间切断）',
+        /^[1-9]\d*$/.test(String(mob.clamp)) && mob.overflow === 'hidden',
+        `clamp=${mob.clamp} overflow=${mob.overflow}`);
+      check('列表给底栏留了空间（最后一张卡不被压住）',
+        parseFloat(mob.listPad) > 40, `padding-bottom=${mob.listPad}`);
+      await shot('script-mobile-sheet');
+    },
+  },
 ];
 
 /* ------------------------------------------------------------------ 起浏览器 */

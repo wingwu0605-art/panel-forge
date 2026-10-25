@@ -98,6 +98,8 @@ const state = {
   chars: [],          // 角色卡 [{id,name,note,images:[dataURL]}]
   activeChars: [],    // 本页启用的角色 id
   clipboard: null,    // 内部剪贴板（图片或气泡）
+  promptSrc: {},      // 每格提示词来源：rule（规则切分）/ ai（AI 生成）/ mine（自己写）
+  promptPrefix: {},   // 每格是否把「形状开头词」放在提示词最前面（默认 true）
   libFilter: null,    // 模板库的标签筛选 {kind:'panels'|'intent'|'ratio'|'tag', value}
   intentZh: {},       // 戏路 id → 中文（从 /api/meta 来）
   history: { past: [], future: [] },
@@ -356,6 +358,8 @@ async function init() {
       state.bubbles = (pg?.bubbles || []).map((b) => ({ ...b }));
       state.lines = { ...(pg?.lines || {}) };
       state.promptEdits = { ...(pg?.promptEdits || {}) };
+      state.promptSrc = { ...(pg?.promptSrc || {}) };
+      state.promptPrefix = { ...(pg?.promptPrefix || {}) };
       if (Array.isArray(pg?.activeChars)) state.activeChars = pg.activeChars;
       state.selectedId = state.tpl?.slots?.[0]?.id || null;
       renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
@@ -1937,9 +1941,42 @@ function bindUI() {
     if (!state.selectedId) return;
     commit();
     delete state.promptEdits[state.selectedId];
+    delete state.promptSrc[state.selectedId];
+    delete state.promptPrefix[state.selectedId];
     queueSave?.();
     renderSlotPanel(); renderScript();
     toast('已恢复自动生成的提示词');
+  });
+  // 提示词来源：规则切分 / AI 生成 / 自己写 —— 三份共存，一键切
+  $('#promptSrc')?.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-src]');
+    if (!b || !state.selectedId) return;
+    const src = b.dataset.src;
+    if (src === 'ai' && !effectivePrompt(state.selectedId).hasAi) {
+      toast('这一格还没有 AI 版提示词：先点「AI 切原文」或「AI 优化提示词」');
+      return;
+    }
+    commit();
+    state.promptSrc[state.selectedId] = src;
+    // 从「自己写」切回自动时，保留草稿但不参与出图（切回来还在）
+    if (src === 'mine') {
+      const ta = $('#slotPrompt');
+      const cur = state.promptEdits[state.selectedId]?.prompt;
+      if (cur == null && ta) setPromptEdit(state.selectedId, 'prompt', ta.value || '');
+    }
+    syncPromptMeta();
+    syncSecSummary(); renderScript();
+    queueSave?.();
+    toast({ rule: '用规则切分的提示词', ai: '用 AI 生成的提示词', mine: '自己写这一格的提示词' }[src] || '');
+  });
+  // 开头词（构图前缀）开关：自己写的时候也保留在最前
+  $('#chkPrefix')?.addEventListener('change', (ev) => {
+    if (!state.selectedId) return;
+    commit();
+    state.promptPrefix[state.selectedId] = ev.target.checked;
+    syncPromptMeta();
+    syncSecSummary(); renderScript();
+    queueSave?.();
   });
   $('#slotPromptSent').closest('details')?.addEventListener('toggle', syncPromptMeta);
   $('#btnKeyMgr')?.addEventListener('click', openKeySheet);
@@ -2505,18 +2542,43 @@ function autoPromptOf(slot, panel) {
   const shape = panel?.shape || slot?.shape || null;
   return [shape?.prefixEn, 'single panel, no text'].filter(Boolean).join(', ');
 }
-/** 这一格最终用的提示词：手改过就用手改的 */
-function effectivePrompt(slotId) {
+/** 这一格的三份提示词：规则切分 / AI 生成 / 用户自己写（前两份由 plan 带下来） */
+function promptParts(slotId) {
   const slot = state.tpl?.slots?.find((s) => s.id === slotId);
   const panel = (pagePlan()?.panels || []).find((p) => p.id === slotId) || null;
   const edit = state.promptEdits?.[slotId] || {};
-  const autoPrompt = autoPromptOf(slot, panel);
-  const autoNeg = panel?.negative || '';
+  // 规则版：AI 覆盖前的那份；AI 版：AI 改写过的那份
+  const rule = panel?.promptEnRule || panel?.promptEn || autoPromptOf(slot, panel);
+  const ai = panel?.aiOptimized && panel?.promptEn ? panel.promptEn : '';
+  const prefix = panel?.shape?.prefixEn || slot?.shape?.prefixEn || '';
+  return { rule: rule || '', ai, mine: edit.prompt ?? '', prefix, panel, slot, edit };
+}
+
+/** 这一格最终用的提示词：按用户选的来源；手写时也要把「形状开头词」保留在最前面 */
+function effectivePrompt(slotId) {
+  const parts = promptParts(slotId);
+  const src = state.promptSrc?.[slotId] || 'rule';
+  const base = src === 'mine' ? parts.mine : (src === 'ai' ? (parts.ai || parts.rule) : parts.rule);
+  const usePrefix = state.promptPrefix?.[slotId] !== false;
+  let prompt = base || '';
+  if (usePrefix && parts.prefix && !prompt.startsWith(parts.prefix)) {
+    prompt = prompt ? `${parts.prefix}, ${prompt}` : parts.prefix;
+  }
+  const edit = parts.edit;
+  const autoNeg = parts.panel?.negative || '';
   return {
-    prompt: edit.prompt ?? autoPrompt,
+    prompt,
     negative: edit.negative ?? autoNeg,
-    autoPrompt, autoNeg,
-    edited: edit.prompt != null || edit.negative != null,
+    autoPrompt: parts.rule,
+    autoNeg,
+    src,
+    usePrefix,
+    hasAi: !!parts.ai,
+    rule: parts.rule,
+    ai: parts.ai,
+    mine: parts.mine,
+    prefix: parts.prefix,
+    edited: src === 'mine' ? parts.mine.trim() !== '' : edit.prompt != null,
   };
 }
 /** 真正发给生图模型的那一段（角色一致性 + 提示词 + 避免项），预览和生图共用 */
@@ -2538,9 +2600,29 @@ function syncPromptMeta() {
   const id = state.selectedId;
   if (!id) return;
   const b = buildImagePrompt(id);
-  $('#promptState').textContent = b.edited ? '已手改' : (currentPlanPanel()?.aiOptimized ? 'AI 写的' : '自动');
+  const src = b.src || 'rule';
+  // 三源切换：规则切分 / AI 生成 / 自己写
+  $$('#promptSrc button').forEach((x) => {
+    const on = x.dataset.src === src;
+    x.classList.toggle('on', on);
+    if (x.dataset.src === 'ai') x.classList.toggle('disabled', !b.hasAi);
+  });
+  $('#promptState').textContent = { rule: '规则切分', ai: 'AI 生成', mine: '自己写' }[src] || '规则切分';
   $('#promptState').classList.toggle('edited', b.edited);
-  $('#btnPromptReset').classList.toggle('hidden', !b.edited);
+  const chk = $('#chkPrefix');
+  if (chk) chk.checked = b.usePrefix;
+  // 只有「自己写」允许编辑；规则/AI 是只读预览（想改就切到「自己写」）
+  const ta = $('#slotPrompt');
+  if (ta) {
+    ta.readOnly = src !== 'mine';
+    ta.classList.toggle('readonly', src !== 'mine');
+    const val = src === 'mine' ? (b.mine ?? '') : b.prompt;
+    if (ta.value !== val) ta.value = val;
+    ta.placeholder = src === 'mine'
+      ? '自己写这一格的画面描述；开头词会自动保留在最前面（可在上面关掉）'
+      : '这是自动生成的提示词，只读；想改就切到「自己写」';
+  }
+  $('#btnPromptReset').classList.toggle('hidden', !b.edited && src !== 'mine');
   $('#slotPromptSent').textContent = b.full || '—';
 }
 
@@ -3657,6 +3739,8 @@ async function switchPage(i) {
   state.bubbles = (pg.bubbles || []).map((b) => ({ ...b }));
   state.lines = { ...(pg.lines || {}) };
   state.promptEdits = { ...(pg.promptEdits || {}) };
+  state.promptSrc = { ...(pg.promptSrc || {}) };
+  state.promptPrefix = { ...(pg.promptPrefix || {}) };
   state.selBubble = null;
   state.cands = pg.cands || {};
   if (Array.isArray(pg.activeChars)) state.activeChars = [...pg.activeChars];

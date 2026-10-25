@@ -970,9 +970,13 @@ body.pf-dragging .canvas svg{box-shadow:none}
 .sc-card .asp{font-size:11.5px;color:var(--label-3)}
 .sc-card .pr{
   font-family:var(--font-mono);font-size:11.5px;line-height:1.55;color:var(--label-2);
-  background:var(--fill-2);border-radius:8px;padding:7px 9px;max-height:70px;overflow:hidden;position:relative;margin-top:6px;
-  -webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent);
+  background:var(--fill-2);border-radius:8px;padding:7px 9px;margin-top:6px;
+  /* 以前是 max-height:70px + overflow:hidden + mask，中文行高 17px 时会在字中间切断，
+     看起来像文字叠在一起。改成按行截断（最后一行带省略号），裁在行边界上。 */
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;
+  overflow:hidden;white-space:pre-wrap;word-break:break-word;
 }
+.sc-card .pr.zh{-webkit-line-clamp:3;color:var(--label-3)}
 .sc-card .act{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 
 /* 导出 */
@@ -1076,8 +1080,13 @@ body.pf-dragging .canvas svg{box-shadow:none}
   .toast{top:calc(var(--topbar-h) + env(safe-area-inset-top) + 10px);bottom:auto;transform:translate(-50%,-14px) scale(.96)}
 
   /* 手机上右栏整体滚动，气泡库排在内容后面，不再常驻占屏 */
-  .rail.right{overflow-y:auto;display:block}
+  .rail.right{overflow-y:auto;display:block;scroll-padding-bottom:calc(var(--tabbar-h) + 12px)}
   .tab-body{overflow:visible;padding-bottom:6px}
+  /* 分镜表最后一张卡会被底栏压住：给列表留出底栏 + 安全区 */
+  .script-list{padding-bottom:calc(var(--tabbar-h) + 16px)}
+  /* 提示词框在手机上多给两行，避免一进来就被截断 */
+  .sc-card .pr{-webkit-line-clamp:6}
+  .sc-card .pr.zh{-webkit-line-clamp:5}
   .bubble-dock{background:transparent;border-top:0;-webkit-backdrop-filter:none;backdrop-filter:none;padding:4px 14px 24px}
   .bubble-dock > .card-body,.bubble-dock .bub-grid{max-height:none}
   .bub-head{padding-top:12px;border-top:.5px solid var(--sep)}
@@ -1881,3 +1890,10 @@ html[data-lang="id"] .stage-bar{gap:8px;padding-left:10px}
 .size-chips{display:flex;gap:5px;flex-wrap:wrap;margin:-4px 0 10px}
 .size-chips .fchip{padding:3px 9px}
 \n.bub-style-row{display:flex;align-items:center;justify-content:space-between;gap:8px;\n  margin:0 0 8px;padding:6px 9px;border-radius:9px;background:var(--fill-2);font-size:11.5px}\n.bub-style-row b{font-weight:600}\n.bub-item.on{outline:2px solid var(--tint);outline-offset:1px}\n.bub-item.best{box-shadow:inset 0 0 0 1px var(--tint)}\n.bub-item.best span{color:var(--tint);font-weight:600}\n
+/* 提示词来源切换：三源共存（规则切分 / AI 生成 / 自己写） */
+.prompt-src{margin:2px 0 8px}
+.prompt-src button{flex:1 1 0;font-size:12px}
+.prompt-src button.disabled{opacity:.45}
+.prompt-prefix{margin:0 0 6px}
+.prompt-prefix #prefixPeek{font-size:11px;color:var(--label-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52%}
+#slotPrompt.readonly{color:var(--label-2);background:var(--fill-2);cursor:default}
