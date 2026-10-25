@@ -1935,3 +1935,4 @@ body[data-shell] .bubble-dock{
 /* 卡片不需要两层阴影 */
 body[data-shell] .card,
 body[data-shell] .sc-card{box-shadow:var(--shadow-1),inset 0 0 0 .5px var(--card-border)}
+\n.share-pick-list{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow:auto}\n.share-pick{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;\n  padding:10px 12px;border-radius:10px;border:0;background:var(--fill-2);cursor:pointer;\n  box-shadow:inset 0 0 0 .5px var(--sep)}\n.share-pick:active{background:var(--fill-hover)}\n.share-pick b{font-size:13.5px}\n.share-pick span{font-size:10.5px;color:var(--label-3);font-family:var(--font-mono)}\n

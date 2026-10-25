@@ -1094,6 +1094,89 @@ async function setPaintPaper(on) {
  * 把一张图「送出去」：原生壳里走系统分享面板，浏览器里走 Web Share，都没有就下载。
  * 这是手机上把这一格交给别的绘画 App（绘世界 / Procreate / 概念…）的唯一可靠通道。
  */
+/* ------------------------------------------------------------------ *
+ * 「用某个绘画 App 打开这一格」
+ * 先把图写到缓存 → 让用户从「真的接收图片的 App」里选一个 → 原生 setPackage 直跳。
+ * 如果目标 App 没声明接收图片，那谁也跳不过去（这是对方的选择，不是我们能绕的）。
+ * ------------------------------------------------------------------ */
+let sharedTargetsCache = null;
+
+/** 列出手机上会出现在分享面板里的 App（壳里才有；浏览器返回 null） */
+async function nativeShareTargets(force = false) {
+  const plugin = window.Capacitor?.Plugins?.ShareTo;
+  if (!plugin?.listTargets) return null;
+  if (sharedTargetsCache && !force) return sharedTargetsCache;
+  try {
+    const r = await plugin.listTargets();
+    sharedTargetsCache = Array.isArray(r?.targets) ? r.targets : [];
+    return sharedTargetsCache;
+  } catch (e) {
+    console.warn('[share] 列目标失败', e);
+    return [];
+  }
+}
+
+/** 把图片交给指定包名的 App（跳过系统面板） */
+async function shareToPackage(pkg, blob, name) {
+  const cap = window.Capacitor;
+  const plugin = cap?.Plugins?.ShareTo;
+  if (!plugin?.sendTo) { toast('这个环境不支持直跳，用「分享」面板'); return false; }
+  try {
+    const b64 = await blobToBase64(blob);
+    const safe = `pf-${Date.now()}.png`;
+    await cap.Plugins.Filesystem.writeFile({ path: safe, data: b64, directory: 'CACHE', recursive: true });
+    const { uri } = await cap.Plugins.Filesystem.getUri({ path: safe, directory: 'CACHE' });
+    await plugin.sendTo({ package: pkg, uri, mime: blob.type || 'image/png' });
+    return true;
+  } catch (e) {
+    console.warn('[share] 直跳失败', e);
+    toast(`直跳失败：${String(e?.message || e).slice(0, 60)}`);
+    return false;
+  }
+}
+
+/** 壳里：「分享」先弹我们自己的 App 选择器，选完直接跳过去；没有插件就退回系统面板 */
+async function sharePickOrSheet(blob, name, title) {
+  const targets = await nativeShareTargets();
+  if (!targets?.length) { await shareOrDownload(blob, name, title); return; }
+  openSharePicker(targets, blob, name);
+}
+
+function openSharePicker(targets, blob, name) {
+  const old = document.querySelector('#sharePick');
+  if (old) old.remove();
+  const sheet = document.createElement('div');
+  sheet.className = 'keysheet';
+  sheet.id = 'sharePick';
+  sheet.innerHTML = `
+    <div class="ks-panel" style="max-width:460px">
+      <div class="ks-head">
+        <b>用哪一个 App 打开</b>
+        <span class="muted small">只有能接收图片的 App 才会出现在这里</span>
+        <button class="btn tiny" data-close>关闭</button>
+      </div>
+      <div class="ks-body" style="display:block;padding:12px 14px 16px">
+        <div class="share-pick-list">
+          ${targets.map((t) => `<button class="share-pick" data-pkg="${escapeHtml(t.package)}">
+            <b>${escapeHtml(t.label || t.package)}</b>
+            <span>${escapeHtml(t.package)}</span>
+          </button>`).join('')}
+        </div>
+        <button class="btn tiny wide" data-sheet style="margin-top:10px">用系统分享面板（更多 App）</button>
+      </div>
+    </div>`;
+  document.body.appendChild(sheet);
+  const close = () => sheet.remove();
+  sheet.addEventListener('click', async (ev) => {
+    if (ev.target === sheet || ev.target.closest('[data-close]')) { close(); return; }
+    if (ev.target.closest('[data-sheet]')) { close(); await shareOrDownload(blob, name); return; }
+    const btn = ev.target.closest('[data-pkg]');
+    if (!btn) return;
+    close();
+    await shareToPackage(btn.dataset.pkg, blob, name);
+  });
+}
+
 async function shareOrDownload(blob, name, title = 'PanelForge 分镜') {
   const file = new File([blob], name, { type: blob.type || 'image/png' });
   const cap = window.Capacitor;
@@ -1201,7 +1284,7 @@ async function exportPaintImage(mode = 'download') {
     if (!raw) { toast('还没有可导出的内容'); return; }
     const out = slot ? await clipToSlot(raw, slot) : raw;
     const name = `${state.tpl?.id || 'page'}-第${slot?.order ?? '?'}格-绘制.png`;
-    if (mode === 'share') { await shareOrDownload(out, name, `第 ${slot?.order ?? '?'} 格`); return; }
+    if (mode === 'share') { await sharePickOrSheet(out, name, `第 ${slot?.order ?? '?'} 格`); return; }
     await exportBlob(out, name);
     toast('已导出这一格的绘制图');
   } catch (e) {

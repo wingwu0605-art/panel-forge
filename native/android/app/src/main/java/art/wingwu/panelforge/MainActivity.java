@@ -21,6 +21,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ShareTargetPlugin.class);
         registerPlugin(SaveImagePlugin.class);
+        registerPlugin(ShareToPlugin.class);
         super.onCreate(savedInstanceState);
         handleShareIntent(getIntent());
     }
