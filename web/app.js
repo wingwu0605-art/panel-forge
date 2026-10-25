@@ -4892,6 +4892,38 @@ function initTheme() {
     withTransition('ui', () => setUi(b.dataset.ui));
   }));
 
+  // 皮肤：经典 / 灵动可爱 / 高级简约（只换色板+圆角+动效令牌，组件代码零改动）
+  // 与上面的「界面风格」正交：玻璃管材质，皮肤管色板。
+  const SKIN_KEY = 'pf.skin';
+  const SKIN_LABEL = { classic: '经典', cute: '灵动可爱', minimal: '高级简约' };
+  const setSkin = (name, animate = true) => {
+    const id = SKIN_LABEL[name] ? name : 'classic';
+    const apply = () => {
+      if (id === 'classic') delete root.dataset.skin; else root.dataset.skin = id;
+      const label = $('#skinName');
+      if (label) label.textContent = SKIN_LABEL[id];
+      $$('#skinSeg button').forEach((b) => b.classList.toggle('on', b.dataset.skin === id));
+      // 主题色板变了，画布底色/圆角也跟着走，重算一次布局尺寸
+      try { window.dispatchEvent(new Event('resize')); } catch { /* ignore */ }
+    };
+    if (animate && document.startViewTransition) withTransition('skin', apply);
+    else apply();
+    store.set(SKIN_KEY, id === 'classic' ? null : id);
+  };
+  $$('#skinSeg button').forEach((b) => b.addEventListener('click', () => {
+    if ((b.dataset.skin || 'classic') === (root.dataset.skin || 'classic')) return;
+    setSkin(b.dataset.skin);
+  }));
+  // 启动时恢复上次的皮肤
+  setSkin(store.get(SKIN_KEY) || 'classic', false);
+  window.__pfSkin = () => root.dataset.skin || 'classic';
+
+  // 版本号：唯一真源是仓库根 VERSION，构建时写进 <meta name="app-version">（scripts/set-version.mjs）
+  const VERSION = document.querySelector('meta[name="app-version"]')?.content || '0.0.0';
+  const verEl = $('#appVersion');
+  if (verEl) verEl.textContent = `PanelForge v${VERSION}`;
+  window.__pfVersion = () => VERSION;
+
   // 语言：中文（源语言）/ English / Bahasa Indonesia
   const LANG_LABEL = { zh: '中文', en: 'English', id: 'Bahasa Indonesia' };
   const setLang = (lang) => {

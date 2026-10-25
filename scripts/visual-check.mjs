@@ -1628,6 +1628,70 @@ const scenarios = [
   },
 
   {
+    name: 'skins',
+    title: '㉑ 两套皮肤（灵动可爱 / 高级简约）+ 版本号 + 偏好记忆',
+    async run(page, shot, { check }) {
+      await page.viewport(1280, 900);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+      await page.evaluate("localStorage.removeItem('pf.skin')");
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const probe = `(() => {
+        const root = document.documentElement;
+        const g = (n) => getComputedStyle(root).getPropertyValue(n).trim();
+        const card = document.querySelector('.card');
+        return {
+          skin: root.dataset.skin || 'classic',
+          tint: g('--tint'),
+          rxl: g('--r-xl'),
+          cardRadius: card ? getComputedStyle(card).borderRadius : '',
+          btnRadius: (() => { const b = document.querySelector('.btn'); return b ? getComputedStyle(b).borderRadius : ''; })(),
+          version: window.__pfVersion ? window.__pfVersion() : '',
+          versionText: (document.querySelector('#appVersion') || {}).textContent || '',
+        };
+      })()`;
+
+      const base = await page.evaluate(probe);
+      check('版本号来自 VERSION 文件', /^\d+\.\d+\.\d+$/.test(base.version), base.version);
+      check('外观面板底部显示版本', /v\d+\.\d+\.\d+/.test(base.versionText), base.versionText);
+
+      // 灵动可爱
+      await page.evaluate("document.querySelector('#skinSeg [data-skin=\"cute\"]').click()");
+      await sleep(700);
+      const cute = await page.evaluate(probe);
+      check('切到灵动可爱（html[data-skin=cute]）', cute.skin === 'cute', cute.skin);
+      check('灵动可爱换了自己的主色（莓红，不是经典蓝）',
+        cute.tint !== base.tint && /oklch|rgb/.test(cute.tint), cute.tint);
+      check('灵动可爱圆角更胖（26px）', cute.rxl === '26px' && cute.cardRadius === '26px', `${cute.rxl}/${cute.cardRadius}`);
+      check('灵动可爱按钮是药丸形', /999|1e\+0|1000/.test(cute.btnRadius) || parseFloat(cute.btnRadius) > 100, cute.btnRadius);
+      await shot('skin-cute');
+
+      // 高级简约
+      await page.evaluate("document.querySelector('#skinSeg [data-skin=\"minimal\"]').click()");
+      await sleep(700);
+      const min = await page.evaluate(probe);
+      check('切到高级简约（html[data-skin=minimal]）', min.skin === 'minimal', min.skin);
+      check('高级简约用的是低饱和靛蓝', min.tint !== cute.tint && /oklch|rgb/.test(min.tint), min.tint);
+      check('高级简约圆角收敛（16px）', min.rxl === '16px' && min.cardRadius === '16px', `${min.rxl}/${min.cardRadius}`);
+      await shot('skin-minimal');
+
+      // 偏好记忆
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+      const remembered = await page.evaluate(probe);
+      check('刷新后记住上次的皮肤', remembered.skin === 'minimal', remembered.skin);
+
+      // 回到经典
+      await page.evaluate("document.querySelector('#skinSeg [data-skin=\"classic\"]').click()");
+      await sleep(600);
+      const back = await page.evaluate(probe);
+      check('能切回经典', back.skin === 'classic' && back.tint !== min.tint, `${back.skin} · ${back.tint}`);
+    },
+  },
+
+  {
     name: 'prompt-source',
     title: '⑱ 提示词三源共存（规则 / AI / 自己写）+ 开头词保留 + 手机分镜表不重叠',
     async run(page, shot, { check }) {
