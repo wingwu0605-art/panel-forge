@@ -13,6 +13,13 @@
     background:#1b1b1f;z-index:9;
   }
   #pf-load.hide{display:none}
+
+  /* 手机上 Klecks 自带的那条顶部操作行太高（一整块黑带），压扁一点；
+     横向宽屏不动它（桌面/平板布局本来就宽裕）。 */
+  @media (max-width:560px){
+    .top-overlay{min-height:0 !important}
+    .top-overlay--inner{padding-top:2px !important;padding-bottom:2px !important}
+  }
 </style>
 <script type="module" src="./embed.js"></script>
 </head>
@@ -45,13 +52,45 @@ const ready = () => new Promise((res, rej) => {
 window.__pfKlecksReady = ready();
 
 /**
- * 建实例。project 只有两层：底稿（可选）+ 一张空的「绘制」层。
- * 笔迹和底稿分开，撤销才不会把底稿一起擦掉。
+ * 建实例。layer 顺序：纸（白底）→ 底稿（可选）→ 绘制。
+ * - 白纸永远在最底下：没有底图时画布就是一张白纸，而不是透明棋盘格
+ *   （以前没底图就是透明的，画起来像在虚空里画，也别指望导出能直接用）
+ * - 笔迹和底稿分开，撤销才不会把底稿一起擦掉
+ * - 关掉白纸（透明底）：传 paper: false
  */
-window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '底稿' } = {}) => {
+window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '底稿', paper = true, guide = null } = {}) => {
   await ready();
   if (window.__pfKlecks) throw new Error('这一份文档已经建过实例了');
   const layers = [];
+  if (paper) {
+    const sheet = document.createElement('canvas');
+    sheet.width = Math.max(1, width);
+    sheet.height = Math.max(1, height);
+    const sg = sheet.getContext('2d');
+    sg.fillStyle = '#ffffff';
+    sg.fillRect(0, 0, sheet.width, sheet.height);
+    // 格子形状参考：把多边形**外面**压一层很淡的灰。
+    // 只看外面不改里面 —— 因为回填时会按同一个多边形裁切，外面的灰自然被裁掉，
+    // 所以不需要额外图层、也不用在导出前藏起来。
+    if (Array.isArray(guide) && guide.length >= 3) {
+      const p = new Path2D();
+      p.rect(0, 0, sheet.width, sheet.height);
+      guide.forEach(([x, y], i) => (i ? p.lineTo(x, y) : p.moveTo(x, y)));
+      p.closePath();
+      sg.fillStyle = 'rgba(0,0,0,0.10)';
+      sg.fill(p, 'evenodd');
+      // 边界再描一道细线（在边界上，导出时被裁掉一半，视觉上正好当引导线）
+      sg.beginPath();
+      guide.forEach(([x, y], i) => (i ? sg.lineTo(x, y) : sg.moveTo(x, y)));
+      sg.closePath();
+      sg.strokeStyle = 'rgba(0,0,0,0.22)';
+      sg.lineWidth = Math.max(2, Math.round(sheet.width / 500));
+      sg.setLineDash([Math.max(8, sheet.width / 90)]); 
+      sg.stroke();
+      sg.setLineDash([]);
+    }
+    layers.push({ name: '纸', opacity: 1, isVisible: true, image: sheet });
+  }
   if (baseUrl) {
     const img = await new Promise((res, rej) => {
       const i = new Image();
@@ -99,6 +138,20 @@ window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '�
       }
       mui.setIsVisible?.(true);
       mui.update?.();
+      // 它手机列里有两块被拉成整屏高（取色器 + 粗细/不透明度滑杆），竖屏下像两根空长条。
+      // 这里统一压到屏幕高度的 22%，超出的内部滚动 —— 不依赖它那些哈希类名。
+      const col = mui.controlsEl;
+      if (col) {
+        const cap = Math.max(64, Math.round(window.innerHeight * 0.22));
+        for (const child of col.children) {
+          const h = child.getBoundingClientRect().height;
+          if (h > cap) {
+            child.style.maxHeight = cap + 'px';
+            child.style.overflowY = 'auto';
+            child.style.overflowX = 'hidden';
+          }
+        }
+      }
       return true;
     } catch { return false; }
   };
@@ -121,6 +174,24 @@ window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '�
 window.__pfKlecksPng = async () => {
   if (!window.__pfKlecks) throw new Error('还没初始化');
   return await window.__pfKlecks.getPNG();
+};
+
+/**
+ * 白底 / 透明：切换「纸」这一层的可见性。
+ * 返回**切换后纸层的实际可见性**（Klecks 的图层可能要等一帧才真正生效，
+ * 调用方据此重试，而不是假设一次就成功）。
+ */
+window.__pfKlecksPaper = (on) => {
+  try {
+    const kl = window.__pfKlecks?.embed?.klApp?.klCanvas;
+    if (!kl) return null;
+    const find = () => (kl.getLayers?.() || []).find((l) => l.name === '纸') || null;
+    const paper = find();
+    if (!paper) return null;
+    kl.setLayerIsVisible?.(paper.id, !!on);
+    const after = find();
+    return after ? !!after.isVisible : null;
+  } catch { return null; }
 };
 
 /** 取分层 PSD（留着以后做「分层回填」用） */

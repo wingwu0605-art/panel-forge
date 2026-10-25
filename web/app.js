@@ -986,6 +986,7 @@ async function openPaint(slotId = state.selectedId) {
   $('#paintTitle').textContent = `绘制第 ${slot.order} 格`;
   $('#paintSub').textContent = `${slot.shape?.zh || '常规格'} · ${Math.round(slot.w)}×${Math.round(slot.h)}`;
   if (!paintBound) bindPaintUI();
+  syncPaintPaperBtn();
 
   // ---- 1) 先试外部引擎 ----
   const host = createKlecksHost({ slot, baseUrl });
@@ -995,10 +996,11 @@ async function openPaint(slotId = state.selectedId) {
     paintHost = host;
     paintEngine = 'klecks';
     document.body.classList.add('paint-engine');
-    // 窄屏（手机竖屏）上 Klecks 的桌面工具栏不收起，工作区只剩一百多像素，画布会缩得很小。
-    // 这里不硬改它的 UI（那是 fork 级别的事），只把预期说清楚。
+    // 应用用户上次选的白底/透明
+    await host.setPaper(paintPaperOn());
+    // 窄屏（手机竖屏）：标题副行给一句最短的提示，别把顶栏撑满
     if (window.innerWidth < 560) {
-      $('#paintSub').textContent = `${slot.shape?.zh || '常规格'} · 竖屏空间小，建议横屏或平板/电脑`;
+      $('#paintSub').textContent = `${slot.shape?.zh || '常规格'} · 竖屏窄，建议横屏`;
     }
     animatePaintIn(slot, host.el);
     perfDone('paint', t0);
@@ -1018,6 +1020,7 @@ async function openPaint(slotId = state.selectedId) {
   const under = state.under[slotId] || null;
   painter = createCellPainter({ slot, strokes: rec?.strokes || [] });
   stage.appendChild(painter.canvas);
+  painter.setPaper(paintPaperOn());
   fitPaintCanvas();
   $('#paintUndo').disabled = !painter.strokes.length;
   wirePaintCanvas();
@@ -1042,6 +1045,26 @@ async function exportSlotImage(slotId = state.selectedId) {
   } catch (e) {
     toast('导出失败：' + e.message);
   }
+}
+
+/** 白底 / 透明：用户可选，记在本机。true = 白底，false = 透明 */
+function paintPaperOn() { return store.get('pf.paint.paper') !== '0'; }
+
+function syncPaintPaperBtn() {
+  const on = paintPaperOn();
+  const b = $('#paintPaper');
+  if (b) {
+    b.textContent = on ? '白底' : '透明';
+    b.classList.toggle('primary', !on);
+  }
+}
+
+async function setPaintPaper(on) {
+  store.set('pf.paint.paper', on ? null : '0');
+  syncPaintPaperBtn();
+  if (paintEngine === 'klecks' && paintHost) await paintHost.setPaper(on);
+  else if (painter) painter.setPaper(on);
+  toast(on ? '画布改成白底（导出不透明 PNG）' : '画布改成透明（导出带透明通道）');
 }
 
 /** 绘制页里「导出」：把当前画面按格子形状裁好存成 PNG（两种引擎都支持） */
@@ -1151,6 +1174,8 @@ function bindPaintUI() {
   $('#paintColor')?.addEventListener('input', (ev) => { painter?.setColor(ev.target.value); });
   $('#paintUndo')?.addEventListener('click', () => { if (painter?.undo()) syncPaintMeta(); });
   $('#paintExport')?.addEventListener('click', () => { exportPaintImage(); });
+  // 白底 / 透明：用户自己选，记在本机
+  $('#paintPaper')?.addEventListener('click', () => { setPaintPaper(!paintPaperOn()); });
   $('#paintCancel')?.addEventListener('click', closePaint);
   $('#paintDone')?.addEventListener('click', () => { finishPaint(); });
   $('#paintSheet')?.addEventListener('pointerdown', (ev) => { if (ev.target.id === 'paintStage') closePaint(); });

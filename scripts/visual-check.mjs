@@ -1534,6 +1534,62 @@ const scenarios = [
   },
 
   {
+    name: 'paint-paper',
+    title: '⑲ 白底 / 透明由用户选（导出像素是真的白 / 真的透明）',
+    async run(page, shot, { check }) {
+      await page.viewport(430, 900);
+      const px = `(async () => {
+        const w = document.querySelector('.paint-frame').contentWindow;
+        const bmp = await w.createImageBitmap(await w.__pfKlecksPng());
+        const cv = w.document.createElement('canvas');
+        cv.width = bmp.width; cv.height = bmp.height;
+        const cx = cv.getContext('2d');
+        cx.drawImage(bmp, 0, 0);
+        const p = cx.getImageData(2, 2, 1, 1).data;
+        return [p[0], p[1], p[2], p[3]].join(',');
+      })()`;
+      const label = `(document.querySelector('#paintPaper')?.textContent || '').trim()`;
+
+      await page.goto('/?perf=1&fresh=1&tpl=jp-triangle-impact&slot=p2');
+      await page.evaluate("localStorage.removeItem('pf.paint.paper')");
+      await page.goto('/?perf=1&fresh=1&tpl=jp-triangle-impact&slot=p2');
+      await page.ready();
+      await page.evaluate("document.querySelector('#btnPaintTop').click()");
+      await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '绘制页打开', timeout: 30000 });
+      await sleep(3200);
+
+      const white = await page.evaluate(px);
+      check('默认白底：导出的像素是不透明白', white === '255,255,255,255', white);
+      check('按钮显示「白底」', (await page.evaluate(label)) === '白底');
+      await shot('paint-paper-white');
+
+      await page.evaluate("document.querySelector('#paintPaper').click()");
+      await sleep(1200);
+      const alpha = await page.evaluate(px);
+      check('切「透明」后导出带透明通道', alpha === '0,0,0,0', alpha);
+      check('按钮显示「透明」', (await page.evaluate(label)) === '透明');
+
+      await page.evaluate("document.querySelector('#paintPaper').click()");
+      await sleep(1200);
+      check('能切回白底', (await page.evaluate(px)) === '255,255,255,255');
+
+      // 选透明 → 关掉重开：偏好要被记住
+      await page.evaluate("document.querySelector('#paintPaper').click()");
+      await sleep(800);
+      await page.evaluate("document.querySelector('#paintCancel').click()");
+      await sleep(600);
+      await page.evaluate("document.querySelector('#btnPaintTop').click()");
+      await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '再打开', timeout: 30000 });
+      await sleep(3200);
+      const reopen = await page.evaluate(px);
+      const reopenLabel = await page.evaluate(label);
+      check('重开后仍按上次的选择（透明）', reopen === '0,0,0,0' && reopenLabel === '透明',
+        `${reopen} · 按钮=${reopenLabel}`);
+      await page.evaluate('window.__pfPaint.close()');
+    },
+  },
+
+  {
     name: 'prompt-source',
     title: '⑱ 提示词三源共存（规则 / AI / 自己写）+ 开头词保留 + 手机分镜表不重叠',
     async run(page, shot, { check }) {

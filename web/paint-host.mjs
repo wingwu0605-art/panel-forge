@@ -22,8 +22,14 @@ export function createKlecksHost({ slot, baseUrl = '', workSide = PAINT_ENGINE_W
   const scale = workSide / Math.max(slot.w, slot.h);
   const width = Math.max(1, Math.round(slot.w * scale));
   const height = Math.max(1, Math.round(slot.h * scale));
+  // 格子多边形换算到画布坐标（画布 = 这一格包围盒，所以减掉 x/y 再乘缩放），
+  // 交给引擎画成「外面压灰」的形状参考线
+  const guide = Array.isArray(slot.poly)
+    ? slot.poly.map(([x, y]) => [Math.round((x - slot.x) * scale), Math.round((y - slot.y) * scale)])
+    : null;
   let frame = null;
   let onSubmit = null;
+  let paperOn = true;
 
   const win = () => frame?.contentWindow || null;
 
@@ -58,8 +64,26 @@ export function createKlecksHost({ slot, baseUrl = '', workSide = PAINT_ENGINE_W
       if (!w.__pfKlecksReady) throw new Error('embed.html 不是预期版本（缺 __pfKlecksReady）');
       await w.__pfKlecksReady;
       w.__pfOnSubmit = () => { try { onSubmit?.(); } catch { /* ignore */ } };
-      await w.__pfKlecksBoot({ width, height, baseUrl });
+      await w.__pfKlecksBoot({ width, height, baseUrl, guide });
+      // 记住用户选的白底/透明，挂载后应用一次
+      if (paperOn === false) w.__pfKlecksPaper?.(false);
       return true;
+    },
+
+    /**
+     * 白底 / 透明：隐藏或显示「纸」层。
+     * 刚 mount 完 Klecks 的图层还没稳，一次切换可能不生效 —— 校验实际状态并重试。
+     */
+    async setPaper(on) {
+      paperOn = !!on;
+      const w = win();
+      if (!w?.__pfKlecksPaper) return false;
+      for (let i = 0; i < 12; i++) {
+        const now = w.__pfKlecksPaper(!!on);
+        if (now === !!on) return true;
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      return false;
     },
 
     /** 取当前画面（所有可见图层合成，带 alpha）。跨 realm 的 Blob 重新包一层更保险。 */

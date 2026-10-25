@@ -55,6 +55,7 @@ export function createCellPainter({ slot, strokes = [], workSide = PAINT_WORK_SI
     underlay: null,  // HTMLImageElement | null（描线时的底图）
     wet: null,       // 正在画的这一笔
     usingPen: false,
+    paper: true,      // 白底（false = 透明底，导出带透明通道）
     activeId: null,
   };
 
@@ -116,6 +117,11 @@ export function createCellPainter({ slot, strokes = [], workSide = PAINT_WORK_SI
 
   function rebuildBase() {
     bctx.clearRect(0, 0, w, h);
+    // 白纸 / 透明：用户可选（和 Klecks 那条链路一致）
+    if (st.paper) {
+      bctx.fillStyle = '#ffffff';
+      bctx.fillRect(0, 0, w, h);
+    }
     drawUnderlay(bctx);
     for (const s of st.strokes) paintStroke(bctx, s);
   }
@@ -208,6 +214,7 @@ export function createCellPainter({ slot, strokes = [], workSide = PAINT_WORK_SI
     setTool: (t) => { st.tool = t === 'eraser' ? 'eraser' : 'pen'; },
     setColor: (c) => { st.color = c; },
     setSize: (n) => { st.size = Math.max(0.5, Number(n) || 1); },
+    setPaper(on) { st.paper = on !== false; rebuildBase(); render(); return st.paper; },
     setUnderlay(img) { st.underlay = img || null; rebuildBase(); render(); },
     begin, move, end,
     render,
