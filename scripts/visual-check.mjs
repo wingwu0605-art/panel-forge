@@ -15,7 +15,7 @@
  */
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -2036,6 +2036,18 @@ const scenarios = [
       check('点右上角按钮才展开全部，并关掉气泡',
         out.expand.rightMini === false && out.expand.rightW > 200 && out.expand.pops === 0, `宽 ${out.expand.rightW}`);
       check('展开后图标条隐藏，回到完整卡片', out.expand.stripShown === false && out.leftExpanded === true);
+
+      // 静态产物自检：app.js 里 import 的每个相对模块，site/ 下必须真的存在
+      {
+        const appSrc = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
+        const mods = [...appSrc.matchAll(/from '\.\/([^']+\.mjs)'/g)].map((m) => m[1]);
+        const missing = [];
+        for (const m of mods) {
+          try { readFileSync(join(ROOT, 'site', m)); } catch { missing.push(m); }
+        }
+        check('静态产物完整性：app.js 引用的模块都在 site/ 里',
+          missing.length === 0, missing.length ? '缺 ' + missing.join(',') : mods.length + ' 个模块齐全');
+      }
       await shot('rails');
     },
   },
