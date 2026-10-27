@@ -2,7 +2,7 @@
  * 纯函数单测（不启服务器、不连模型）：node scripts/test-units.mjs
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
-import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint } from '../lib/llm-core.mjs';
+import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
 import { splitClauses, assignSegments, buildPlan } from '../lib/matcher.mjs';
 import { TEMPLATES } from '../lib/library.mjs';
@@ -178,6 +178,20 @@ ok('404 但内容不是模型问题时，指向 baseUrl 版本段',
 ok('401/403 指向 Key 与开通状态',
   /Key/.test(chatErrorHint(401, 'Unauthorized', arkEp, 'm')));
 ok('429 提到额度/频率', /额度|频率/.test(chatErrorHint(429, 'rate limit', arkEp, 'm')));
+
+/* 生图可以完全独立：文本用 A 家、生图用 B 家（两把 Key 两套地址） */
+ok('生图 Base URL 优先于对话 Base URL',
+  resolveImageEndpoint({ baseUrl: 'https://api.deepseek.com/v1', imgBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', imageProvider: 'volcengine' })
+    === 'https://ark.cn-beijing.volces.com/api/v3/images/generations');
+ok('没填生图 Base URL 就回落用对话那条',
+  resolveImageEndpoint({ baseUrl: 'https://api.openai.com/v1', imageProvider: 'openai' })
+    === 'https://api.openai.com/v1/images/generations');
+ok('两把 Key 都能被 normalizeCfg 保留',
+  (() => {
+    const c = normalizeCfg({ baseUrl: 'https://a/v1', apiKey: 'k1', imgKey: 'k2', imgBaseUrl: 'https://b/api/v3' });
+    return c.apiKey === 'k1' && c.imgKey === 'k2' && c.imgBaseUrl === 'https://b/api/v3';
+  })(),
+  'imgKey 与 imgBaseUrl');
 
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 

@@ -654,7 +654,21 @@
             <input id="ksImgModel" type="text" spellcheck="false" placeholder="gpt-image-1 / doubao-seedream-5-0-pro-260628">
           </label>
         </div>
-        <div class="ks-hint muted small">「测试连接」只测**对话模型**；只填生图模型也能直接用格子里的「生这一格」。模型 ID 请从控制台复制（带日期后缀，如 …-260628）。</div>
+        <div class="ks-hint muted small">「测试连接」只测对话模型；只填生图模型也能直接用格子里的「生这一格」。模型 ID 从控制台复制（带日期后缀）。</div>
+        <!-- 生图可以完全独立：换服务商 / 换 Key / 换地址。留空就复用上面那把 -->
+        <details class="ks-more">
+          <summary>生图用另一把 Key / 另一个服务商（可选）</summary>
+          <div class="ks-more-body">
+            <label class="field"><span>生图 Base URL（留空 = 用上面的）</span>
+              <input id="ksImgBase" type="text" spellcheck="false" placeholder="https://ark.cn-beijing.volces.com/api/v3">
+            </label>
+            <label class="field"><span>生图 API Key（留空 = 用上面的）</span>
+              <input id="ksImgKey" type="password" spellcheck="false" placeholder="可选：文本和生图不是同一家时才需要">
+            </label>
+            <p class="muted small" style="margin:6px 0 0">火山方舟 / OpenAI / 硅基流动 / 通义百炼：同一个 Key 就能两项都用，这里留空即可。
+              只有当「文本用 A 家、生图用 B 家」，或某家中转分开授权时，才需要分两把。</p>
+          </div>
+        </details>
         <div class="row2">
           <button class="btn tiny" id="ksTest">测试连接</button>
           <button class="btn tiny primary" id="ksSave">保存并使用</button>

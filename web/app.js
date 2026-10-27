@@ -3603,6 +3603,8 @@ function applyKeyEntry(e) {
     apiKey: e.apiKey || '',
     imageProvider: e.imgProvider || 'openai',
     imgModel: e.imgModel || '',
+    imgBaseUrl: e.imgBaseUrl || '',
+    imgKey: e.imgKey || '',
     sessionOnly: false,
   };
   $('#llmProtocol').value = state.llm.protocol;
@@ -3671,6 +3673,11 @@ function fillKeyForm(e) {
   $('#ksKey').value = e.apiKey || '';
   $('#ksImgProvider').value = e.imgProvider || 'openai';
   $('#ksImgModel').value = e.imgModel || '';
+  // 生图专属（留空 = 复用上面那条）
+  if ($('#ksImgBase')) $('#ksImgBase').value = e.imgBaseUrl || '';
+  if ($('#ksImgKey')) $('#ksImgKey').value = e.imgKey || '';
+  const more = document.querySelector('.ks-more');
+  if (more) more.open = !!(e.imgBaseUrl || e.imgKey);
 }
 
 function formEntry() {
@@ -3683,6 +3690,8 @@ function formEntry() {
     apiKey: $('#ksKey').value.trim(),
     imgProvider: $('#ksImgProvider').value,
     imgModel: $('#ksImgModel').value.trim(),
+    imgBaseUrl: ($('#ksImgBase')?.value || '').trim(),
+    imgKey: ($('#ksImgKey')?.value || '').trim(),
     verifiedAt: 0,
   };
 }
