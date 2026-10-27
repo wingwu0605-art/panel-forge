@@ -1,69 +1,102 @@
-PanelForge 分镜坊 · 专有许可（All Rights Reserved）
+PolyForm Noncommercial License 1.0.0
+https://polyformproject.org/licenses/noncommercial/1.0.0
 
-Copyright (c) 2026 PanelForge 作者。保留所有权利。
-Copyright (c) 2026 the PanelForge author. All rights reserved.
+## Acceptance
 
-────────────────────────────────────────────────────────────────
-一、这不是开源许可
+In order to get any license under these terms, you must agree to them as both strict obligations and conditions to all your licenses.
 
-本仓库自 2026 年 10 月起转为**闭源专有项目**。未经作者事先书面授权，
-任何人不得使用、复制、修改、翻译、汇编、发行、出租、出售、再许可，
-或以任何形式利用本软件及其源代码的全部或实质性部分。
+## Copyright License
 
-本许可不授予任何明示或默示的权利。作者保留全部未明确授予的权利。
+The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe the licensor's copyright in it for any permitted purpose. However, you may only distribute the software according to [Distribution License](#distribution-license) and make changes or new works based on the software according to [Changes and New Works License](#changes-and-new-works-license).
 
-────────────────────────────────────────────────────────────────
-二、你仍然可以用它的产出物做商业项目（这一点不变）
+## Distribution License
 
-用本软件**生成或导出**的内容——分镜页图片（PNG / SVG）、分镜表（Markdown / JSON）、
-你自己绘制的图画、以及据此创作的作品——**归你所有**，可以用于任何目的，
-**包括商业目的**（出版、连载、接稿、出售、印刷、周边、商用稿件等），
-无需向作者付费，也无需署名。
+The licensor grants you an additional copyright license to distribute copies of the software. Your license to distribute covers distributing the software with changes and new works permitted by [Changes and New Works License](#changes-and-new-works-license).
 
-这条只适用于**已经合法获得使用资格**的人（作者授权的用户或作者本人）；
-它不构成对你使用本软件本身的授权。
+## Notices
 
-────────────────────────────────────────────────────────────────
-三、授权方式
+You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms or the URL for them above, as well as copies of any plain-text lines beginning with `Required Notice:` that the licensor provided with the software. For example:
 
-需要商业使用、团队使用、二次开发或私有部署，请联系作者取得书面授权。
-授权范围、期限、费用由双方另行约定。
+> Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
 
-────────────────────────────────────────────────────────────────
-四、第三方组件不适用本许可（它们的开源许可必须保留）
+## Changes and New Works License
 
-本软件内含的第三方组件各自适用其原许可，本许可不改变它们，也不能被解释为限制它们：
+The licensor grants you an additional copyright license to make changes and new works based on the software for any permitted purpose.
 
-  · Klecks（web/klecks/）—— MIT，Copyright (c) bitbof
-  · perfect-freehand（web/vendor/perfect-freehand.mjs）—— MIT，Copyright (c) Steve Ruiz
+## Patent License
 
-详见 THIRD-PARTY-NOTICES.md。**这两部分是 MIT，任何人仍可按 MIT 单独使用它们**
-——这是 MIT 的性质，闭源改变不了。本许可的专有条款只作用于作者原创的部分：
-模板数据、渲染与排版内核、AI 编排流程、界面与交互实现。
+The licensor grants you a patent license for the software that covers patent claims the licensor can license, or becomes able to license, that you would infringe by using the software.
 
-────────────────────────────────────────────────────────────────
-五、无担保与责任限制
+## Noncommercial Purposes
 
-本软件按「现状」提供，不附带任何明示或默示的担保。在任何情况下，
-作者均不对因使用或无法使用本软件而产生的任何索赔、损害或其他责任负责。
+Any noncommercial purpose is a permitted purpose.
 
-────────────────────────────────────────────────────────────────
-六、终止
+## Personal Uses
 
-任何违反本许可的使用即刻自动终止，且不因此免除违反者的赔偿责任。
+Personal use for research, experiment, and testing for the benefit of public knowledge, personal study, private entertainment, hobby projects, amateur pursuits, or religious observance, without any anticipated commercial application, is use for a permitted purpose.
 
-────────────────────────────────────────────────────────────────
-English summary（仅为方便阅读，中文正文为准 / the Chinese text governs）
+## Noncommercial Organizations
 
-This is proprietary, closed-source software. All rights are reserved. No permission is
-granted to use, copy, modify, distribute, sublicense or commercially exploit the software
-or any substantial part of it without the author's prior written permission.
+Use by any charitable organization, educational institution, public research organization, public safety or health organization, environmental protection organization, or government institution is use for a permitted purpose regardless of the source of funding or obligations resulting from the funding.
 
-Outputs you create with an authorized copy of the software — exported storyboard pages,
-images, scripts and artwork — are entirely yours and may be used commercially, free of
-charge and without attribution.
+## Fair Use
 
-Bundled third-party components (Klecks, perfect-freehand) remain under their own MIT
-licenses and are not affected by this license.
+You may have "fair use" rights for the software under the law. These terms do not limit them.
 
-No warranty of any kind is provided.
+## No Other Rights
+
+These terms do not allow you to sublicense or transfer any of your licenses to anyone else, or prevent the licensor from granting licenses to anyone else. These terms do not imply any other licenses.
+
+## Patent Defense
+
+If you make any written claim that the software infringes or contributes to infringement of any patent, your patent license for the software granted under these terms ends immediately. If your company makes such a claim, your patent license ends immediately for work on behalf of your company.
+
+## Violations
+
+The first time you are notified in writing that you have violated any of these terms, or done anything with the software not covered by your licenses, your licenses can nonetheless continue if you come into full compliance with these terms, and take practical steps to correct past violations, within 32 days of receiving notice. Otherwise, all your licenses end immediately.
+
+## No Liability
+
+***As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim.***
+
+## Definitions
+
+The **licensor** is the individual or organization offering these terms, and the **software** is the software the licensor makes available under these terms.
+
+**You** refers to the individual or organization agreeing to these terms.
+
+**Your company** is any legal entity, sole proprietorship, or other kind of organization that you work for, plus all its affiliates.
+
+**Affiliates** means the other organizations than an organization has control over, is under the control of, or is under common control with.
+
+**Control** means ownership of substantially all the assets of an organization, or the power to direct its management and policies by vote, contract, or otherwise. Control can be direct or indirect.
+
+**Your licenses** are all the licenses granted to you for the software under these terms.
+
+**Use** means anything you do with the software requiring one of your licenses.
+
+**Trademark** means trademarks, service marks, and similar rights.
+
+---
+
+Required Notice: Copyright (c) 2026 the PanelForge author.
+
+Required Notice: 本许可限制的是**软件本身（代码）**的使用：代码仅限非商业用途，商业使用需另行取得授权。
+用本软件**产出的作品**（分镜稿、画面、图像、文本等）不受此限制 —— 产出物可自由商用。
+完整解释见 `LICENSE-OUTPUTS.md`。
+
+Required Notice: This license restricts use of the **software (its code)** to noncommercial purposes;
+commercial use of the code requires a separate commercial license.
+**Outputs** you create with the software (storyboards, images, artwork, text) are **not** restricted
+and may be used commercially. See `LICENSE-OUTPUTS.md`.
+
+---
+
+## 关于第三方组件 / Third-party components
+
+本仓库包含第三方组件，它们各自保留原有许可，**不受**上面的非商业条款影响：
+
+- `web/klecks/` —— 绘画引擎 Klecks，MIT 许可（见该目录内的声明与上游仓库）
+- `web/vendor/` —— 其他第三方脚本，许可见各自文件头
+
+若你只取用这些 MIT 组件本身，仍按 MIT 使用；非商业限制只约束本项目的原创代码。
