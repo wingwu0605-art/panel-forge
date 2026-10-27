@@ -626,6 +626,9 @@ const scenarios = [
         `render ${drag.renders} 次 · patch ${drag.patches} 次 · 单次 patch ${drag.patchMs.toFixed(2)}ms`);
       await shot('hot-images-dragged');
 
+      // 刷新前显式落盘：queueSave 有 1200ms 防抖，不等它就会"草稿里没有这张图"（真问题，已在 app 侧加 flushSave）
+      await page.evaluate("window.__pfFlush ? window.__pfFlush() : null");
+      await page.waitFor("window.__pfSaveBusy === false", { label: '草稿落盘完成', timeout: 8000 }).catch(() => {});
       // 刷新：图片存在 IndexedDB 里（Blob），取回来要能重建 href
       await page.goto('/?perf=1&tpl=ref-4band-2col');
       await page.ready();
@@ -1950,8 +1953,8 @@ const scenarios = [
   },
 
   {
-    name: 'long-press',
-    title: '㉗ 手机长按某一格：震动 + 直接进这一格的编辑页',
+    name: 'double-tap',
+    title: '㉗ 手机双击某一格：震动 + 直接进这一格的编辑页（长按让位给系统菜单）',
     async run(page, shot, { check }) {
       await page.viewport(430, 900);
       await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
@@ -1960,64 +1963,78 @@ const scenarios = [
       const out = await page.evaluate(`(async () => {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         let vib = 0;
-        navigator.vibrate = (ms) => { vib++; return true; };
-        const svg = document.querySelector('#canvas svg');
-        const r = svg.getBoundingClientRect();
-        const at = (fx, fy) => ({ clientX: r.left + r.width * fx, clientY: r.top + r.height * fy });
-        const ev = (type, fx, fy, pointerType = 'touch') => svg.dispatchEvent(new PointerEvent(type, {
-          bubbles: true, cancelable: true, pointerId: 1, pointerType, isPrimary: true, ...at(fx, fy),
-        }));
+        navigator.vibrate = () => { vib++; return true; };
+        const svg = () => document.querySelector('#canvas svg');
+        const at = (fx, fy) => {
+          const r = svg().getBoundingClientRect();
+          return { clientX: r.left + r.width * fx, clientY: r.top + r.height * fy };
+        };
+        const tap = async (fx, fy) => {
+          svg().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 3, pointerType: 'touch', isPrimary: true, ...at(fx, fy) }));
+          await wait(40);
+          svg().dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 3, pointerType: 'touch', isPrimary: true, ...at(fx, fy) }));
+        };
         const res = { startView: document.body.dataset.view || '' };
 
-        // ① 长按 620ms 不动
-        ev('pointerdown', 0.5, 0.25);
-        await wait(620);
-        res.long = {
-          view: document.body.dataset.view,
-          vib,
-          pulse: document.body.classList.contains('pf-lp'),
-          toast: document.querySelector('#toast')?.textContent || '',
-          selected: !!document.querySelector('#slotRole')?.textContent.trim(),
-        };
-        ev('pointerup', 0.5, 0.25);
-        await wait(180);
+        // ① 单击：只选中
+        await tap(0.5, 0.28);
+        await wait(420);
+        res.single = { vib, view: document.body.dataset.view, toast: document.querySelector('#toast')?.textContent || '' };
 
-        // ② 短按不触发
-        const v0 = vib;
-        ev('pointerdown', 0.3, 0.7);
-        await wait(80);
-        ev('pointerup', 0.3, 0.7);
-        await wait(260);
-        res.tap = { vib: vib - v0 };
-
-        // ③ 长按中途移动 → 取消
-        const v1 = vib;
-        ev('pointerdown', 0.5, 0.5);
+        // ② 双击：震动 + 进编辑
+        await tap(0.5, 0.28);
         await wait(120);
-        ev('pointermove', 0.62, 0.56);
-        await wait(520);
-        res.drag = { vib: vib - v1 };
-        ev('pointerup', 0.62, 0.56);
+        await tap(0.5, 0.28);
+        await wait(450);
+        res.double = { vib, view: document.body.dataset.view, toast: document.querySelector('#toast')?.textContent || '' };
 
-        // ④ 鼠标长按不触发（桌面走右键）
-        const v2 = vib;
-        ev('pointerdown', 0.5, 0.25, 'mouse');
-        await wait(620);
-        res.mouse = { vib: vib - v2 };
-        ev('pointerup', 0.5, 0.25, 'mouse');
+        // ③ 间隔太久不算双击
+        document.body.dataset.view = 'canvas';
+        const v0 = vib;
+        await tap(0.3, 0.7);
+        await wait(520);
+        await tap(0.3, 0.7);
+        await wait(320);
+        res.slow = { dVib: vib - v0, view: document.body.dataset.view };
+
+        // ④ 触屏长按的 contextmenu 被吞掉
+        const r = svg().getBoundingClientRect();
+        const ctxTouch = new PointerEvent('contextmenu', { bubbles: true, cancelable: true, pointerType: 'touch',
+          clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 });
+        svg().dispatchEvent(ctxTouch);
+        await wait(220);
+        res.touchCtx = {
+          prevented: ctxTouch.defaultPrevented,
+          menuShown: !document.querySelector('#ctxMenu')?.classList.contains('hidden'),
+        };
+
+        // ⑤ 鼠标右键照旧
+        const ctxMouse = new MouseEvent('contextmenu', { bubbles: true, cancelable: true,
+          clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 });
+        svg().dispatchEvent(ctxMouse);
+        await wait(220);
+        res.mouseCtx = {
+          menuShown: !document.querySelector('#ctxMenu')?.classList.contains('hidden'),
+          title: document.querySelector('#ctxMenu .ctx-title')?.textContent || '',
+        };
+        document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
         return res;
       })()`);
 
-      check('长按某一格会触发震动', out.long.vib === 1, String(out.long.vib));
-      check('长按后直接进入编辑视图', out.long.view === 'edit', out.long.view || '(空)');
-      check('长按有视觉反馈（画布脉冲 + 提示）',
-        out.long.pulse === true && /长按进入/.test(out.long.toast), out.long.toast);
-      check('短按不会震动（避免误触）', out.tap.vib === 0, String(out.tap.vib));
-      check('长按过程中移动会取消（拖图不被误判成长按）', out.drag.vib === 0, String(out.drag.vib));
-      check('鼠标长按不触发（桌面用右键菜单）', out.mouse.vib === 0, String(out.mouse.vib));
-      await shot('long-press');
+      check('单击只选中，不震动、不进编辑',
+        out.single.vib === 0 && out.single.view === out.startView, `vib=${out.single.vib} view=${out.single.view}`);
+      check('双击某一格会震动', out.double.vib === 1, String(out.double.vib));
+      check('双击后直接进入编辑视图', out.double.view === 'edit', out.double.view || '(空)');
+      check('双击有提示', /双击进入/.test(out.double.toast), out.double.toast);
+      check('两下间隔太久不算双击', out.slow.dVib === 0, String(out.slow.dVib));
+      check('触屏长按的 contextmenu 被吞掉、不弹我们的菜单',
+        out.touchCtx.prevented === true && out.touchCtx.menuShown === false,
+        `prevented=${out.touchCtx.prevented} shown=${out.touchCtx.menuShown}`);
+      check('鼠标右键仍然弹菜单', out.mouseCtx.menuShown === true, out.mouseCtx.title);
+      await shot('double-tap');
     },
   },
+
 
   {
     name: 'inbox',

@@ -1891,9 +1891,10 @@ function slotAt(pt) {
   return null;
 }
 
-/* ---------------- 手机长按：震动 + 进这一格的编辑页 ---------------- */
-const LP_MS = 460;          // 长按多久算长按（太短容易和拖图冲突）
-const LP_SLOP = 8;          // 手指抖动容差（px）
+
+/* ---------------- 手机双击：震动 + 进这一格的编辑页 ---------------- */
+const DTAP_MS = 340;        // 两次点击间隔小于这个算双击
+const DTAP_SLOP = 10;       // 两次点击位置允许的偏差（px）
 
 function haptic(ms = 18) {
   // Android Chrome 支持；iOS Safari 没有 vibrate，静默跳过（靠视觉反馈兜底）
@@ -1906,37 +1907,32 @@ function lpPulse() {
   lpPulse._t = setTimeout(() => document.body.classList.remove('pf-lp'), 320);
 }
 
-function cancelLongPress() {
-  const lp = state._lp;
-  if (!lp) return;
-  clearTimeout(lp.timer);
-  state._lp = null;
-}
-
-/** 长按某一格：震动 → 选中它 → 进编辑页 */
-function fireLongPress(slot) {
-  state._lp = null;
+/** 双击某一格：震动 → 选中它 → 进编辑页 */
+function fireDoubleTap(slot) {
   haptic(22);
   lpPulse();
   state.selectedId = slot.id;
   state.selBubble = null;
   renderStage();
   renderSlotPanel();
-  // 手机上「编辑」是一个底部抽屉视图；桌面没有长按路径，但真触屏平板也走这里
+  // 缩放条位置由「画布重绘观察器」自动跟随，这里不需要再手动同步
   setView('edit', { animate: true });
   const order = state.tpl?.slots?.find((x) => x.id === slot.id)?.order;
-  toast(`长按进入第 ${order ?? '?'} 格的编辑`);
+  toast(`双击进入第 ${order ?? '?'} 格的编辑`);
 }
 
-function startLongPress(slot, ev) {
-  if (!slot || ev.pointerType === 'mouse') return;   // 桌面用右键菜单，不长按
-  cancelLongPress();
-  const timer = setTimeout(() => {
-    const lp = state._lp;
-    if (!lp || lp.moved) return;
-    fireLongPress(slot);
-  }, LP_MS);
-  state._lp = { slot, timer, x: ev.clientX, y: ev.clientY, moved: false };
+/** 判断这一下是不是"同一格的第二次点" */
+function noteTap(slot, ev) {
+  if (!slot || ev.pointerType === 'mouse') return false;   // 鼠标走 dblclick
+  const now = Date.now();
+  const last = state._lastTap;
+  const same = last && last.id === slot.id && now - last.t < DTAP_MS
+    && Math.hypot(ev.clientX - last.x, ev.clientY - last.y) < DTAP_SLOP;
+  if (same) { state._lastTap = null; return true; }
+  state._lastTap = { id: slot.id, t: now, x: ev.clientX, y: ev.clientY };
+  clearTimeout(noteTap._clear);
+  noteTap._clear = setTimeout(() => { state._lastTap = null; }, DTAP_MS + 60);
+  return false;
 }
 
 function bindUI() {
@@ -1952,14 +1948,13 @@ function bindUI() {
       drag = { bubble: bub, moved: false, x0: ev.clientX, y0: ev.clientY };
       renderStage();
       renderBubbleInspector();
-      canvas.setPointerCapture?.(ev.pointerId);
+      try { canvas.setPointerCapture?.(ev.pointerId); } catch { /* 指针已失效时忽略 */ }
       return;
     }
     if (state.hollow) { toast('镂空预览模式下不能填图，先关掉「镂空」'); return; }
     const slot = slotAt(pt);
     drag = { slot, moved: false, x0: ev.clientX, y0: ev.clientY, start: pt };
-    if (slot) canvas.setPointerCapture?.(ev.pointerId);
-    startLongPress(slot, ev);   // 手机：长按这一格 → 震动 + 进编辑页
+    if (slot) try { canvas.setPointerCapture?.(ev.pointerId); } catch { /* 指针已失效时忽略 */ }
   });
 
   canvas.addEventListener('pointermove', (ev) => {
@@ -1972,7 +1967,6 @@ function bindUI() {
       return;
     }
     const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
-    if (state._lp && Math.hypot(dx, dy) > LP_SLOP) cancelLongPress();
     if (!drag.moved && Math.hypot(dx, dy) > 4) {
       drag.moved = true;
       document.body.classList.add('pf-dragging');
@@ -2004,7 +1998,6 @@ function bindUI() {
   });
 
   const endDrag = (ev) => {
-    cancelLongPress();   // 松手就不算长按了
     document.body.classList.remove('pf-dragging');
     if (!drag) return;
     if (drag.bubble) {
@@ -2014,23 +2007,30 @@ function bindUI() {
       return;
     }
     if (!drag.moved) {
-      if (drag.slot) { state.selectedId = drag.slot.id; state.selBubble = null; renderStage(); renderSlotPanel(); renderBubbles(); }
+      const slot = drag.slot;
+      // 手机：同一格连点两下 → 震动 + 进这一格的编辑页（长按会和系统菜单打架，已弃用）
+      const isDouble = slot ? noteTap(slot, ev) : false;
+      if (slot) { state.selectedId = slot.id; state.selBubble = null; renderStage(); renderSlotPanel(); renderBubbles(); }
       else { state.selectedId = null; state.selBubble = null; renderStage(); renderSlotPanel(); }
-    } else if (drag.slot) {
+      drag = null;
+      if (isDouble) fireDoubleTap(slot);
+      return;
+    }
+    if (drag.slot) {
       // 拖动过程中走的是 patch 热路径（不存盘），松手这里才真正落一次草稿
       renderSlotPanel();
       queueSave();
     }
     drag = null;
   };
+
   canvas.addEventListener('pointerup', endDrag);
-  canvas.addEventListener('pointercancel', () => { cancelLongPress(); drag = null; document.body.classList.remove('pf-dragging'); });
+  canvas.addEventListener('pointercancel', () => { drag = null; document.body.classList.remove('pf-dragging'); });
   canvas.addEventListener('pointerleave', () => {
     if (state.hoverId) { state.hoverId = null; renderStage(); }
   });
 
   canvas.addEventListener('wheel', (ev) => {
-    cancelLongPress();
     if (!state.tpl || state.hollow) return;
     if (!ev.altKey && !ev.ctrlKey && !ev.metaKey) return;
     const slot = slotAt(pagePoint(ev));
@@ -3069,6 +3069,11 @@ window.__pfAutoSet = (m) => setAutoMode(m);
 
   bindAutoUI();
   bindInboxUI();
+  // 页面被隐藏或卸载前，把还没落盘的草稿立刻写一次
+  const flushNow = () => { if (dirty) { try { flushSave(); } catch { /* ignore */ } } };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushNow(); });
+  window.addEventListener('pagehide', flushNow);
+  window.__pfFlush = () => flushSave();
   bindSlotZoom();
 
 /* ================================================================== *
@@ -3710,7 +3715,9 @@ function installContextMenu() {
   const hide = () => menu.classList.add('hidden');
 
   document.addEventListener('contextmenu', (ev) => {
-    cancelLongPress();
+    // 触屏长按也会派发 contextmenu：那不是用户要的右键菜单，直接吞掉（编辑用双击）
+    const fromTouch = ev.pointerType === 'touch' || ev.sourceCapabilities?.firesTouchEvents === true;
+    if (fromTouch) { ev.preventDefault(); return; }
     const spec = buildContextMenu(ev);
     if (!spec || !spec.items?.length) return;   // 没有我们的上下文 → 保留浏览器菜单
     ev.preventDefault();
@@ -5313,6 +5320,17 @@ function queueSave() {
   // 给自动化测试一个可等待的「保存中」标记（固定 sleep 在慢机器上会抖）
   window.__pfSaveBusy = true;
   saveTimer = setTimeout(saveDraft, 1200);
+}
+
+/**
+ * 立即落盘（跳过 queueSave 的 1200ms 防抖）。
+ * 场景：刚拖完图就刷新/关页面 —— 防抖还没到点，草稿里就没有这张图。
+ */
+async function flushSave() {
+  if (!state.tpl || !state.pages.length) return false;
+  clearTimeout(saveTimer);
+  try { await saveDraft(); return true; }
+  catch { return false; }
 }
 
 async function saveDraft() {
