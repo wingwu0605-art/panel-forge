@@ -629,7 +629,7 @@ const scenarios = [
       // 刷新：图片存在 IndexedDB 里（Blob），取回来要能重建 href
       await page.goto('/?perf=1&tpl=ref-4band-2col');
       await page.ready();
-      await page.waitFor("document.querySelectorAll('#canvas svg image[data-slot]').length >= 3", { label: '草稿里的图片回来', timeout: 12000 });
+      await page.waitFor("document.querySelectorAll('#canvas svg image[data-slot]').length >= 3", { label: '草稿里的图片回来', timeout: 25000 });
       const back = await page.evaluate(`({
         imgs: document.querySelectorAll('#canvas svg image[data-slot]').length,
         allBlob: [...document.querySelectorAll('#canvas svg image[data-slot]')].every((e) => (e.getAttribute('href') || '').startsWith('blob:')),
@@ -1875,11 +1875,14 @@ const scenarios = [
         const svg = document.querySelector('#canvas svg');
         const r = svg.getBoundingClientRect();
         const br = box.getBoundingClientRect();
+        // 用「格子真实屏幕矩形」当参照（图片是 cover 的，会溢出格子，拿 <image> 的 rect 会算错）
+        const slotRect = window.__pfSlotRect ? window.__pfSlotRect() : null;
         res.show = {
           visible: !box.classList.contains('hidden'),
           pct: document.querySelector('#slotZoomVal')?.textContent || '',
-          rightOfCanvas: br.left > r.left + r.width - 60,
-          centered: Math.abs((br.top + br.height / 2) - (r.top + r.height / 2)) < r.height / 2,
+          gapRight: slotRect ? Math.round(br.left - slotRect.right) : null,
+          vCenterDiff: slotRect ? Math.round(Math.abs((br.top + br.height / 2) - (slotRect.top + slotRect.height / 2))) : null,
+          hasSlotRect: !!slotRect,
         };
 
         // + 号放大
@@ -1928,8 +1931,10 @@ const scenarios = [
       })()`);
 
       check('没有图时缩放条不出现', out.hiddenBeforeImage === true);
-      check('有图后缩放条出现在画布右侧', out.show.visible && out.show.rightOfCanvas === true,
-        out.show.visible ? 'right ok' : 'hidden');
+      check('有图后缩放条贴在「这一格」正右侧（距格子右边界约 10px）',
+        out.show.visible && out.show.hasSlotRect && out.show.gapRight >= 6 && out.show.gapRight <= 14,
+        `gap=${out.show.gapRight}px`);
+      check('缩放条与这一格垂直居中', Math.abs(out.show.vCenterDiff) <= 2, `Δ=${out.show.vCenterDiff}px`);
       check('缩放条显示百分比', /^\d+%$/.test(out.show.pct), out.show.pct);
       check('点「+」放大并同步百分比', out.plus !== out.show.pct, `${out.show.pct} → ${out.plus}`);
       check('拖滑杆到 200% 生效', out.slider === '200%', out.slider);

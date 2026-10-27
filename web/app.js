@@ -3195,31 +3195,61 @@ function slotZoomEls() {
 function syncSlotZoom() {
   const { box, range, val } = slotZoomEls();
   if (!box) return;
-  const canvas = $('#canvas');
-  const svg = canvas?.querySelector('svg');
+  const svg = $('#canvas')?.querySelector('svg');
   const slot = state.tpl?.slots?.find((x) => x.id === state.selectedId);
   const img = state.selectedId ? state.images[state.selectedId] : null;
   const view = document.body.dataset.view || '';
   const showIt = !!(svg && slot && img && !state.hollow && view !== 'edit');
   if (!showIt) { box.classList.add('hidden'); return; }
 
-  const cRect = canvas.getBoundingClientRect();
+  // 用 position:fixed + 视口坐标：完全不依赖 offsetParent。
+  // （踩过两次坑：offsetParent 会因祖先被加 transform 而变，算出来的位置在同步和 resize 时不一致）
   const sRect = svg.getBoundingClientRect();
   const tpl = state.tpl.page;
   const kx = sRect.width / tpl.w;
   const ky = sRect.height / tpl.h;
-  const x = sRect.left - cRect.left + (slot.x + slot.w) * kx + 10;
-  const y = sRect.top - cRect.top + (slot.y + slot.h / 2) * ky;
+  const x = sRect.left + (slot.x + slot.w) * kx + 10;
+  const y = sRect.top + (slot.y + slot.h / 2) * ky;
 
   box.classList.remove('hidden');
   box.style.left = Math.round(x) + 'px';
   box.style.top = Math.round(y) + 'px';
   box.style.transform = 'translateY(-50%)';
 
+  // 直接观察 svg 自身尺寸：加载后期版心还会变宽一点（453→466），只在 #canvas 上挂 RO 抓不到
+  if (typeof ResizeObserver === 'function' && svg !== syncSlotZoom._svg) {
+    syncSlotZoom._ro?.disconnect();
+    syncSlotZoom._svg = svg;
+    syncSlotZoom._ro = new ResizeObserver(() => {
+      try { syncSlotZoom(); } catch { /* ignore */ }
+    });
+    syncSlotZoom._ro.observe(svg);
+  }
+
   const pct = Math.round((img.zoom || 1) * 100);
   if (val) val.textContent = pct + '%';
   if (range && document.activeElement !== range) range.value = String(Math.min(400, Math.max(30, pct)));
 }
+
+/** 调试/测试用：某一格的屏幕矩形（从模板几何 + SVG 缩放换算，与图片溢出一概无关） */
+window.__pfSlotRect = (id = state.selectedId) => {
+  const canvas = $('#canvas');
+  const svg = canvas?.querySelector('svg');
+  const slot = state.tpl?.slots?.find((x) => x.id === id);
+  if (!svg || !slot) return null;
+  const r = svg.getBoundingClientRect();
+  const page = state.tpl.page;
+  const kx = r.width / page.w;
+  const ky = r.height / page.h;
+  return {
+    left: r.left + slot.x * kx,
+    top: r.top + slot.y * ky,
+    right: r.left + (slot.x + slot.w) * kx,
+    bottom: r.top + (slot.y + slot.h) * ky,
+    width: slot.w * kx,
+    height: slot.h * ky,
+  };
+};
 
 /** 设置当前格的缩放（30%–400%），走热路径只改这一张图 */
 function setSlotZoom(pct) {
@@ -3243,6 +3273,8 @@ function bindSlotZoom() {
   const { box, range, val } = slotZoomEls();
   if (!box || box.dataset.ready) return;
   box.dataset.ready = '1';
+  // 挂到 body：position:fixed 就不再受任何祖先 transform 影响
+  if (box.parentElement !== document.body) document.body.appendChild(box);
   range?.addEventListener('input', (ev) => setSlotZoom(ev.target.value));
   box.addEventListener('click', (ev) => {
     const step = ev.target.closest('[data-step]');
@@ -3258,15 +3290,30 @@ function bindSlotZoom() {
   document.addEventListener('scroll', syncSlotZoom, { passive: true, capture: true });
   // 画布每次重绘（换页/换格/改图）都会替换 svg —— 盯住它，重算缩放条位置
   const canvasEl = $('#canvas');
+  // 画布每次重绘都会换 svg；但「刚换完」那一刻布局可能还没稳定（实测会算出偏 288px 的假位置），
+  // 所以连续同步两次：rAF 一次、稍后再一次；尺寸变化再交给 ResizeObserver。
+  // 重绘后连续同步一小段：加载后期版心会变宽、进页动画也会缩放画布，
+  // 这些变化 ResizeObserver 看不见（它只报布局盒，不报 transform），所以按时间点补几帧。
+  const syncTwice = () => {
+    for (const t of [0, 50, 120, 250, 500, 900]) {
+      setTimeout(() => { try { syncSlotZoom(); } catch { /* ignore */ } }, t);
+    }
+  };
   if (canvasEl && !canvasEl.dataset.zoomObserver) {
     canvasEl.dataset.zoomObserver = '1';
     let raf = 0;
     new MutationObserver(() => {
       cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => { try { syncSlotZoom(); } catch { /* ignore */ } });
+      raf = requestAnimationFrame(syncTwice);
     }).observe(canvasEl, { childList: true });
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(() => { try { syncSlotZoom(); } catch { /* ignore */ } });
+      ro.observe(canvasEl);
+      const stageEl = canvasEl.closest('.stage') || canvasEl.parentElement;
+      if (stageEl) ro.observe(stageEl);
+    }
   }
-  syncSlotZoom();
+  syncTwice();
 }
 
 /* ---------------- 拖放提示：毛玻璃卡片 + 格式说明 ---------------- */
