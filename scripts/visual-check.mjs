@@ -1749,6 +1749,112 @@ const scenarios = [
   },
 
   {
+    name: 'inbox',
+    title: '㉕ 拖放/粘贴图片 + 气泡拖入 + 大图预览 + 右键菜单',
+    async run(page, shot, { check }) {
+      await page.viewport(1400, 980);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        const mkFile = (name) => {
+          const bin = atob(png); const arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          return new File([arr], name, { type: 'image/png' });
+        };
+        const images = () => window.__pfImages();
+        const svg = document.querySelector('#canvas svg');
+        const r = svg.getBoundingClientRect();
+        const at = (fx, fy) => ({ clientX: r.left + r.width * fx, clientY: r.top + r.height * fy });
+        const res = {};
+
+        // ① 拖图片进画布
+        const dt = new DataTransfer(); dt.items.add(mkFile('drop.png'));
+        document.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, ...at(0.5, 0.25) }));
+        await wait(500);
+        res.dropped = Object.values(images()).map((x) => x.name);
+
+        // ② Ctrl+V 粘贴图片
+        const dt2 = new DataTransfer(); dt2.items.add(mkFile('paste.png'));
+        document.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt2 }));
+        await wait(500);
+        res.pasted = Object.values(images()).map((x) => x.name);
+
+        // ③ 气泡可拖 + 拖进画面
+        const bubBtn = document.querySelector('#bubGrid .bub-item[data-id]');
+        res.bubDraggable = bubBtn ? bubBtn.draggable : false;
+        const dt3 = new DataTransfer();
+        dt3.setData('text/pf-bubble', bubBtn ? bubBtn.dataset.id : 'talk-oval');
+        // 注意：每次 renderStage 都会换掉 #canvas svg，必须重新查询，否则派发到已脱离文档的旧节点
+        const svg2 = document.querySelector('#canvas svg');
+        svg2.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt3, ...at(0.45, 0.45) }));
+        await wait(400);
+        res.bubbles = document.querySelectorAll('#canvas g[data-bubble]').length;
+
+        // ④ 右键某一格（有图）→ 我们的菜单 + 放大生效
+        document.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, ...at(0.5, 0.25) }));
+        await wait(200);
+        const menu = document.querySelector('#ctxMenu');
+        res.ctx = {
+          shown: menu && !menu.classList.contains('hidden'),
+          title: menu?.querySelector('.ctx-title')?.textContent || '',
+          count: menu?.querySelectorAll('.ctx-item').length || 0,
+          isOurs: !!menu?.querySelector('.ctx-item'),
+        };
+        const beforeZoom = Object.values(images())[0]?.zoom;
+        menu?.querySelector('.ctx-item')?.click();   // 第一项 = 放大
+        await wait(200);
+        res.zoom = { before: beforeZoom, after: Object.values(images())[0]?.zoom };
+
+        // ⑤ 右键输入框 → 文本菜单（复制/粘贴/全选）
+        const line = document.querySelector('#slotLine');
+        line.focus();
+        line.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 300 }));
+        await wait(200);
+        res.textCtx = {
+          title: menu?.querySelector('.ctx-title')?.textContent || '',
+          items: [...(menu?.querySelectorAll('.ctx-item') || [])].map((b) => b.textContent.trim()),
+        };
+        document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        await wait(100);
+
+        // ⑥ 大图预览
+        window.__pfLightbox(0);
+        await wait(250);
+        const lb = document.querySelector('#lightbox');
+        res.lightbox = {
+          shown: !!lb,
+          count: lb?.querySelector('#lbCount')?.textContent || '',
+          acts: [...(lb?.querySelectorAll('.lb-acts button') || [])].length,
+        };
+        lb?.querySelector('[data-close]')?.click();
+        await wait(120);
+        res.lightboxClosed = !document.querySelector('#lightbox');
+        return res;
+      })()`);
+
+      check('拖图片进画布 → 自动填入指针下那一格',
+        out.dropped.includes('drop.png'), out.dropped.join(','));
+      check('Ctrl+V 粘贴图片 → 同样入库', out.pasted.includes('paste.png'), out.pasted.join(','));
+      check('气泡库的项可拖拽', out.bubDraggable === true);
+      check('把气泡拖到画面上 → 生成气泡', out.bubbles >= 1, String(out.bubbles));
+      check('右键某一格弹出我们自己的菜单（不是浏览器菜单）',
+        out.ctx.shown && out.ctx.isOurs && out.ctx.title.includes('格'), `${out.ctx.title} · ${out.ctx.count} 项`);
+      check('菜单里有常用的对齐/缩放项（≥12 项）', out.ctx.count >= 12, String(out.ctx.count));
+      check('点「放大」真的改变了缩放',
+        Number(out.zoom.after) > Number(out.zoom.before || 1), `${out.zoom.before} → ${out.zoom.after}`);
+      check('右键输入框是文本菜单（复制/粘贴/全选）',
+        out.textCtx.title === '文本' && out.textCtx.items.some((x) => x.includes('全选')), out.textCtx.items.join(' / '));
+      check('候选/单图可以点开大图预览',
+        out.lightbox.shown && /1\s*\/|第 1/.test(out.lightbox.count), out.lightbox.count);
+      check('大图能关掉', out.lightboxClosed === true);
+      await shot('inbox');
+    },
+  },
+
+  {
     name: 'auto-mode',
     title: '㉔ 全自动模式：开关 / 全文面板 / 危险确认 / 批量队列',
     async run(page, shot, { check }) {

@@ -2941,6 +2941,474 @@ window.__pfAuto = () => ({
 window.__pfAutoSet = (m) => setAutoMode(m);
 
   bindAutoUI();
+  bindInboxUI();
+
+/* ================================================================== *
+ * 交互收件箱：拖放 / 粘贴 / 气泡拖入 / 候选大图 / 右键菜单
+ *
+ * 设计原则：
+ *   1. 任何「能把图片放进来」的地方都支持三种入口：点按钮选文件、拖进来、Ctrl+V 粘贴
+ *   2. 拖放目标以「指针下面是什么」为准（画布 → 那一格；角色卡 → 角色参考图）
+ *   3. 右键菜单用我们自己的（浏览器默认菜单在编辑器里很难用），
+ *      但输入框里保留文本操作项，不让人失去剪切/粘贴
+ * ================================================================== */
+
+let inboxArea = 'slot';   // 'slot' | 'char'：粘贴时往哪儿放
+
+function firstImageFromDataTransfer(dt) {
+  if (!dt) return [];
+  const out = [];
+  if (dt.files && dt.files.length) {
+    for (const f of dt.files) if (/^image\//i.test(f.type)) out.push(f);
+  }
+  if (!out.length && dt.items) {
+    for (const it of dt.items) {
+      if (it.kind === 'file') { const f = it.getAsFile(); if (f && /^image\//i.test(f.type)) out.push(f); }
+    }
+  }
+  return out;
+}
+
+/** 指针落在哪：画布 / 角色卡 / 其它 */
+function dropZoneOf(el) {
+  if (!el || !el.closest) return null;
+  if (el.closest('.chars')) return 'char';
+  if (el.closest('#canvas') || el.closest('#stage') || el.closest('.paint-stage')) return 'canvas';
+  return null;
+}
+
+async function acceptImages(files, { zone, ev } = {}) {
+  const imgs = (files || []).filter((f) => f && /^image\//i.test(f.type));
+  if (!imgs.length) return false;
+  if (zone === 'char') {
+    await addCharCard(imgs);
+    toast(`已加入 ${imgs.length} 张角色参考图`);
+    return true;
+  }
+  // 画布：优先「指针下那一格」，否则当前选中的格子
+  let slotId = state.selectedId;
+  if (ev && zone === 'canvas') {
+    const pt = pagePoint(ev);
+    const s = slotAt(pt);
+    if (s) slotId = s.id;
+  }
+  if (!slotId) { toast('先点一个格子，再拖图进来'); return false; }
+  await putImage(slotId, imgs[0]);
+  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
+  toast(`已填入第 ${slot?.order ?? '?'} 格${imgs.length > 1 ? `（只用了第一张，共 ${imgs.length} 张）` : ''}`);
+  return true;
+}
+
+/* ---------------- 拖放 + 粘贴 ---------------- */
+function installImageInbox() {
+  const canvas = $('#canvas');
+
+  // 记录最近一次交互区域，供 Ctrl+V 决定往哪放
+  document.addEventListener('pointerdown', (ev) => {
+    const zone = dropZoneOf(ev.target);
+    if (zone === 'char') inboxArea = 'char';
+    else if (zone === 'canvas' || ev.target.closest?.('#railRight')) inboxArea = 'slot';
+  }, true);
+  document.addEventListener('focusin', (ev) => {
+    if (ev.target.closest?.('.chars')) inboxArea = 'char';
+  }, true);
+
+  // 拖到画布/角色卡上时给出可放置的视觉反馈
+  document.addEventListener('dragover', (ev) => {
+    const hasFiles = firstImageFromDataTransfer(ev.dataTransfer).length > 0;
+    const isBubble = ev.dataTransfer?.types?.includes('text/pf-bubble');
+    if (!hasFiles && !isBubble) return;
+    const zone = dropZoneOf(ev.target);
+    if (!zone) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'copy';
+    document.body.dataset.dropZone = zone;
+  });
+  document.addEventListener('dragleave', (ev) => {
+    if (ev.target === document || !ev.relatedTarget) delete document.body.dataset.dropZone;
+  });
+
+  document.addEventListener('drop', async (ev) => {
+    const bubbleType = ev.dataTransfer?.getData('text/pf-bubble');
+    // 事件可能派发在 document 上（合成事件 / 某些浏览器），这时用坐标兜底判断落在画布
+    const zone = dropZoneOf(ev.target)
+      || (Number.isFinite(ev.clientX) && $('#canvas svg') ? 'canvas' : null);
+    delete document.body.dataset.dropZone;
+    if (bubbleType) {
+      if (!zone || zone === 'char') return;
+      ev.preventDefault();
+      const pt = pagePoint(ev);
+      const slot = slotAt(pt);
+      if (!state.tpl) { toast('先选一套版式'); return; }
+      const b = addBubble(bubbleType, { at: pt, noCommit: false });
+      if (b) {
+        if (slot) { state.selectedId = slot.id; renderSlotPanel(); }
+        toast(`已把「${BUBBLES[bubbleType]?.zh || bubbleType}」放到画面上，拖它调位置`);
+      }
+      return;
+    }
+    const files = firstImageFromDataTransfer(ev.dataTransfer);
+    if (!files.length) return;
+    ev.preventDefault();
+    await acceptImages(files, { zone, ev });
+  });
+
+  // Ctrl+V 粘贴图片
+  document.addEventListener('paste', async (ev) => {
+    const files = firstImageFromDataTransfer(ev.clipboardData);
+    if (!files.length) return;   // 文本粘贴不拦
+    const inField = ev.target.closest?.('input, textarea');
+    // 输入框里粘图片没意义（会变成字），但用户常常是在输入框聚焦时按的 Ctrl+V
+    const zone = inboxArea === 'char' ? 'char' : 'canvas';
+    ev.preventDefault();
+    await acceptImages(files, { zone });
+    if (inField) toast('已把剪贴板里的图片放进去了');
+  });
+}
+
+/* ---------------- 气泡库可拖拽 ---------------- */
+function makeBubbleLibDraggable() {
+  const lib = $('#bubGrid');
+  if (!lib || lib.dataset.draggableReady) return;
+  lib.dataset.draggableReady = '1';
+  const SEL = '.bub-item[data-id]';
+  lib.addEventListener('dragstart', (ev) => {
+    const btn = ev.target.closest(SEL);
+    if (!btn) return;
+    const type = btn.dataset.id;
+    ev.dataTransfer.setData('text/pf-bubble', type);
+    ev.dataTransfer.setData('text/plain', BUBBLES[type]?.zh || type);
+    ev.dataTransfer.effectAllowed = 'copy';
+    btn.classList.add('dragging');
+  });
+  lib.addEventListener('dragend', (ev) => {
+    ev.target.closest(SEL)?.classList.remove('dragging');
+    delete document.body.dataset.dropZone;
+  });
+  // 气泡项是 .bub-item[data-id]，标记成可拖（每次重渲染后都要补）
+  const mark = () => {
+    lib.querySelectorAll(SEL).forEach((b) => {
+      b.draggable = true;
+      const zh = BUBBLES[b.dataset.id]?.zh || b.dataset.id;
+      b.title = `${zh} · 拖到画面上直接放置（也可以点一下加到当前格）`;
+    });
+  };
+  mark();
+  new MutationObserver(mark).observe(lib, { childList: true, subtree: true });
+}
+
+/* ---------------- 候选图大图预览 ---------------- */
+function openLightbox(list, index = 0, opts = {}) {
+  if (!list || !list.length) return;
+  let i = Math.max(0, Math.min(list.length - 1, index));
+  let box = $('#lightbox');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.className = 'keysheet lightbox';
+  box.id = 'lightbox';
+  box.innerHTML = `
+    <div class="lb-panel">
+      <div class="lb-head">
+        <b id="lbCount">–</b>
+        <span class="muted small">← → 切换 · Esc 关闭 · 滚轮缩放</span>
+        <button class="btn tiny" data-close>关闭</button>
+      </div>
+      <div class="lb-stage"><img id="lbImg" alt="候选图预览" draggable="false"></div>
+      <div class="row2 lb-acts">
+        <button class="btn tiny" id="lbPrev">上一张</button>
+        <button class="btn tiny" id="lbNext">下一张</button>
+        <button class="btn tiny primary" id="lbUse">用这张</button>
+        <button class="btn tiny" id="lbEdit">用这张进画布改</button>
+        <button class="btn tiny danger" id="lbDel">删掉这张</button>
+      </div>
+    </div>`;
+  document.body.appendChild(box);
+
+  const img = $('#lbImg', box);
+  let scale = 1;
+  const sync = () => {
+    img.src = list[i];
+    scale = 1;
+    img.style.transform = 'scale(1)';
+    $('#lbCount', box).textContent = `第 ${i + 1} / ${list.length} 张`;
+    $('#lbPrev', box).disabled = i <= 0;
+    $('#lbNext', box).disabled = i >= list.length - 1;
+  };
+  const close = () => { box.remove(); document.removeEventListener('keydown', onKey, true); };
+  const onKey = (ev) => {
+    if (ev.key === 'Escape') { ev.stopPropagation(); close(); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); if (i > 0) { i--; sync(); } }
+    else if (ev.key === 'ArrowRight') { ev.preventDefault(); if (i < list.length - 1) { i++; sync(); } }
+  };
+  document.addEventListener('keydown', onKey, true);
+
+  box.addEventListener('click', (ev) => {
+    if (ev.target === box || ev.target.closest('[data-close]')) { close(); return; }
+  });
+  $('#lbPrev', box).addEventListener('click', () => { if (i > 0) { i--; sync(); } });
+  $('#lbNext', box).addEventListener('click', () => { if (i < list.length - 1) { i++; sync(); } });
+  $('#lbUse', box).addEventListener('click', async () => { close(); await applyCand(i); });
+  $('#lbEdit', box).addEventListener('click', async () => { close(); await applyCandAndEdit(i); });
+  $('#lbDel', box).addEventListener('click', () => {
+    const sid = state.selectedId;
+    const arr = candsOf(sid);
+    if (!arr.length) return;
+    arr.splice(i, 1);
+    renderCands();
+    if (!arr.length) { close(); return; }
+    i = Math.min(i, arr.length - 1);
+    list = arr;
+    sync();
+  });
+  box.querySelector('.lb-stage').addEventListener('wheel', (ev) => {
+    ev.preventDefault();
+    scale = Math.min(4, Math.max(0.4, scale * (ev.deltaY < 0 ? 1.1 : 0.9)));
+    img.style.transform = `scale(${scale})`;
+  }, { passive: false });
+  sync();
+}
+
+/* ---------------- 右键菜单 ---------------- */
+const CTX_TRANSFORM = [
+  { key: 'zoomIn', label: '放大', hint: '+', run: (id) => nudgeImage(id, 'zoom', 1.12) },
+  { key: 'zoomOut', label: '缩小', hint: '−', run: (id) => nudgeImage(id, 'zoom', 1 / 1.12) },
+  { sep: true },
+  { key: 'left', label: '靠左', run: (id) => alignImage(id, 'left') },
+  { key: 'hcenter', label: '水平居中', run: (id) => alignImage(id, 'hcenter') },
+  { key: 'right', label: '靠右', run: (id) => alignImage(id, 'right') },
+  { key: 'top', label: '靠上', run: (id) => alignImage(id, 'top') },
+  { key: 'vcenter', label: '垂直居中', run: (id) => alignImage(id, 'vcenter') },
+  { key: 'bottom', label: '靠下', run: (id) => alignImage(id, 'bottom') },
+  { sep: true },
+  { key: 'cover', label: '填满裁切', run: (id) => setImageMode(id, 'cover') },
+  { key: 'contain', label: '完整显示', run: (id) => setImageMode(id, 'contain') },
+  { key: 'reset', label: '复位位置', run: (id) => resetImageTransform(id) },
+];
+
+function nudgeImage(id, field, factor) {
+  const img = state.images[id];
+  if (!img) return;
+  commit();
+  if (field === 'zoom') img.zoom = clamp((img.zoom || 1) * factor, 0.3, 6);
+  renderStage(); renderSlotPanel(); queueSave();
+}
+function alignImage(id, dir) {
+  const img = state.images[id];
+  if (!img) return;
+  commit();
+  const big = 260;   // 用足够大的位移把图推到边界（渲染时会被格子裁剪）
+  img.mode = img.mode || 'cover';
+  if (dir === 'left') img.panX = -big;
+  if (dir === 'right') img.panX = big;
+  if (dir === 'hcenter') img.panX = 0;
+  if (dir === 'top') img.panY = -big;
+  if (dir === 'bottom') img.panY = big;
+  if (dir === 'vcenter') img.panY = 0;
+  renderStage(); renderSlotPanel(); queueSave();
+}
+function setImageMode(id, mode) {
+  const img = state.images[id];
+  if (!img) return;
+  commit();
+  img.mode = mode;
+  renderStage(); renderSlotPanel(); queueSave();
+  toast(mode === 'contain' ? '完整显示（可能留白）' : '填满裁切');
+}
+function resetImageTransform(id) {
+  const img = state.images[id];
+  if (!img) return;
+  commit();
+  img.zoom = 1; img.panX = 0; img.panY = 0;
+  renderStage(); renderSlotPanel(); queueSave();
+}
+
+function ctxItem(label, run, opts = {}) {
+  return { label, run, ...opts };
+}
+
+/** 根据右键位置算出该显示哪些菜单项 */
+function buildContextMenu(ev) {
+  // 真实右键的 target 就是被点的元素；只有合成事件派发在 document/body 上时才用坐标兜底
+  const raw = ev.target;
+  const usable = raw && raw.closest && raw !== document && raw !== document.body && raw !== document.documentElement;
+  const target = usable ? raw : (document.elementFromPoint(ev.clientX, ev.clientY) || raw);
+  const sel = state.selectedId;
+
+  // ① 输入框/文本域：保留文本操作（不用浏览器菜单，但功能要对等）
+  if (target.closest?.('input, textarea, [contenteditable="true"]')) {
+    const el = target.closest('input, textarea, [contenteditable="true"]');
+    const hasSel = (el.selectionStart ?? 0) !== (el.selectionEnd ?? 0);
+    return {
+      title: '文本',
+      items: [
+        ctxItem('复制', () => { el.focus(); document.execCommand('copy'); }, { disabled: !hasSel }),
+        ctxItem('剪切', () => { el.focus(); document.execCommand('cut'); }, { disabled: !hasSel }),
+        ctxItem('粘贴', () => { el.focus(); toast('用 Ctrl+V 粘贴（浏览器不允许脚本代按）'); }, { hint: 'Ctrl+V' }),
+        { sep: true },
+        ctxItem('全选', () => { el.focus(); el.select?.(); }),
+      ],
+    };
+  }
+
+  // ② 候选图
+  const cand = target.closest?.('.cand');
+  if (cand) {
+    const i = Number(cand.dataset.i) || 0;
+    return {
+      title: '候选图',
+      items: [
+        ctxItem('放大看细节', () => openLightbox(candsOf(sel), i)),
+        ctxItem('用这张', () => applyCand(i)),
+        ctxItem('用这张进画布改', () => applyCandAndEdit(i)),
+        { sep: true },
+        ctxItem('删掉这张', () => {
+          const arr = candsOf(sel);
+          arr.splice(i, 1);
+          renderCands();
+        }),
+      ],
+    };
+  }
+
+  // ③ 画布（含某一格的图）
+  const inCanvas = target.closest?.('#canvas') || target.closest?.('#stage');
+  if (inCanvas) {
+    const pt = pagePoint(ev);
+    const slot = slotAt(pt);
+    const sid = slot?.id || sel;
+    if (!sid) return null;
+    const hasImg = !!state.images[sid];
+    const items = [];
+    if (hasImg) {
+      items.push(...CTX_TRANSFORM.map((it) => (it.sep ? it : { ...it, run: () => it.run(sid) })));
+      items.push({ sep: true });
+      items.push(ctxItem('看大图', () => { state.selectedId = sid; window.__pfLightbox(0); }));
+      items.push(ctxItem('替换图片…', () => { state.selectedId = sid; $('#filePick').dataset.mode = 'slot'; $('#filePick').click(); }));
+      items.push(ctxItem('绘制这一格', () => { state.selectedId = sid; openPaint(sid); }));
+      items.push(ctxItem('导出这一格', async () => { state.selectedId = sid; await exportSlotImage(); }));
+      items.push({ sep: true });
+      items.push(ctxItem('清空这一格的图', () => {
+        commit();
+        delete state.images[sid];
+        renderStage(); renderSlotPanel(); refreshScript(); queueSave();
+        toast('已清空这一格的图');
+      }, { danger: true }));
+    } else {
+      items.push(ctxItem('选图片填入这一格', () => { state.selectedId = sid; renderSlotPanel(); $('#filePick').dataset.mode = 'slot'; $('#filePick').click(); }));
+      items.push(ctxItem('AI 生成这一格', () => { state.selectedId = sid; renderSlotPanel(); generateSlotImage(sid); }));
+      items.push(ctxItem('绘制这一格', () => { state.selectedId = sid; openPaint(sid); }));
+    }
+    // 选中的格与右键的格不同时，先把它选上，动作才不会作用错对象
+    const firstRun = items.find((x) => x.run);
+    if (firstRun) {
+      const orig = firstRun.run;
+      firstRun.run = () => { state.selectedId = sid; renderSlotPanel(); orig(); };
+    }
+    return { title: slot ? `第 ${slot.order} 格` : '画布', items };
+  }
+
+  // ④ 气泡
+  // 画面里的气泡渲染成 <g data-bubble="<id>">（见 lib/svg.mjs），不是 .bub / data-bubble-id
+  const bub = target.closest?.('g[data-bubble]');
+  if (bub) {
+    const id = bub.getAttribute('data-bubble');
+    return {
+      title: '气泡',
+      items: [
+        ctxItem('换样式', () => { state.selBubble = id; renderBubbles(); $('#bubbleLib')?.scrollIntoView({ block: 'nearest' }); }),
+        ctxItem('编辑文字', () => { state.selBubble = id; renderBubbles(); $('#bubText')?.focus(); }),
+        ctxItem('复制一个', () => duplicateBubble()),
+        { sep: true },
+        ctxItem('删除', () => { state.selBubble = id; deleteBubble(); }, { danger: true }),
+      ],
+    };
+  }
+
+  // ⑤ 全局
+  return {
+    title: 'PanelForge',
+    items: [
+      ctxItem('AI 生成这一格', () => generateSlotImage(state.selectedId)),
+      ctxItem('绘制这一格', () => openPaint(state.selectedId)),
+      { sep: true },
+      ctxItem('导出这一页 PNG', () => $('#btnExportPng')?.click()),
+      ctxItem('快捷键表', () => toggleShortcuts(true), { hint: '?' }),
+    ],
+  };
+}
+
+function installContextMenu() {
+  let menu = $('#ctxMenu');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'ctxMenu';
+    menu.className = 'ctx-menu hidden';
+    document.body.appendChild(menu);
+  }
+  const hide = () => menu.classList.add('hidden');
+
+  document.addEventListener('contextmenu', (ev) => {
+    const spec = buildContextMenu(ev);
+    if (!spec || !spec.items?.length) return;   // 没有我们的上下文 → 保留浏览器菜单
+    ev.preventDefault();
+    menu.innerHTML = `<div class="ctx-title">${escapeHtml(spec.title || '')}</div>`
+      + spec.items.map((it, i) => (it.sep
+        ? '<div class="ctx-sep"></div>'
+        : `<button class="ctx-item${it.disabled ? ' disabled' : ''}${it.danger ? ' danger' : ''}" data-i="${i}" ${it.disabled ? 'disabled' : ''}>
+             <span>${escapeHtml(it.label)}</span>${it.hint ? `<kbd>${escapeHtml(it.hint)}</kbd>` : ''}
+           </button>`)).join('');
+    menu.classList.remove('hidden');
+    // 贴边修正
+    const r = menu.getBoundingClientRect();
+    const x = Math.min(ev.clientX, window.innerWidth - r.width - 8);
+    const y = Math.min(ev.clientY, window.innerHeight - r.height - 8);
+    menu.style.left = Math.max(6, x) + 'px';
+    menu.style.top = Math.max(6, y) + 'px';
+    menu._spec = spec;
+  });
+
+  menu.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.ctx-item');
+    if (!btn || btn.disabled) { hide(); return; }
+    const i = Number(btn.dataset.i);
+    const item = menu._spec?.items?.[i];
+    hide();
+    try { item?.run?.(); } catch (e) { toast('操作失败：' + e.message); }
+  });
+  document.addEventListener('pointerdown', (ev) => {
+    if (!menu.contains(ev.target)) hide();
+  }, true);
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hide(); });
+  window.addEventListener('blur', hide);
+}
+
+/* ---------------- 绑定 ---------------- */
+function bindInboxUI() {
+  installImageInbox();
+  makeBubbleLibDraggable();
+  installContextMenu();
+  // 候选图：点缩略图直接看大图（原来的「点一下用这张」仍在右键/大图里）
+  $('#candGrid')?.addEventListener('click', (ev) => {
+    const del = ev.target.closest('[data-del]');
+    if (del) return;                       // 删除按钮走原逻辑
+    const editBtn = ev.target.closest('[data-edit]');
+    if (editBtn) return;                   // ✎ 走原逻辑
+    const card = ev.target.closest('.cand');
+    if (!card) return;
+    if (ev.altKey || ev.shiftKey) return;  // 按住修饰键时保留原来的「直接用」行为
+    ev.stopImmediatePropagation?.();
+    ev.preventDefault();
+    openLightbox(candsOf(state.selectedId), Number(card.dataset.i) || 0);
+  }, true);
+}
+
+window.__pfLightbox = (i = 0) => {
+  const list = (candsOf(state.selectedId) || []).slice();
+  if (!list.length && state.images[state.selectedId]) list.push(state.images[state.selectedId].href);
+  return openLightbox(list, i);
+};
+window.__pfContextMenu = (ev) => buildContextMenu(ev);
+window.__pfInbox = () => inboxArea;
 
   // 快捷键表
   $('#btnShortcuts').addEventListener('click', () => toggleShortcuts(true));
