@@ -2,7 +2,7 @@
  * 纯函数单测（不启服务器、不连模型）：node scripts/test-units.mjs
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
-import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError } from '../lib/llm-core.mjs';
+import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError, planImageRequest } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
 import { splitClauses, assignSegments, buildPlan } from '../lib/matcher.mjs';
 import { TEMPLATES } from '../lib/library.mjs';
@@ -215,6 +215,28 @@ ok('尺寸类 400 → 指向尺寸而不是 Key', /尺寸/.test(err400.hint || '
 
 const errKey = imageHttpError({ status: 401, bodyText: 'Your api key: sk-secret-abcdef is invalid', json: null, endpoint: arkImg, model: 'm', key: 'sk-secret-abcdef' });
 ok('401 报错里不泄露完整 Key', !errKey.message.includes('sk-secret-abcdef'), errKey.message.split('\n')[0]);
+
+/* 回归：生图 Base URL 丢失时会打到对话那条 —— 用户报的
+   「POST https://api.deepseek.com/images/generations · model=doubao-seedream-…」就是这个 */
+const lost = planImageRequest({ baseUrl: 'https://api.deepseek.com/v1', imageProvider: 'volcengine' }, 'doubao-seedream-5-0-flash-260915');
+ok('方舟模型 + 缺失生图 Base URL → 自动改回方舟地址',
+  lost.endpoint === 'https://ark.cn-beijing.volces.com/api/v3/images/generations' && lost.corrected === true,
+  `${lost.endpoint} corrected=${lost.corrected}`);
+ok('配好的生图 Base URL 不会被改写',
+  (() => {
+    const p2 = planImageRequest({
+      baseUrl: 'https://api.deepseek.com/v1',
+      imgBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+      imageProvider: 'volcengine',
+    }, 'doubao-seedream-5-0-flash-260915');
+    return p2.endpoint === 'https://ark.cn-beijing.volces.com/api/v3/images/generations' && p2.corrected === false;
+  })());
+ok('非方舟模型不受影响（OpenAI 仍走 /v1/images/generations）',
+  planImageRequest({ baseUrl: 'https://api.openai.com/v1', imageProvider: 'openai' }, 'gpt-image-1').endpoint
+    === 'https://api.openai.com/v1/images/generations');
+ok('硅基流动仍走自己的地址',
+  planImageRequest({ baseUrl: 'https://api.siliconflow.cn/v1', imageProvider: 'siliconflow' }, 'Kwai-Kolors/Kolors').endpoint
+    === 'https://api.siliconflow.cn/v1/images/generations');
 
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 

@@ -1317,6 +1317,8 @@ function showErrorDetail(title, err, extra = '') {
 
 // 调试/自动化钩子：不产生真实请求就能看错误面板长什么样
 window.__pfShowError = showErrorDetail;
+// 调试钩子：查看当前实际生效的 LLM 配置（排查「配了却没生效」这类问题）
+window.__pfLlm = () => ({ ...state.llm });
 
 
 /**
@@ -3249,13 +3251,19 @@ function loadLlm() {
 
 function saveLlm() {
   const sessionOnly = !!$('#chkKeySession')?.checked;
+  // 注意：这里是**从表单重建** state.llm，所以任何表单项之外的字段都必须显式带过来。
+  // 曾经漏了 imgBaseUrl / imgKey —— 生图前会调用本函数，于是「生图专用 Base URL」被抹掉、
+  // 请求回落到对话那条 baseUrl（用户看到的 api.deepseek.com/images/generations 就是这么来的）。
   state.llm = {
+    ...state.llm,
     protocol: $('#llmProtocol').value,
     baseUrl: $('#llmBase').value.trim(),
     apiKey: $('#llmKey').value.trim(),
     model: $('#llmModel').value.trim(),
-    imgModel: $('#imgModel') ? $('#imgModel').value.trim() : '',
-    imageProvider: $('#imgProvider') ? $('#imgProvider').value : 'openai',
+    imgModel: $('#imgModel') ? $('#imgModel').value.trim() : (state.llm.imgModel || ''),
+    imageProvider: $('#imgProvider') ? $('#imgProvider').value : (state.llm.imageProvider || 'openai'),
+    imgBaseUrl: $('#imgBaseUrl') ? $('#imgBaseUrl').value.trim() : (state.llm.imgBaseUrl || ''),
+    imgKey: $('#imgKey') ? $('#imgKey').value.trim() : (state.llm.imgKey || ''),
     sessionOnly,
   };
   state.charSheet = $('#charSheet').value.trim();
@@ -3765,11 +3773,11 @@ function closeKeySheet() { $('#keySheet').classList.add('hidden'); }
 function syncImgReady() {
   const el = $('#ksImgReady');
   if (!el) return;
-  const provider = $('#ksImgProvider')?.value || 'openai';
-  const model = ($('#ksImgModel')?.value || '').trim();
-  const base = ($('#ksImgBase')?.value || '').trim() || ($('#ksBase')?.value || '').trim();
-  const ownKey = ($('#ksImgKey')?.value || '').trim();
-  const fallbackKey = ($('#ksKey')?.value || '').trim();
+  const provider = $('#ksImgProvider')?.value || state.llm?.imageProvider || 'openai';
+  const model = ($('#ksImgModel')?.value || '').trim() || (state.llm?.imgModel || '');
+  const base = ($('#ksImgBase')?.value || '').trim() || (state.llm?.imgBaseUrl || '') || ($('#ksBase')?.value || '').trim() || (state.llm?.baseUrl || '');
+  const ownKey = ($('#ksImgKey')?.value || '').trim() || (state.llm?.imgKey || '');
+  const fallbackKey = ($('#ksKey')?.value || '').trim() || (state.llm?.apiKey || '');
   const key = ownKey || fallbackKey;
   const providerName = { volcengine: '火山方舟 Seedream', openai: 'OpenAI 兼容', siliconflow: '硅基流动', stability: 'Stability' }[provider] || provider;
   if (!model) { el.textContent = '生图还没配好：缺生图模型'; el.dataset.ok = '0'; return; }
