@@ -2,6 +2,7 @@
  * 纯函数单测（不启服务器、不连模型）：node scripts/test-units.mjs
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
+import { readFileSync } from 'node:fs';
 import { estimateLayout, splitTextIntoPages, buildAutoSteps, imageQueueForPage, imageQueueAll, estimateCostHint, MAX_AUTO_PAGES } from '../lib/auto.mjs';
 import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError, planImageRequest, imageRoute, normalizeLineItems } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
@@ -319,6 +320,30 @@ ok('花费提示给出区间与张数', (() => {
   return c.images === 10 && c.text.includes('10 张图') && /¥/.test(c.text);
 })());
 
+
+/* 语法级防呆：$ 与 $ 是两个不同函数，误写会让整站启动失败（真踩过） */
+const SRC_FILES = ['web/app.js', 'web/rails.mjs', 'web/api-static.js'];
+const FOR_EACH_DOLLAR = /[^$]\$\([^)]*\)\.forEach/;
+const FOR_OF_DOLLAR = /for \(const \w+ of \$\(/;
+const dollarBugs = [];
+for (const f of SRC_FILES) {
+  const src = readFileSync(new URL(`../${f}`, import.meta.url), "utf8").split(/\r?\n/);
+  src.forEach((line, i) => {
+    if (FOR_EACH_DOLLAR.test(line)) dollarBugs.push(f + ":" + (i + 1) + " 单 $ 后接 forEach");
+    if (FOR_OF_DOLLAR.test(line)) dollarBugs.push(f + ":" + (i + 1) + " for-of 用单 $");
+  });
+}
+const D1 = String.fromCharCode(36);
+ok("没有把两个 $ 误写成一个 $（否则整站启动失败）", dollarBugs.length === 0, dollarBugs.slice(0, 3).join(" | "));
+
+/* 请求超时与逃生门：挂住的请求会让按钮永远停在「生成中」，看起来就是卡死 */
+const appSrc2 = readFileSync(new URL('../web/app.js', import.meta.url), 'utf8');
+const DD_CHAIN = appSrc2.match(/[$][$]\([^)]*\)\s*\.\s*(querySelector|querySelectorAll|closest)/g) || [];
+ok('没有把单个元素查询误写成 $(...)（数组没有 querySelector，会让渲染函数整段抛错）', DD_CHAIN.length === 0, DD_CHAIN.slice(0, 2).map((m) => m[0]).join(' | '));
+ok('存在 withTimeout 工具', /function withTimeout\(/.test(appSrc2));
+ok('生图请求套了超时', /withTimeout\(api\.imageGenerate\(/.test(appSrc2));
+ok('有 IMG_TIMEOUT_MS 常量', /IMG_TIMEOUT_MS\s*=/.test(appSrc2));
+ok('有卡住时的逃生门 __pfUnstick', /__pfUnstick/.test(appSrc2));
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 
 

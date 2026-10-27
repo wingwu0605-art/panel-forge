@@ -1912,6 +1912,24 @@ function lpPulse() {
   lpPulse._t = setTimeout(() => document.body.classList.remove('pf-lp'), 320);
 }
 
+/**
+ * 给一个 Promise 加超时。
+ * 为什么要它：生图/写台词这类请求一旦挂住（服务商不返回、网络半死），
+ * 按钮会永远停在"生成中"、格子永远显示"正在生成"，用户看到的就是"卡死了"。
+ * 超时后抛错，流程照常走 catch/finally，状态才能真正复位。
+ */
+function withTimeout(promise, ms, label = '请求') {
+  let timer = 0;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label}超时（${Math.round(ms / 1000)}s 没有响应），已放弃`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// 生图超时：Seedream/Flux 排队 1–2 分钟是常态，默认给 120s；?imgtimeout=毫秒 可临时改（测试用）
+const IMG_TIMEOUT_MS = Number(new URLSearchParams(location.search).get('imgtimeout')) || 120000;
+const LLM_TIMEOUT_MS = 60000;    // 文本：60s 还没回来基本就是挂了
+
 /** 双击某一格：震动 → 选中它 → 进编辑页 */
 function fireDoubleTap(slot) {
   haptic(22);
@@ -1939,6 +1957,35 @@ function noteTap(slot, ev) {
   noteTap._clear = setTimeout(() => { state._lastTap = null; }, DTAP_MS + 60);
   return false;
 }
+
+/**
+ * 逃生门：界面看起来"卡死"时一键复位。
+ * 只清「进行中」的临时状态和浮层，不动用户的内容（图片/台词/草稿都不碰）。
+ */
+window.__pfUnstick = () => {
+  const before = {
+    imgJobs: Object.keys(state.imgJobs || {}).length,
+    overlays: ['#dangerSheet', '#charConfirm', '#lightbox', '#ctxMenu', '#shortcuts', '#keysheet'].filter((sel) => {
+      const el = $(sel);
+      return el && !el.classList.contains('hidden');
+    }).length,
+  };
+  state.imgJobs = {};
+  state.autoStop = true;
+  // 关浮层
+  for (const sel of ['#dangerSheet', '#charConfirm', '#lightbox', '#ctxMenu', '#shortcuts', '#keysheet', '#railPop']) {
+    $(sel)?.classList.add('hidden');
+  }
+  document.querySelectorAll('.rail-pop').forEach((p) => p.classList.add('hidden'));
+  // 复所有被禁用的按钮（只放开 disabled，不改文案）
+ $$('button[disabled]').forEach((b) => {
+    if (b.id === 'dangerGo' || b.dataset.keepDisabled) return;
+    b.disabled = false;
+  });
+  try { refreshGenButtons(); renderSlotPanel(); renderStage(); } catch { /* ignore */ }
+  toast('已复位：清掉进行中标记、关掉浮层（你的内容没动）');
+  return before;
+};
 
 function bindUI() {
   const canvas = $('#canvas');
@@ -4803,7 +4850,7 @@ function renderScript() {
     </div>`).join('');
   stagger($('#scriptList'), '.sc-card', 10);
 
-  $('#scriptList').querySelectorAll('.sc-card').forEach((card) => {
+ $('#scriptList').querySelectorAll('.sc-card').forEach((card) => {
     const p = panels.find((x) => x.id === card.dataset.id);
     card.addEventListener('click', (ev) => {
       const act = ev.target.closest('button')?.dataset.act;
@@ -5727,7 +5774,7 @@ async function generateSlotImage(targetId = state.selectedId) {
       const ok = confirm('还没启用角色参考图，生成的图可能每格长得不一样。\n\n建议先去左边「角色参考图」加一张。\n\n仍然继续生图吗？');
       if (!ok) { btn.disabled = false; btn.textContent = old; return; }
     }
-    const res = await api.imageGenerate({
+    const res = await withTimeout(api.imageGenerate({
       prompt: built.full,
       refs: charPayload.refs,
       size: panel?.genSize || undefined,
@@ -5736,7 +5783,7 @@ async function generateSlotImage(targetId = state.selectedId) {
       llm: state.llm,
       templateId: state.tpl.id,
       slotId: sid,
-    });
+    }), IMG_TIMEOUT_MS, `${cellLabel}生图`);
     if (!res?.ok) throw new Error((res?.code ? res.code + '：' : '') + (res?.error || '生图失败'));
     let href = res.href;
     if (!href && res.b64) href = 'data:image/png;base64,' + res.b64;
