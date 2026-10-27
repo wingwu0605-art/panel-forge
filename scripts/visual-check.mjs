@@ -1953,6 +1953,106 @@ const scenarios = [
   },
 
   {
+    name: 'style-follow',
+    title: '㉙ 风格跟随（人设图 / 样图 / 都参考）+ AI 生成可收起 + 模板库默认收起',
+    async run(page, shot, { check }) {
+      await page.viewport(1400, 980);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        const b = atob(png); const a = new Uint8Array(b.length);
+        for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
+        const mk = (n) => new File([a], n, { type: 'image/png' });
+        const res = {};
+
+        // ① 卡片顺序：风格跟随必须在角色参考图之前
+        res.order = [...document.querySelectorAll('.rail.left > .card')].map((c) => c.dataset.panel || '');
+
+        // ② 默认：跟人设图，样图区收起
+        res.default = {
+          mode: window.__pfStyle().mode,
+          sampleBoxHidden: document.querySelector('#sampleBox').classList.contains('hidden'),
+        };
+
+        // ③ 切到「跟样图」→ 样图区出现
+        document.querySelector('#styleSeg [data-follow="sample"]').click();
+        await wait(220);
+        res.sampleMode = {
+          mode: window.__pfStyle().mode,
+          visible: !document.querySelector('#sampleBox').classList.contains('hidden'),
+          hint: document.querySelector('#styleHint')?.textContent || '',
+        };
+
+        // ④ 拖两张样图进来
+        const dt = new DataTransfer();
+        dt.items.add(mk('s1.png')); dt.items.add(mk('s2.png'));
+        document.querySelector('#styleFollow').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+        await wait(900);
+        res.dropped = {
+          n: document.querySelectorAll('#sampleGrid .sample-item').length,
+          state: window.__pfStyle(),
+        };
+
+        // ⑤ 粘贴再加一张
+        const dt2 = new DataTransfer(); dt2.items.add(mk('s3.png'));
+        document.querySelector('#sampleGrid').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        document.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt2 }));
+        await wait(700);
+        res.pasted = document.querySelectorAll('#sampleGrid .sample-item').length;
+
+        // ⑥ 删一张
+        document.querySelector('#sampleGrid .sample-del')?.click();
+        await wait(300);
+        res.afterDel = document.querySelectorAll('#sampleGrid .sample-item').length;
+
+        // ⑦「都参考」时两份都算
+        document.querySelector('#styleSeg [data-follow="both"]').click();
+        await wait(200);
+        res.both = window.__pfStyle();
+
+        // ⑧ AI 生成为第四段，可收起
+        const secs = [...document.querySelectorAll('#slotPanel .slot-sec')].map((x) => x.dataset.sec);
+        const ai = document.querySelector('#slotPanel .slot-sec[data-sec="ai"]');
+        res.aiSec = {
+          secs,
+          hasHead: !!ai.querySelector('.sec-head'),
+          sum: ai.querySelector('.sec-sum')?.textContent || '',
+          open: !ai.classList.contains('collapsed'),
+        };
+        ai.querySelector('.sec-head').click();
+        await wait(400);
+        res.aiCollapsed = ai.classList.contains('collapsed');
+
+        // ⑨ 模板库默认收起
+        res.browseCollapsed = document.querySelector('[data-collapse="browse"]')?.classList.contains('collapsed');
+        return res;
+      })()`);
+
+      check('风格跟随卡片在角色参考图之前',
+        out.order.indexOf('style') >= 0 && out.order.indexOf('style') < out.order.indexOf('chars'),
+        out.order.join(' → '));
+      check('默认「跟人设图」，样图区收起',
+        out.default.mode === 'char' && out.default.sampleBoxHidden === true, out.default.mode);
+      check('切到「跟样图」后出现样图区',
+        out.sampleMode.mode === 'sample' && out.sampleMode.visible === true, out.sampleMode.hint);
+      check('样图可以直接拖进来（可多张）', out.dropped.n === 2, String(out.dropped.n));
+      check('样图可以 Ctrl+V 粘贴', out.pasted === 3, String(out.pasted));
+      check('样图可以单独删掉', out.afterDel === 2, String(out.afterDel));
+      check('「都参考」同时跟人设图与样图',
+        out.both.followChars === true && out.both.followSamples === true);
+      check('AI 生成是与前三段同级的第四段（可收起）',
+        out.aiSec.secs.join(',') === 'text,board,image,ai' && out.aiSec.hasHead, out.aiSec.secs.join(','));
+      check('AI 段头部有摘要且能收起',
+        out.aiSec.open === true && out.aiCollapsed === true && out.aiSec.sum.length > 0, out.aiSec.sum);
+      check('模板库默认收起', out.browseCollapsed === true);
+      await shot('style-follow');
+    },
+  },
+
+  {
     name: 'double-tap',
     title: '㉗ 手机双击某一格：震动 + 直接进这一格的编辑页（长按让位给系统菜单）',
     async run(page, shot, { check }) {

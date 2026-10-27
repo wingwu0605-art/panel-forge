@@ -2555,3 +2555,21 @@ body.pf-lp #canvas svg{transform:scale(1.015)}
   .slot-zoom .sz-track{height:76px}
   .slot-zoom .sz-track input[type="range"]{width:76px}
 }
+
+/* 风格跟随卡片 + 样图 */
+.stylefollow .seg{margin:6px 0 8px}
+.sample-box{display:flex;flex-direction:column;gap:6px}
+.sample-box.hidden{display:none}
+.sample-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sample-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:6px}
+.sample-item{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;
+  background:var(--fill-2);box-shadow:inset 0 0 0 .5px var(--sep)}
+.sample-item img{width:100%;height:100%;object-fit:cover;display:block}
+.sample-del{position:absolute;top:2px;right:2px;width:18px;height:18px;border:0;border-radius:50%;
+  background:rgba(0,0,0,.6);color:#fff;font:600 11px/1 var(--font);cursor:pointer;display:grid;place-items:center}
+.sample-del:hover{background:var(--red-ink)}
+.sample-add{aspect-ratio:1;border:1.5px dashed var(--sep);border-radius:10px;background:transparent;
+  color:var(--label-3);font:400 18px/1 var(--font);cursor:pointer}
+.sample-add:hover{border-color:var(--tint);color:var(--tint)}
+/* 样图区是拖放目标时也亮一下 */
+body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outline-offset:4px;border-radius:14px}

@@ -233,6 +233,28 @@
       <div class="ai-result hidden" id="aiResult"></div>
     </section>
 
+    <!-- 风格跟随：生图时参考谁（人设图 / 样图 / 都参考） -->
+    <section class="card stylefollow" id="styleFollow" data-panel="style" data-panel-name="风格跟随" data-collapse="style">
+      <div class="card-head">
+        <h2>风格跟随</h2>
+        <span class="hint" id="styleHint">AI 生图时参考谁</span>
+      </div>
+      <div class="seg tiny-seg" id="styleSeg" role="tablist" aria-label="风格跟随">
+        <button type="button" data-follow="char" class="on">跟人设图</button>
+        <button type="button" data-follow="sample">跟样图</button>
+        <button type="button" data-follow="both">都参考</button>
+        <button type="button" data-follow="none">都不跟</button>
+      </div>
+      <div class="sample-box hidden" id="sampleBox">
+        <div class="sample-head">
+          <span class="muted small">样图 · 可多张（拖进来或 Ctrl+V 粘贴）</span>
+          <button class="btn tiny" id="btnSamplePick" type="button">选样图</button>
+          <input type="file" id="sampleFiles" accept="image/*" multiple class="hidden">
+        </div>
+        <div class="sample-grid" id="sampleGrid"></div>
+        <p class="muted small" style="margin:4px 0 0">按参考图的画风、线宽、上色方式画；有样图时不跟人设图（除非选「都参考」）。</p>
+      </div>
+    </section>
     <section class="card chars" data-panel="chars" data-panel-name="角色参考图" data-collapse="chars">
       <div class="card-head">
         <h2>角色参考图</h2>
@@ -464,65 +486,72 @@
               <button class="btn tiny" id="btnResetPan">复位位置</button>
             </div>
 
-            <div class="sub-label">AI 生成</div>
-            <div class="prompt-box prompt-edit">
-              <div class="prompt-head">
-                <span>生图提示词 · <b id="promptState">规则切分</b></span>
-                <span class="ph-acts">
-                  <button class="btn tiny hidden" id="btnPromptReset" title="清掉自己的写法，回到自动">恢复自动</button>
-                  <button class="btn tiny" id="btnCopyPrompt">复制</button>
-                </span>
+                <!-- AI 生成：与「这一格说什么 / 分镜 / 图片」同级的第四段，可单独收起 -->
+    <section class="slot-sec" data-sec="ai">
+      <button type="button" class="sec-head" aria-expanded="true">
+        <span>AI 生成</span><span class="sec-sum" id="secAiSum"></span><span class="caret"><svg viewBox="0 0 12 12" width="10" height="10"><path d="M2 4.2 6 8l4-3.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      </button>
+      <div class="sec-body">
+              <div class="prompt-box prompt-edit">
+                <div class="prompt-head">
+                  <span>生图提示词 · <b id="promptState">规则切分</b></span>
+                  <span class="ph-acts">
+                    <button class="btn tiny hidden" id="btnPromptReset" title="清掉自己的写法，回到自动">恢复自动</button>
+                    <button class="btn tiny" id="btnCopyPrompt">复制</button>
+                  </span>
+                </div>
+                <!-- 三源共存：规则切分 / AI 生成 / 自己写，一键切换；开头词始终保留 -->
+                <div class="seg tiny-seg prompt-src" id="promptSrc" role="tablist" aria-label="提示词来源">
+                  <button type="button" data-src="rule" class="on">规则切分</button>
+                  <button type="button" data-src="ai">AI 生成</button>
+                  <button type="button" data-src="mine">自己写</button>
+                </div>
+                <label class="switch block prompt-prefix" title="形状开头词（构图前缀）—— 自己写的时候也会自动保留在最前面">
+                  <input type="checkbox" id="chkPrefix" checked> 带开头词 <span class="muted small" id="prefixPeek">—</span>
+                </label>
+                <textarea id="slotPrompt" rows="6" spellcheck="false" placeholder="写一段剧情并匹配后，这里会出现贴合这一格的提示词；也可以切到「自己写」"></textarea>
+                <div class="neg-row">
+                  <span>避免出现</span>
+                  <input id="slotNegative" type="text" spellcheck="false" placeholder="text, watermark, extra fingers …">
+                </div>
+                <details class="sent-preview">
+                  <summary>实际发给生图模型的完整内容</summary>
+                  <pre id="slotPromptSent">—</pre>
+                </details>
               </div>
-              <!-- 三源共存：规则切分 / AI 生成 / 自己写，一键切换；开头词始终保留 -->
-              <div class="seg tiny-seg prompt-src" id="promptSrc" role="tablist" aria-label="提示词来源">
-                <button type="button" data-src="rule" class="on">规则切分</button>
-                <button type="button" data-src="ai">AI 生成</button>
-                <button type="button" data-src="mine">自己写</button>
+              <div class="ai-gen">
+                <div class="seg slot-ai-mode" id="slotAiMode" role="tablist" aria-label="AI 动作">
+                  <button type="button" data-m="img" class="on">生图</button>
+                  <button type="button" data-m="prompt">只写提示词</button>
+                </div>
+                <button class="btn wide ai-soft" id="btnAiImage" title="按上面的选择：直接生图，或只让 AI 重写这一格提示词">生这一格</button>
               </div>
-              <label class="switch block prompt-prefix" title="形状开头词（构图前缀）—— 自己写的时候也会自动保留在最前面">
-                <input type="checkbox" id="chkPrefix" checked> 带开头词 <span class="muted small" id="prefixPeek">—</span>
-              </label>
-              <textarea id="slotPrompt" rows="6" spellcheck="false" placeholder="写一段剧情并匹配后，这里会出现贴合这一格的提示词；也可以切到「自己写」"></textarea>
-              <div class="neg-row">
-                <span>避免出现</span>
-                <input id="slotNegative" type="text" spellcheck="false" placeholder="text, watermark, extra fingers …">
+              <div class="cand-strip hidden" id="candStrip">
+                <div class="cand-head">
+                  <span>这一格的候选图</span>
+                  <span class="cand-acts">
+                    <button class="btn tiny" id="btnCandNext" title="换一张（随机）">换一张</button>
+                    <button class="btn tiny" id="btnCandClear">清空候选</button>
+                  </span>
+                </div>
+                <div class="cand-grid" id="candGrid"></div>
               </div>
-              <details class="sent-preview">
-                <summary>实际发给生图模型的完整内容</summary>
-                <pre id="slotPromptSent">—</pre>
-              </details>
-            </div>
-            <div class="ai-gen">
-              <div class="seg slot-ai-mode" id="slotAiMode" role="tablist" aria-label="AI 动作">
-                <button type="button" data-m="img" class="on">生图</button>
-                <button type="button" data-m="prompt">只写提示词</button>
-              </div>
-              <button class="btn wide ai-soft" id="btnAiImage" title="按上面的选择：直接生图，或只让 AI 重写这一格提示词">生这一格</button>
-            </div>
-            <div class="cand-strip hidden" id="candStrip">
-              <div class="cand-head">
-                <span>这一格的候选图</span>
-                <span class="cand-acts">
-                  <button class="btn tiny" id="btnCandNext" title="换一张（随机）">换一张</button>
-                  <button class="btn tiny" id="btnCandClear">清空候选</button>
-                </span>
-              </div>
-              <div class="cand-grid" id="candGrid"></div>
-            </div>
 
-            <div class="prompt-box shape-box">
-              <div class="prompt-head">
-                <span>形状开头词 · <b id="shapeName">—</b></span>
-                <button class="btn tiny" id="btnCopyShape" title="英文版，粘到国际模型提示词最前面">复制英文</button>
+              <div class="prompt-box shape-box">
+                <div class="prompt-head">
+                  <span>形状开头词 · <b id="shapeName">—</b></span>
+                  <button class="btn tiny" id="btnCopyShape" title="英文版，粘到国际模型提示词最前面">复制英文</button>
+                </div>
+                <pre id="shapePrefix">—</pre>
+                <div class="prompt-head sub">
+                  <span>中文版 · <b class="muted">喂国内模型更稳</b></span>
+                  <button class="btn tiny" id="btnCopyShapeZh">复制中文</button>
+                </div>
+                <pre id="shapePrefixZh">—</pre>
+                <div class="shape-tip" id="shapeTip">已经自动放在上面生图提示词的最前面；自己用别的工具出图时也可以单独复制。</div>
               </div>
-              <pre id="shapePrefix">—</pre>
-              <div class="prompt-head sub">
-                <span>中文版 · <b class="muted">喂国内模型更稳</b></span>
-                <button class="btn tiny" id="btnCopyShapeZh">复制中文</button>
-              </div>
-              <pre id="shapePrefixZh">—</pre>
-              <div class="shape-tip" id="shapeTip">已经自动放在上面生图提示词的最前面；自己用别的工具出图时也可以单独复制。</div>
-            </div>
+      </div>
+    </section>
 
             <div class="kv" id="slotKv"></div>
           </div>

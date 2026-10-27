@@ -99,6 +99,8 @@ const state = {
   under: {},          // slotId -> 图片资产：画在照片上时，照片留在这里当底图
   chars: [],          // 角色卡 [{id,name,note,images:[dataURL]}]
   activeChars: [],    // 本页启用的角色 id
+  styleFollow: 'char',  // 生图参考谁：char 人设图 / sample 样图 / both 都参考 / none 都不跟
+  samples: [],          // 样图（风格参考），可多张
   clipboard: null,    // 内部剪贴板（图片或气泡）
   promptSrc: {},      // 每格提示词来源：rule（规则切分）/ ai（AI 生成）/ mine（自己写）
   promptPrefix: {},   // 每格是否把「形状开头词」放在提示词最前面（默认 true）
@@ -299,6 +301,7 @@ async function init() {
   initChrome();
   initPerfHud();
   bindUI();
+  bindStyleFollow();
   initCollapsibles();
   api = await makeApi();
   adaptTopLinksForStatic();
@@ -644,9 +647,12 @@ function initCollapsibles() {
   // ?collapse=ai,browse 可指定初始收起（分享"专注模式"链接用，不影响记住的状态）
   const force = (new URLSearchParams(location.search).get('collapse') || '').split(',').filter(Boolean);
 
+  // 默认收起的卡片（用户改过就以记录为准）：模板库内容多、日常最占地方
+  const DEFAULT_CLOSED = ['browse'];
   for (const el of $$('[data-collapse]')) {
     const key = el.dataset.collapse;
-    const initialOpen = saved[key] !== false && !force.includes(key);
+    const savedVal = saved[key];
+    const initialOpen = typeof savedVal === 'boolean' ? savedVal : (!DEFAULT_CLOSED.includes(key) && !force.includes(key));
 
     // 原生 <details>（「怎么用」）
     if (el.tagName === 'DETAILS') {
@@ -1326,7 +1332,6 @@ window.__pfJobs = () => ({ ...(state.imgJobs || {}) });
 window.__pfImages = () => ({ ...state.images });
 window.__pfSel = (id) => { state.selectedId = id; renderStage(); renderSlotPanel(); refreshGenButtons(); };
 
-
 /**
  * 把这一格做成「给别的 App 画」的画布：包围盒尺寸 + 白底（或已有底图）+ 形状参考。
  * 形状参考 = 多边形外面压 12% 灰 + 边界虚线。回填时按同一个多边形裁切，外面的灰会被裁掉，
@@ -1891,7 +1896,6 @@ function slotAt(pt) {
   return null;
 }
 
-
 /* ---------------- 手机双击：震动 + 进这一格的编辑页 ---------------- */
 const DTAP_MS = 340;        // 两次点击间隔小于这个算双击
 const DTAP_SLOP = 10;       // 两次点击位置允许的偏差（px）
@@ -2226,13 +2230,24 @@ function bindUI() {
   });
 
   window.addEventListener('paste', async (ev) => {
-    if (!state.tpl || !state.selectedId) return;
+    if (!state.tpl) return;
     const items = [...(ev.clipboardData?.items || [])];
-    const img = items.find((i) => i.type.startsWith('image/'));
-    if (!img) return;
+    const imgs = items.filter((i) => i.type && i.type.startsWith('image/')).map((i) => i.getAsFile()).filter(Boolean);
+    if (!imgs.length) return;
+    // 和拖放用同一套落点规则：样图区 / 角色卡 / 当前格子
+    if (inboxArea === 'sample' || document.activeElement?.closest?.('#styleFollow')) {
+      ev.preventDefault();
+      await addSamples(imgs);
+      return;
+    }
+    if (inboxArea === 'char' || document.activeElement?.closest?.('.chars')) {
+      ev.preventDefault();
+      await addCharCard(imgs);
+      return;
+    }
+    if (!state.selectedId) return;
     ev.preventDefault();
-    const file = img.getAsFile();
-    if (file) await putImage(state.selectedId, file);
+    await putImage(state.selectedId, imgs[0]);
   });
 
   // 顶栏 / 左栏
@@ -3068,13 +3083,13 @@ window.__pfAuto = () => ({
 window.__pfAutoSet = (m) => setAutoMode(m);
 
   bindAutoUI();
-  bindInboxUI();
   // 页面被隐藏或卸载前，把还没落盘的草稿立刻写一次
   const flushNow = () => { if (dirty) { try { flushSave(); } catch { /* ignore */ } } };
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushNow(); });
   window.addEventListener('pagehide', flushNow);
   window.__pfFlush = () => flushSave();
   bindSlotZoom();
+  bindInboxUI();
 
 /* ================================================================== *
  * 交互收件箱：拖放 / 粘贴 / 气泡拖入 / 候选大图 / 右键菜单
@@ -3105,6 +3120,7 @@ function firstImageFromDataTransfer(dt) {
 /** 指针落在哪：画布 / 角色卡 / 其它 */
 function dropZoneOf(el) {
   if (!el || !el.closest) return null;
+  if (el.closest('#styleFollow')) return 'sample';   // 拖到「风格跟随」= 加样图
   if (el.closest('.chars')) return 'char';
   if (el.closest('#canvas') || el.closest('#stage') || el.closest('.paint-stage')) return 'canvas';
   return null;
@@ -3113,6 +3129,11 @@ function dropZoneOf(el) {
 async function acceptImages(files, { zone, ev } = {}) {
   const imgs = (files || []).filter((f) => f && /^image\//i.test(f.type));
   if (!imgs.length) return false;
+  if (zone === 'sample') {
+    setStyleFollow(followSamples() ? styleMode() : 'sample');
+    await addSamples(imgs);
+    return true;
+  }
   if (zone === 'char') {
     await addCharCard(imgs);
     toast(`已加入 ${imgs.length} 张角色参考图`);
@@ -3353,11 +3374,13 @@ function installImageInbox() {
   // 记录最近一次交互区域，供 Ctrl+V 决定往哪放
   document.addEventListener('pointerdown', (ev) => {
     const zone = dropZoneOf(ev.target);
-    if (zone === 'char') inboxArea = 'char';
+    if (zone === 'sample') inboxArea = 'sample';
+    else if (zone === 'char') inboxArea = 'char';
     else if (zone === 'canvas' || ev.target.closest?.('#railRight')) inboxArea = 'slot';
   }, true);
   document.addEventListener('focusin', (ev) => {
-    if (ev.target.closest?.('.chars')) inboxArea = 'char';
+    if (ev.target.closest?.('#styleFollow')) inboxArea = 'sample';
+    else if (ev.target.closest?.('.chars')) inboxArea = 'char';
   }, true);
 
   // 拖到画布/角色卡上时给出可放置的视觉反馈
@@ -3753,6 +3776,7 @@ function installContextMenu() {
 }
 
 /* ---------------- 绑定 ---------------- */
+
 function bindInboxUI() {
   installImageInbox();
   makeBubbleLibDraggable();
@@ -4151,7 +4175,7 @@ function makePlaceholder(slot) {
 /* ---------------- 格子面板：「这一格说什么」/「这一格的分镜」/「图片」三段各自折叠 ---------------- */
 const SLOT_SEC_KEY = 'pf.slotsec';
 /** 默认展开哪些段：「分镜」默认收起（它是查资料用的，日常最占地方） */
-const SLOT_SEC_OPEN = { text: true, image: true, board: false };
+const SLOT_SEC_OPEN = { text: true, image: true, ai: true, board: false };
 function initSlotSections() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SLOT_SEC_KEY) || '{}') || {}; } catch { /* ignore */ }
@@ -4246,6 +4270,8 @@ function syncPromptMeta() {
     if (x.dataset.src === 'ai') x.classList.toggle('disabled', !b.hasAi);
   });
   $('#promptState').textContent = { rule: '规则切分', ai: 'AI 生成', mine: '自己写' }[src] || '规则切分';
+  const aiSum = $('#secAiSum');
+  if (aiSum) aiSum.textContent = { rule: '规则切分', ai: 'AI 生成', mine: '自己写' }[src] || '规则切分';
   $('#promptState').classList.toggle('edited', b.edited);
   const chk = $('#chkPrefix');
   if (chk) chk.checked = b.usePrefix;
@@ -5143,13 +5169,40 @@ function shrinkImage(file, max) {
 }
 
 /** 当前启用的角色 → { block: 提示词片段, refs: [dataURL] } */
+/** 风格跟随模式（char / sample / both / none） */
+function styleMode() {
+  const m = state.styleFollow;
+  return ['char', 'sample', 'both', 'none'].includes(m) ? m : 'char';
+}
+function followChars() { return styleMode() === 'char' || styleMode() === 'both'; }
+function followSamples() { return styleMode() === 'sample' || styleMode() === 'both'; }
+
+/**
+ * 这一次要发给生图模型的人设/风格信息。
+ * 统一入口：人设图、样图都从这里出，避免"某个按钮忘了带参考图"这类不一致。
+ */
 function activeCharPayload() {
-  const chars = state.chars.filter((c) => state.activeChars.includes(c.id));
-  if (!chars.length) return { block: '', refs: [] };
-  const block = '角色一致性：' + chars.map((c) => `${c.name}${c.note ? '（' + c.note + '）' : ''}`).join('；')
-    + '。外观、发型、服装、年龄必须与参考图完全一致，不要换脸。';
-  const refs = chars.flatMap((c) => c.images || []).slice(0, 3);
-  return { block, refs };
+  const parts = [];
+  const refs = [];
+
+  if (followChars()) {
+    const chars = state.chars.filter((c) => state.activeChars.includes(c.id));
+    if (chars.length) {
+      parts.push('角色一致性：' + chars.map((c) => `${c.name}${c.note ? '（' + c.note + '）' : ''}`).join('；')
+        + '。外观、发型、服装、年龄必须与参考图完全一致，不要换脸。');
+      refs.push(...chars.flatMap((c) => c.images || []));
+    }
+  }
+
+  if (followSamples()) {
+    const samples = (state.samples || []).filter((x) => x && x.href);
+    if (samples.length) {
+      parts.push(`风格一致性：严格照参考样图的画风、线宽、上色方式与配色，不要擅自更换画风（共 ${samples.length} 张样图）。`);
+      refs.push(...samples.map((x) => x.href));
+    }
+  }
+
+  return { block: parts.join(' '), refs: refs.slice(0, 6) };
 }
 
 /* ---------------- 角色卡的导出 / 导入（团队共用同一批人） ---------------- */
@@ -6297,7 +6350,6 @@ function debounce(fn, ms) {
   return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
 
-
 /* ================================================================== *
  * 外观层：主题 / 平台快捷键 / 手机视图 / 滑块填充 / 静态版链接
  * ================================================================== */
@@ -6815,7 +6867,6 @@ function initStaticLinks() {
   if (sheet) { sheet.href = REPO_URL; sheet.textContent = 'GitHub 仓库'; }
 }
 
-
 /* ---------------- 本格句子里的建议行 & 两段的小结 ---------------- */
 const renderScriptSoon = debounce(() => { if (state.tpl) renderScript(); }, 400);
 
@@ -6843,7 +6894,129 @@ function syncSecSummary() {
 /* ================================================================== *
  * 真正启动（必须留在文件最后：这时上面所有 const 都已初始化完成）
  * ================================================================== */
+/* ---------------- 风格跟随：样图 ---------------- */
+const SAMPLES_MAX = 6;
+
+function renderSamples() {
+  const box = $('#sampleBox');
+  const grid = $('#sampleGrid');
+  if (!box || !grid) return;
+  box.classList.toggle('hidden', !followSamples());
+  $$('#styleSeg button').forEach((b) => b.classList.toggle('on', (b.dataset.follow || 'char') === styleMode()));
+  const hint = $('#styleHint');
+  if (hint) {
+    hint.textContent = {
+      char: '跟角色参考图',
+      sample: '跟样图的画风',
+      both: '人设图 + 样图都参考',
+      none: '不参考任何图',
+    }[styleMode()];
+  }
+  grid.innerHTML = (state.samples || []).map((sp, i) => `
+    <div class="sample-item" data-i="${i}">
+      <img src="${escapeHtml(sp.href)}" alt="样图 ${i + 1}">
+      <button class="sample-del" type="button" data-del="${i}" title="删掉这张">×</button>
+    </div>`).join('') + ((state.samples || []).length < SAMPLES_MAX
+    ? '<button class="sample-add" type="button" id="btnSampleAddInner" title="加样图（也可以直接拖进来 / Ctrl+V）">＋</button>'
+    : '');
+}
+
+async function addSamples(files) {
+  const list = (files || []).filter((f) => f && /^image\//i.test(f.type || ''));
+  if (!list.length) return 0;
+  const room = SAMPLES_MAX - (state.samples || []).length;
+  if (room <= 0) { toast(`样图最多 ${SAMPLES_MAX} 张`); return 0; }
+  const use = list.slice(0, room);
+  for (const f of use) {
+    try {
+      const asset = await imageAsset(f, { name: 'sample' });
+      state.samples.push(asset);
+    } catch { /* 跳过坏图 */ }
+  }
+  renderSamples();
+  persistSamples();
+  toast(`已加入 ${use.length} 张样图（共 ${state.samples.length} 张）`);
+  return use.length;
+}
+
+function removeSample(i) {
+  state.samples.splice(i, 1);
+  renderSamples();
+  persistSamples();
+}
+
+let sampleSaveTimer = 0;
+function persistSamples() {
+  clearTimeout(sampleSaveTimer);
+  sampleSaveTimer = setTimeout(async () => {
+    try {
+      const urls = [];
+      for (const sp of state.samples || []) {
+        // href 是 blob URL，先取回 Blob 再转 dataURL（blobToDataURL 只接受 Blob）
+        const blob = await (await fetch(sp.href)).blob();
+        urls.push(await blobToDataURL(blob));
+      }
+      await idbSet('samples', { urls, savedAt: Date.now() });
+    } catch { /* ignore */ }
+  }, 400);
+}
+
+async function restoreSamples() {
+  try {
+    const rec = await idbGet('samples');
+    const urls = rec?.urls || [];
+    const out = [];
+    for (const u of urls) {
+      try { out.push(await imageAsset(u, { name: 'sample' })); } catch { /* 跳过 */ }
+    }
+    if (out.length) { state.samples = out; renderSamples(); }
+  } catch { /* ignore */ }
+}
+
+function setStyleFollow(mode) {
+  const m = ['char', 'sample', 'both', 'none'].includes(mode) ? mode : 'char';
+  state.styleFollow = m;
+  try { localStorage.setItem('pf.stylefollow', m); } catch { /* ignore */ }
+  renderSamples();
+  queueSave?.();
+  toast({
+    char: '生图会跟人设图',
+    sample: '生图会跟样图的画风',
+    both: '人设图 + 样图都会参考',
+    none: '生图不参考任何图（每格可能长得不一样）',
+  }[m]);
+}
+
+window.__pfStyle = () => ({
+  mode: styleMode(),
+  samples: (state.samples || []).length,
+  followChars: followChars(),
+  followSamples: followSamples(),
+});
+
+function bindStyleFollow() {
+  try {
+    const saved = localStorage.getItem('pf.stylefollow');
+    if (saved) state.styleFollow = saved;
+  } catch { /* ignore */ }
+  renderSamples();
+  restoreSamples();
+  $$('#styleSeg button').forEach((b) => b.addEventListener('click', () => setStyleFollow(b.dataset.follow)));
+  $('#btnSamplePick')?.addEventListener('click', () => $('#sampleFiles').click());
+  $('#sampleFiles')?.addEventListener('change', async (ev) => {
+    await addSamples([...(ev.target.files || [])]);
+    ev.target.value = '';
+  });
+  $('#sampleGrid')?.addEventListener('click', (ev) => {
+    const del = ev.target.closest('[data-del]');
+    if (del) { removeSample(Number(del.dataset.del)); return; }
+    if (ev.target.closest('#btnSampleAddInner')) $('#sampleFiles').click();
+  });
+
+}
+
 init().catch((e) => {
   console.error(e);
+  window.__pfLastInitError = String((e && e.stack) || e);   // 出问题时方便在控制台一眼看到
   toast('初始化失败：' + e.message);
 });
