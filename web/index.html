@@ -161,7 +161,7 @@
         <input id="llmModel" type="text">
         <input id="llmBase" type="text">
         <input id="llmKey" type="password">
-        <select id="imgProvider"><option value="openai">OpenAI</option><option value="siliconflow">硅基流动</option><option value="stability">Stability</option></select>
+        <select id="imgProvider"><option value="openai">OpenAI 兼容</option><option value="volcengine">火山方舟 Seedream</option><option value="siliconflow">硅基流动</option><option value="stability">Stability</option></select>
         <input id="imgModel" type="text">
         <label class="switch"><input type="checkbox" id="chkKeySession"> 仅本次会话</label>
         <div class="row2">
@@ -644,9 +644,10 @@
         <div class="row2">
           <label class="field"><span>生图服务商</span>
             <select id="ksImgProvider">
-              <option value="openai">OpenAI</option>
+              <option value="openai">OpenAI 兼容（GPT / 中转）</option>
+              <option value="volcengine">火山方舟 Seedream（豆包）</option>
               <option value="siliconflow">硅基流动</option>
-              <option value="stability">Stability</option>
+              <option value="stability">Stability AI</option>
             </select>
           </label>
           <label class="field"><span>生图模型</span>

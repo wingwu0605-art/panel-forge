@@ -3544,9 +3544,9 @@ const KEY_PRESETS = {
     name: '火山方舟（豆包）', protocol: 'openai',
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     model: 'doubao-seed-1-6-250615',
-    imgProvider: 'openai',
+    imgProvider: 'volcengine',
     imgModel: 'doubao-seedream-4-0-250828',
-    imgHint: '方舟的生图模型常是 seedream 系列；也可填控制台给你的接入点 ID（ep-...）',
+    imgHint: '方舟生图走 seedream 系列（4.0 质量最好）；模型要先在控制台「开通管理」里开通，否则 404',
   },
   dashscope: {
     name: '通义百炼', protocol: 'openai',

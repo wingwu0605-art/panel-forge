@@ -149,6 +149,22 @@ ok('Stability 走 v2beta/stable-image/generate/core',
   resolveImageEndpoint(cfgOf('https://api.stability.ai', { imageProvider: 'stability' }))
     === 'https://api.stability.ai/v2beta/stable-image/generate/core');
 
+// 火山方舟（Seedream）：一个端点同时管文生图/图生图；尺寸表不能用 OpenAI 那套
+ok('火山方舟生图端点 = /api/v3/images/generations',
+  resolveImageEndpoint(cfgOf('https://ark.cn-beijing.volces.com/api/v3', { imageProvider: 'volcengine' }))
+    === 'https://ark.cn-beijing.volces.com/api/v3/images/generations');
+ok('火山方舟：光看域名也能认出来（即使用户把服务商选成 OpenAI）',
+  resolveImageEndpoint(cfgOf('https://ark.cn-beijing.volces.com/api/v3'))
+    === 'https://ark.cn-beijing.volces.com/api/v3/images/generations');
+ok('火山方舟尺寸不接受 OpenAI 的 1792x1024',
+  fitImageSize('volcengine', '1600x900', 'doubao-seedream-4-0-250828') !== '1792x1024',
+  fitImageSize('volcengine', '1600x900', 'doubao-seedream-4-0-250828'));
+ok('火山方舟 1:1 走 1024x1024',
+  fitImageSize('volcengine', '1024x1024', 'doubao-seedream-4-0-250828') === '1024x1024');
+ok('火山方舟竖图走 832x1248 或 720x1280',
+  ['832x1248', '720x1280'].includes(fitImageSize('volcengine', '800x1200', 'doubao-seedream-4-0-250828')),
+  fitImageSize('volcengine', '800x1200', 'doubao-seedream-4-0-250828'));
+
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 
 
