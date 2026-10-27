@@ -75,7 +75,16 @@
     <span class="name">PanelForge</span>
     <span class="sub">分镜坊</span>
   </div>
-  <div class="top-mid">
+      <!-- 全自动模式：关闭 / 分镜全自动 / 真正全自动 -->
+    <div class="auto-switch">
+      <span class="auto-switch-label">全自动</span>
+      <div class="seg auto-seg" id="autoSeg" role="tablist" aria-label="全自动模式">
+        <button type="button" data-auto="off" class="on">关闭</button>
+        <button type="button" data-auto="story">分镜</button>
+        <button type="button" data-auto="full">全自动</button>
+      </div>
+    </div>
+<div class="top-mid">
     <span class="pill" id="statTpl">载入中…</span>
     <span class="pill ok" id="statApi">API</span>
     <span class="pill dim mono" id="statPort"></span>
@@ -103,6 +112,33 @@
         <h2>剧情 → 分镜</h2>
         <span class="hint" id="analyzeHint">本地规则引擎</span>
       </div>
+      <!-- 全自动：直接把全文丢进来，剩下的由工作流决定 -->
+      <section class="auto-panel hidden" id="autoPanel">
+        <div class="auto-head">
+          <b id="autoModeName">分镜全自动</b>
+          <span class="muted small" id="autoModeDesc">决定画几页、每页怎么切，你只改提示词和角色</span>
+        </div>
+        <textarea id="autoText" rows="10" placeholder="把全文粘到这里（小说／剧本／大纲都行）。开始后我会自己决定画几页、每页怎么分。"></textarea>
+        <div class="row2">
+          <button class="btn tiny" id="btnAutoFile" type="button">上传文件</button>
+          <input type="file" id="autoFile" accept=".txt,.md,.markdown,text/plain" class="hidden">
+          <button class="btn tiny" id="btnAutoEstimate" type="button">估算页数</button>
+        </div>
+        <div class="row2">
+          <label class="field"><span>男主形象</span>
+            <input id="autoHero" type="text" placeholder="例：黑短发、左眉疤、深色高领外套">
+          </label>
+          <label class="field"><span>女主形象</span>
+            <input id="autoHeroine" type="text" placeholder="例：银色长发、白色披风、冷淡眼神">
+          </label>
+        </div>
+        <div class="auto-stat muted small" id="autoStat">粘贴全文后点「估算页数」看看要画几页</div>
+        <div class="row2">
+          <button class="btn primary" id="btnAutoStart" type="button">开始</button>
+          <button class="btn danger" id="btnAutoStop" type="button" disabled>停止</button>
+        </div>
+        <div class="auto-log hidden" id="autoLog" aria-live="polite"></div>
+      </section>
       <textarea id="plot" rows="5" placeholder="粘贴一段剧情，越具体越准。例如：雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋，两人在积水里僵持。"></textarea>
       <div class="row2">
         <label class="field"><span>排戏范围</span>
@@ -789,5 +825,34 @@
 </div>
 
 <script type="module" src="./app.js?v=0qqy5"></script>
+  <!-- 批量生图：右下角悬浮（会花很多钱，所以每次都要二次确认） -->
+  <div class="fab-stack" id="fabStack">
+    <button class="fab" id="fabGenPage" type="button" title="生成当前页所有还没图的格子">
+      <span class="fab-ico">▤</span><span class="fab-txt">本页<b>全部图片</b></span>
+    </button>
+    <button class="fab fab-all" id="fabGenAll" type="button" title="生成所有页面所有还没图的格子">
+      <span class="fab-ico">▦</span><span class="fab-txt">全部页<b>所有图片</b></span>
+    </button>
+  </div>
+
+  <!-- 危险操作确认：必须勾选「我已知晓」才能继续 -->
+  <div class="keysheet hidden" id="dangerSheet">
+    <div class="ks-panel" style="max-width:520px">
+      <div class="ks-head">
+        <b id="dangerTitle">确认</b>
+        <span class="muted small">这一步会花掉很多 token，而且中途停不下来</span>
+        <button class="btn tiny" type="button" data-cancel>关闭</button>
+      </div>
+      <div class="ks-body">
+        <div class="danger-body" id="dangerBody"></div>
+        <label class="danger-ack"><input type="checkbox" id="dangerAck"> 我已知晓上面的说明</label>
+        <div class="row2">
+          <button class="btn danger" id="dangerGo" type="button" disabled>继续</button>
+          <button class="btn tiny" type="button" data-cancel2>取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

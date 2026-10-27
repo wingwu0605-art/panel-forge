@@ -1749,6 +1749,85 @@ const scenarios = [
   },
 
   {
+    name: 'auto-mode',
+    title: '㉔ 全自动模式：开关 / 全文面板 / 危险确认 / 批量队列',
+    async run(page, shot, { check }) {
+      await page.viewport(1400, 980);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        window.confirm = () => true;
+        const api = window.__pfApi();
+        const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        let imgCalls = 0;
+        api.imageGenerate = async () => { imgCalls++; await wait(60); return { ok: true, b64: png, provider: 'fake', size: '1024x1024', model: 'fake', refsUsed: 0, refsIgnored: 0 }; };
+
+        const res = {};
+        res.seg = [...document.querySelectorAll('#autoSeg button')].map((b) => b.dataset.auto);
+        res.defaultMode = window.__pfAuto().mode;
+        res.fabHiddenWhenOff = document.querySelector('#fabStack').classList.contains('hidden');
+
+        window.__pfAutoSet('story');
+        await wait(150);
+        res.story = {
+          panelVisible: !document.querySelector('#autoPanel').classList.contains('hidden'),
+          plotHidden: document.querySelector('#plot').closest('.card').classList.contains('hidden'),
+          fabVisible: !document.querySelector('#fabStack').classList.contains('hidden'),
+          label: document.querySelector('#autoModeName').textContent,
+        };
+
+        // 估算
+        document.querySelector('#autoText').value = '雨夜屋顶拔刀。敌人偷袭，反手斩断刀锋。两人在积水里僵持。'.repeat(20);
+        document.querySelector('#btnAutoEstimate').click();
+        await wait(150);
+        res.estimate = document.querySelector('#autoStat').textContent;
+
+        // 危险弹窗：未勾选禁用
+        document.querySelector('#fabGenPage').click();
+        await wait(200);
+        res.danger = {
+          shown: !document.querySelector('#dangerSheet').classList.contains('hidden'),
+          goDisabled: document.querySelector('#dangerGo').disabled,
+          hasAck: !!document.querySelector('#dangerAck'),
+        };
+        const ack = document.querySelector('#dangerAck');
+        ack.checked = true;
+        ack.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait(80);
+        res.dangerGoEnabled = !document.querySelector('#dangerGo').disabled;
+
+        // 真跑：点继续 → 队列顺序生成
+        document.querySelector('#dangerGo').click();
+        await wait(2600);
+        res.imagesAfter = Object.keys(window.__pfImages()).length;
+        res.imgCalls = imgCalls;
+        res.logLines = document.querySelectorAll('#autoLog .al-row').length;
+        res.logHasDone = [...document.querySelectorAll('#autoLog .al-row')].some((r) => /完成/.test(r.textContent));
+
+        window.__pfAutoSet('off');
+        await wait(120);
+        res.offRestored = document.querySelector('#fabStack').classList.contains('hidden');
+        return res;
+      })()`);
+
+      check('顶栏开关三态（关闭 / 分镜 / 全自动）', out.seg.join(',') === 'off,story,full', out.seg.join(','));
+      check('默认关闭，悬浮按钮不出现', out.defaultMode === 'off' && out.fabHiddenWhenOff === true);
+      check('分镜模式：全自动面板出现、原剧情框收起',
+        out.story.panelVisible && out.story.plotHidden, JSON.stringify(out.story));
+      check('悬浮按钮在分镜模式下出现', out.story.fabVisible === true);
+      check('估算页数给出页数与格数', /页/.test(out.estimate) && /格/.test(out.estimate), out.estimate);
+      check('危险弹窗出现，且未勾选时「继续」禁用', out.danger.shown && out.danger.goDisabled && out.danger.hasAck);
+      check('勾选「我已知晓」后「继续」才可用', out.dangerGoEnabled === true);
+      check('点继续后按队列逐格生成图片', out.imagesAfter >= 1 && out.imgCalls >= 1, `图 ${out.imagesAfter} 张 / 请求 ${out.imgCalls} 次`);
+      check('前台日志记录了每一步', out.logLines >= 2 && out.logHasDone === true, `${out.logLines} 行`);
+      check('切回关闭后悬浮按钮收起', out.offRestored === true);
+      await shot('auto-mode');
+    },
+  },
+
+  {
     name: 'ai-lines',
     title: '㉓ AI 写台词（单格 / 整页 / 自动挂气泡）',
     async run(page, shot, { check }) {

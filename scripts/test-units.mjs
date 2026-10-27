@@ -2,6 +2,7 @@
  * 纯函数单测（不启服务器、不连模型）：node scripts/test-units.mjs
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
+import { estimateLayout, splitTextIntoPages, buildAutoSteps, imageQueueForPage, imageQueueAll, estimateCostHint, MAX_AUTO_PAGES } from '../lib/auto.mjs';
 import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError, planImageRequest, imageRoute, normalizeLineItems } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
 import { splitClauses, assignSegments, buildPlan, matchTemplates, filterTemplatesByGenre, isGenreTag, GENRE_TAGS } from '../lib/matcher.mjs';
@@ -293,6 +294,30 @@ ok('空句子的 kind 归为「空」', LINES.lines.p2.kind === '空' && LINES.l
 ok('非法 kind 回落成「台词」', LINES.lines.p3.kind === '台词');
 ok('「他说：」前缀被剥掉', LINES.lines.p3.text === '走吧', LINES.lines.p3.text);
 ok('超长句子被截断', LINES.lines.p4.text.length <= 40, String(LINES.lines.p4.text.length));
+
+
+/* 全自动：页数估算 / 分页 / 步骤计划 / 队列（算错就是真金白银） */
+ok('短文本至少 1 页', estimateLayout('一句话。').pages === 1);
+ok('按字数估页数（260 字/页）', estimateLayout('字'.repeat(800)).pages === 4, String(estimateLayout('字'.repeat(800)).pages));
+ok('超过上限会截断并标注', (() => { const e = estimateLayout('字'.repeat(260 * 30)); return e.pages === MAX_AUTO_PAGES && e.clamped === true; })());
+ok('分页不切在句子中间（每页都以句末标点或为空）', (() => {
+  const out = splitTextIntoPages('第一句。第二句！第三句？第四句。第五句。', 3);
+  return out.length === 3 && out.slice(0, -1).every((t) => !t || /[。！？]$/.test(t));
+})());
+ok('story 模式不包含出图步骤', !buildAutoSteps({ mode: 'story', pages: 1 }).some((x) => x.cost === 'image'));
+ok('full 模式包含出图步骤且排在最后', (() => {
+  const st = buildAutoSteps({ mode: 'full', pages: 2 });
+  return st[st.length - 1].cost === 'image' && st.some((x) => x.key === 'line-1');
+})());
+ok('队列跳过已经有图的格子', imageQueueForPage([{ id: 'p1' }, { id: 'p2' }], { p1: {} }).join() === 'p2');
+ok('全部页队列带页码', (() => {
+  const q = imageQueueAll([[{ id: 'a' }], [{ id: 'b' }]], [{}, {}]);
+  return q.length === 2 && q[0].page === 0 && q[1].slotId === 'b';
+})());
+ok('花费提示给出区间与张数', (() => {
+  const c = estimateCostHint({ images: 10 });
+  return c.images === 10 && c.text.includes('10 张图') && /¥/.test(c.text);
+})());
 
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 
