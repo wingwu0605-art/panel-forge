@@ -1820,6 +1820,25 @@ const scenarios = [
         document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
         await wait(100);
 
+        // ⑥ 拖文本文件进「全文」框（全自动面板）
+        window.__pfAutoSet('story');
+        await wait(250);
+        const ta = document.querySelector('#autoText');
+        const mkText = (name, type, body) => new File([body], name, { type });
+        const dropFile = (el, file) => {
+          const d = new DataTransfer();
+          d.items.add(file);
+          el.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: d }));
+        };
+        dropFile(ta, mkText('chapter1.md', 'text/markdown', '雨夜的屋顶上他缓缓拔出刀。敌人从背后偷袭，他反手斩断刀锋。'.repeat(12)));
+        await wait(600);
+        res.textDrop = { len: ta.value.length, stat: document.querySelector('#autoStat')?.textContent || '' };
+        dropFile(ta, mkText('script.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'x'));
+        await wait(300);
+        res.docReject = document.querySelector('#toast')?.textContent || '';
+        window.__pfAutoSet('off');
+        await wait(150);
+
         // ⑥ 大图预览
         window.__pfLightbox(0);
         await wait(250);
@@ -1850,6 +1869,11 @@ const scenarios = [
       check('候选/单图可以点开大图预览',
         out.lightbox.shown && /1\s*\/|第 1/.test(out.lightbox.count), out.lightbox.count);
       check('大图能关掉', out.lightboxClosed === true);
+      check('原文档可以直接拖进「全文」框（不用点上传按钮）',
+        out.textDrop.len > 100, String(out.textDrop.len) + ' 字');
+      check('拖进来后自动估算页数', /页/.test(out.textDrop.stat), out.textDrop.stat);
+      check('docx 这类读不了的格式会明确说清楚',
+        /读不了|另存/.test(out.docReject), out.docReject);
       await shot('inbox');
     },
   },

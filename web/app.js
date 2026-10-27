@@ -3000,6 +3000,64 @@ async function acceptImages(files, { zone, ev } = {}) {
 }
 
 /* ---------------- 拖放 + 粘贴 ---------------- */
+/** 拖进来的文件里挑出「文本类」的（原文/大纲/脚本） */
+const TEXT_EXT = /\.(txt|md|markdown|text|csv|tsv|journal|log)$/i;
+function textFilesFromDataTransfer(dt) {
+  if (!dt) return [];
+  const out = [];
+  const push = (f) => {
+    if (!f) return;
+    // docx/pdf 这类也算「文本候选」—— 收下来才能给一句明确的「读不了，请另存 txt」
+    const DOC_EXT = /\.(docx|doc|pdf|epub|rtf)$/i;
+    const isText = /^text\//i.test(f.type) || TEXT_EXT.test(f.name || '') || DOC_EXT.test(f.name || '');
+    if (isText) out.push(f);
+  };
+  if (dt.files && dt.files.length) for (const f of dt.files) push(f);
+  if (!out.length && dt.items) {
+    for (const it of dt.items) if (it.kind === 'file') push(it.getAsFile());
+  }
+  return out;
+}
+
+/** 判断落点是哪个文本框：全自动的全文框 / 普通模式的剧情框 */
+function textTargetOf(el) {
+  if (!el || !el.closest) return null;
+  if (el.closest('#autoPanel, #autoCard')) return '#autoText';
+  if (el.closest('.match, #plot')) return '#plot';
+  return null;
+}
+
+/** 把文本文件读进对应的文本框；读不了（比如 docx）就说清楚 */
+async function acceptTextFiles(files, { targetSel } = {}) {
+  const list = (files || []).filter(Boolean);
+  if (!list.length) return false;
+  const f = list[0];
+  const sel = targetSel || (state.autoMode && state.autoMode !== 'off' ? '#autoText' : '#plot');
+  const ta = $(sel);
+  if (!ta) return false;
+  // docx / pdf / epub：浏览器里要额外依赖才能解，别假装支持
+  if (/\.(docx|doc|pdf|epub|rtf)$/i.test(f.name || '')) {
+    toast('这个格式读不了：请另存为 .txt / .md 再拖进来（docx 在浏览器里需要额外依赖）');
+    return false;
+  }
+  try {
+    const text = await f.text();
+    if (!text || !text.trim()) { toast('这个文件是空的'); return false; }
+    ta.value = text.slice(0, 200000);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    if (sel === '#autoText') autoEstimate();
+    const chars = text.replace(/\s+/g, '').length;
+    toast(`已读入「${f.name}」：${chars} 字${sel === '#autoText' ? '，已估算页数' : ''}`);
+    ta.focus();
+    // 光标放到末尾，方便接着写
+    try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch { /* ignore */ }
+    return true;
+  } catch (e) {
+    toast('读文件失败：' + e.message);
+    return false;
+  }
+}
+
 function installImageInbox() {
   const canvas = $('#canvas');
 
@@ -3015,10 +3073,13 @@ function installImageInbox() {
 
   // 拖到画布/角色卡上时给出可放置的视觉反馈
   document.addEventListener('dragover', (ev) => {
-    const hasFiles = firstImageFromDataTransfer(ev.dataTransfer).length > 0;
+    const hasImages = firstImageFromDataTransfer(ev.dataTransfer).length > 0;
+    const hasText = textFilesFromDataTransfer(ev.dataTransfer).length > 0;
     const isBubble = ev.dataTransfer?.types?.includes('text/pf-bubble');
-    if (!hasFiles && !isBubble) return;
-    const zone = dropZoneOf(ev.target);
+    if (!hasImages && !hasText && !isBubble) return;
+    // 文本文件优先落在文本框上
+    const textSel = hasText && !hasImages ? textTargetOf(ev.target) : null;
+    const zone = textSel ? 'text' : dropZoneOf(ev.target);
     if (!zone) return;
     ev.preventDefault();
     ev.dataTransfer.dropEffect = 'copy';
@@ -3045,6 +3106,14 @@ function installImageInbox() {
         if (slot) { state.selectedId = slot.id; renderSlotPanel(); }
         toast(`已把「${BUBBLES[bubbleType]?.zh || bubbleType}」放到画面上，拖它调位置`);
       }
+      return;
+    }
+    // 先看是不是文本文件（原文/大纲），它落在文本框上就填文本框
+    const texts = textFilesFromDataTransfer(ev.dataTransfer);
+    const textSel = texts.length ? textTargetOf(ev.target) : null;
+    if (texts.length && (textSel || !firstImageFromDataTransfer(ev.dataTransfer).length)) {
+      ev.preventDefault();
+      await acceptTextFiles(texts, { targetSel: textSel });
       return;
     }
     const files = firstImageFromDataTransfer(ev.dataTransfer);

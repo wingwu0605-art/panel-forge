@@ -2471,3 +2471,7 @@ body[data-drop-zone="char"] .chars{outline:2px dashed var(--tint);outline-offset
 .bub-grid .bub-item{cursor:grab}
 .bub-grid .bub-item:active{cursor:grabbing}
 .bub-grid .bub-item.dragging{opacity:.5}
+
+/* 拖文本文件到文本框上的落点提示 */
+body[data-drop-zone="text"] #autoText,
+body[data-drop-zone="text"] #plot{outline:2px dashed var(--tint);outline-offset:3px;border-radius:10px}
