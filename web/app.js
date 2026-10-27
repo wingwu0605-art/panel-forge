@@ -2665,8 +2665,8 @@ function setAutoMode(mode, opts = {}) {
   const name = $('#autoModeName');
   const title = $('#autoModeTitle');
   const desc = $('#autoModeDesc');
-  if (name) name.textContent = m === 'full' ? '真正全自动' : '分镜全自动';
-  if (title) title.textContent = m === 'full' ? '真正全自动' : '分镜全自动';
+  if (name) name.textContent = m === 'full' ? '真正全自动' : '分镜自动';
+  if (title) title.textContent = m === 'full' ? '真正全自动' : '分镜自动';
   if (desc) {
     desc.textContent = m === 'full'
       ? '从分镜、提示词、出图到台词与气泡全由 AI 完成，全程前台可见、随时可停'
@@ -2823,7 +2823,7 @@ async function autoRun() {
   if (btnStart) btnStart.disabled = true;
   if (btnStop) btnStop.disabled = false;
   const t0 = Date.now();
-  autoLog('▶ 全自动开始（' + (mode === 'full' ? '真正全自动' : '分镜全自动') + '）：' + est.pages + ' 页', 'start');
+  autoLog('▶ 全自动开始（' + (mode === 'full' ? '真正全自动' : '分镜自动') + '）：' + est.pages + ' 页', 'start');
 
   try {
     const pageTexts = splitTextIntoPages(text, est.pages);

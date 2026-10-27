@@ -2423,3 +2423,10 @@ html[data-skin="minimal"] .chip[aria-pressed="true"]{
 .auto-card.hidden{display:none}
 @media (max-width:1180px){.auto-switch-label{display:none}}
 @media (max-width:860px){.auto-switch .auto-seg button{padding:2px 6px;font-size:11px}}
+
+/* 顶栏自动开关：任何宽度都不换行 */
+.auto-switch{align-items:center}
+.auto-switch-label{white-space:nowrap;flex:0 0 auto}
+.auto-switch .auto-seg{flex:0 0 auto;width:auto}
+.auto-switch .auto-seg button{white-space:nowrap;flex:0 0 auto}
+@media (max-width:1320px){.auto-switch-label{display:none}}
