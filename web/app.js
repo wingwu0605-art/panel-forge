@@ -2338,30 +2338,81 @@ function bindUI() {
   $('#ksTest')?.addEventListener('click', async () => {
     const btn = $('#ksTest'); const old = btn.textContent;
     btn.disabled = true; btn.textContent = '测试中…';
-    $('#ksMsg').textContent = '正在请求模型…';
+    $('#ksMsg').textContent = '正在请求对话模型…';
     try {
       const r = await api.llmTest({ llm: formEntry() });
       if (r?.ok) {
-        $('#ksMsg').textContent = '✅ 连接成功 · ' + (r.model || '') + ' · ' + (r.latencyMs || '?') + 'ms';
+        $('#ksMsg').textContent = '✅ 对话模型通了 · ' + (r.model || '') + ' · ' + (r.latencyMs || '?') + 'ms';
         state._lastTestOk = true;
       } else {
         const where = r?.endpoint ? ` · POST ${String(r.endpoint).replace(/^https?:\/\//, '')} · model=${r.model || '?'}` : '';
-        $('#ksMsg').textContent = '❌ ' + (r?.error || '失败') + where + (r?.hint ? ' · ' + r.hint : '');
+        // 明确说这是「对话」失败 —— 生图是另一条链路，用另一把 Key，不受影响
+        $('#ksMsg').textContent = '❌ 对话模型失败（不影响生图）：' + (r?.error || '失败') + where + (r?.hint ? ' · ' + r.hint : '');
         state._lastTestOk = false;
       }
     } catch (e) {
-      $('#ksMsg').textContent = '❌ ' + e.message;
+      $('#ksMsg').textContent = '❌ 对话模型失败：' + e.message;
       state._lastTestOk = false;
     } finally { btn.disabled = false; btn.textContent = old; }
   });
+
+  /**
+   * 只测生图：真的生成一张 512×512 小图（约 0.02 元），用来确认生图这条链路。
+   * 和「测试对话」完全分开 —— 文本用哪家、生图用哪家互不影响。
+   */
+  $('#ksTestImg')?.addEventListener('click', async () => {
+    const entry = formEntry();
+    const model = entry.imgModel || '(未填生图模型)';
+    if (!confirm(`会用生图模型 ${model} 真实生成一张小图（约 0.02 元），继续吗？`)) return;
+    const btn = $('#ksTestImg'); const old = btn.textContent;
+    btn.disabled = true; btn.textContent = '生成中…';
+    $('#ksMsg').textContent = '正在调用生图接口…';
+    const t0 = Date.now();
+    try {
+      const r = await api.imageGenerate({
+        prompt: 'a simple red circle on white background, minimal',
+        size: '512x512',
+        model: entry.imgModel,
+        provider: entry.imgProvider,
+        llm: entry,
+      });
+      if (r?.ok) {
+        const host = r.endpointHost || '?';
+        $('#ksMsg').textContent = `✅ 生图通了 · ${host} · ${r.model || model} · 请求尺寸 ${r.size || '?'} · ${Date.now() - t0}ms`
+          + (r.refsUsed ? ` · 带 ${r.refsUsed} 张参考图` : '');
+        state._lastImgTestOk = true;
+      } else {
+        $('#ksMsg').textContent = '❌ 生图失败：' + (r?.error || '失败') + (r?.hint ? ' · ' + r.hint : '');
+        state._lastImgTestOk = false;
+      }
+    } catch (e) {
+      $('#ksMsg').textContent = '❌ 生图失败：' + e.message;
+      state._lastImgTestOk = false;
+    } finally { btn.disabled = false; btn.textContent = old; syncImgReady(); }
+  });
+  // 生图这些字段一变就刷新「生图就绪」提示（它和对话模型是两条独立链路）
+  ['ksImgProvider', 'ksImgModel', 'ksImgBase', 'ksImgKey', 'ksBase', 'ksKey'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', syncImgReady);
+    el.addEventListener('change', syncImgReady);
+  });
+  syncImgReady();
   $('#ksSave')?.addEventListener('click', () => {
     const e = formEntry();
-    if (!e.apiKey) { $('#ksMsg').textContent = '请先填 API Key'; return; }
-    if (!e.baseUrl) { $('#ksMsg').textContent = '请先填 Base URL'; return; }
-    if (state._lastTestOk) e.verifiedAt = Date.now();
+    // 允许「只有生图配置」：文本用不上 AI 的人不该被对话 Key 拦住
+    const hasChat = e.apiKey && e.baseUrl;
+    const hasImg = e.imgKey && (e.imgBaseUrl || e.baseUrl) && e.imgModel;
+    if (!hasChat && !hasImg) {
+      $('#ksMsg').textContent = '至少配一条：对话（Base URL + API Key）或生图（生图模型 + Key）';
+      return;
+    }
+    if (state._lastTestOk || state._lastImgTestOk) e.verifiedAt = Date.now();
     upsertKey(e);
     state._editingKeyId = null;
-    $('#ksMsg').textContent = e.verifiedAt ? '已保存并验证，可以开始用了' : '已保存（未验证，建议先点测试连接）';
+    $('#ksMsg').textContent = e.verifiedAt
+      ? '已保存并验证，可以开始用了'
+      : (hasChat ? '已保存（对话未验证，可以点「测试对话」）' : '已保存生图配置（可直接用「生这一格」）');
     toast('已保存 Key：' + e.name);
   });
   initSlotSections();
@@ -3664,6 +3715,25 @@ function openKeySheet() {
 }
 
 function closeKeySheet() { $('#keySheet').classList.add('hidden'); }
+
+/** 生图这条链路到底配好了没 —— 独立于对话模型，避免「对话挂了以为生图也废了」 */
+function syncImgReady() {
+  const el = $('#ksImgReady');
+  if (!el) return;
+  const provider = $('#ksImgProvider')?.value || 'openai';
+  const model = ($('#ksImgModel')?.value || '').trim();
+  const base = ($('#ksImgBase')?.value || '').trim() || ($('#ksBase')?.value || '').trim();
+  const ownKey = ($('#ksImgKey')?.value || '').trim();
+  const fallbackKey = ($('#ksKey')?.value || '').trim();
+  const key = ownKey || fallbackKey;
+  const providerName = { volcengine: '火山方舟 Seedream', openai: 'OpenAI 兼容', siliconflow: '硅基流动', stability: 'Stability' }[provider] || provider;
+  if (!model) { el.textContent = '生图还没配好：缺生图模型'; el.dataset.ok = '0'; return; }
+  if (!key) { el.textContent = '生图还没配好：缺 Key（生图 Key 或上面的 API Key 都行）'; el.dataset.ok = '0'; return; }
+  const keySrc = ownKey ? '生图专用 Key' : '共用上面的 Key';
+  const tail = ownKey || !fallbackKey ? '' : '（注意：上面那把 Key 可能属于另一家，测试对话失败也不影响这里）';
+  el.textContent = `生图就绪：${providerName} · ${model} · ${base.replace(/^https?:\/\//, '')} · ${keySrc} ****${String(key).slice(-4)}${tail}`;
+  el.dataset.ok = '1';
+}
 
 function fillKeyForm(e) {
   if (!e) return;

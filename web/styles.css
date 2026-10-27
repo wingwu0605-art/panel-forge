@@ -2343,3 +2343,7 @@ html[data-skin="minimal"] .chip[aria-pressed="true"]{
 .ks-more summary::before{content:"▸ ";color:var(--label-3)}
 .ks-more[open] summary::before{content:"▾ "}
 .ks-more-body{padding:8px 0 2px;display:flex;flex-direction:column;gap:8px}
+
+/* 生图就绪状态：ok=1 走成功色，ok=0 走提醒色 */
+#ksImgReady[data-ok="1"]{color:var(--green-ink)}
+#ksImgReady[data-ok="0"]{color:var(--orange-ink)}
