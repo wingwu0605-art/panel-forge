@@ -382,7 +382,8 @@ const routes = [
     const candidateCount = clampNum(body.candidates, 3, 16, 10);
 
     // ① 规则引擎先给合法候选（模型只在这里面挑，不许发明格位）
-    const m = matchTemplates(plot, { culture, ratio, limit: candidateCount, includeCore: body.includeCore !== false });
+    const genre = body.genre || 'all';
+  const m = matchTemplates(plot, { culture, genre, ratio, limit: candidateCount, includeCore: body.includeCore !== false });
     const cfg = readLlmConfig(body.llm || {});
 
     // ② AI 导演
@@ -466,6 +467,7 @@ const routes = [
     const body = await readBody(req);
     if (!body.plot) return { __status: 400, error: '缺少 plot 字段（剧情文本）' };
     const r = matchTemplates(String(body.plot), {
+    genre: body.genre || 'all',
       culture: body.culture || 'all',
       ratio: body.ratio || 'auto',
       limit: clampNum(body.limit, 1, 50, 10),

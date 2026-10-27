@@ -105,7 +105,7 @@
       </div>
       <textarea id="plot" rows="5" placeholder="粘贴一段剧情，越具体越准。例如：雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋，两人在积水里僵持。"></textarea>
       <div class="row2">
-        <label class="field"><span>画风体系</span>
+        <label class="field"><span>排戏范围</span>
           <select id="culture">
             <option value="all">自动判断</option>
             <option value="jp">日式页漫（右→左）</option>
@@ -113,6 +113,20 @@
             <option value="kr">韩式条漫（竖屏 webtoon）</option>
           </select>
         </label>
+        <label class="field"><span>题材</span>
+          <select id="genre">
+            <option value="all">不限</option>
+            <option value="少年">少年（热血 / 战斗）</option>
+            <option value="少女">少女（情感 / 细腻）</option>
+            <option value="青年">青年（黑暗 / 写实）</option>
+            <option value="日常">日常</option>
+            <option value="搞笑">搞笑</option>
+            <option value="恐怖">恐怖</option>
+            <option value="悬疑">悬疑</option>
+          </select>
+        </label>
+      </div>
+      <div class="row2">
         <label class="field"><span>画幅</span>
           <select id="ratio">
             <option value="auto">自动</option>

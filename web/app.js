@@ -3356,6 +3356,7 @@ async function runAiDecide() {
     const res = await api.aiDecide({
       plot,
       culture: $('#culture').value,
+      genre: $('#genre') ? $('#genre').value : 'all',
       ratio: $('#ratio').value,
       pageWidth: state.exportWidth,
       candidates: 10,
@@ -3425,6 +3426,7 @@ async function runMatch() {
     const res = await api.match({
       plot,
       culture: $('#culture').value,
+      genre: $('#genre') ? $('#genre').value : 'all',
       // 「自动」时如果这一页已经改过画幅，就按当前画幅挑模板（从一开始就对齐目标尺寸）
       ratio: $('#ratio').value !== 'auto' ? $('#ratio').value : (state.wantRatio || 'auto'),
       limit: 8,

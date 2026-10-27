@@ -4,7 +4,7 @@
  */
 import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError, planImageRequest, imageRoute } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
-import { splitClauses, assignSegments, buildPlan } from '../lib/matcher.mjs';
+import { splitClauses, assignSegments, buildPlan, matchTemplates, filterTemplatesByGenre, isGenreTag, GENRE_TAGS } from '../lib/matcher.mjs';
 import { TEMPLATES } from '../lib/library.mjs';
 import { analyzePlot } from '../lib/matcher.mjs';
 
@@ -256,6 +256,25 @@ ok('硅基流动有参考图 → siliconflow-image',
   imageRoute({ baseUrl: 'https://api.siliconflow.cn/v1', imageProvider: 'siliconflow' }, 'Kwai-Kolors/Kolors', 1).mode === 'siliconflow-image');
 ok('参考图数量超过 4 张时也不会崩（由分支内部 slice）',
   imageRoute(arkCfg, 'doubao-seedream-5-0-flash-260915', 9).refsUsed === 9);
+
+
+/* 题材限制：用户「就喜欢日漫少年漫」→ 规则路和 AI 路都只在这一类里挑 */
+ok('题材词表只含题材，不含版面标签', GENRE_TAGS.includes('少年') && !GENRE_TAGS.includes('大格'));
+ok('isGenreTag 认题材、不认版面标签', isGenreTag('恐怖') === true && isGenreTag('斜切') === false);
+ok('filterTemplatesByGenre 过滤生效', (() => {
+  const all = [{ id: 'a', tags: ['少年'] }, { id: 'b', tags: ['少女'] }];
+  return filterTemplatesByGenre(all, '少年').map((t) => t.id).join() === 'a';
+})());
+ok('filterTemplatesByGenre 命中为空时退回原池（不让人面对空白）', (() => {
+  const all = [{ id: 'a', tags: ['少年'] }];
+  return filterTemplatesByGenre(all, '恐怖').length === 1;
+})());
+ok('matchTemplates 按题材过滤（日式 + 恐怖 → 全是恐怖）', (() => {
+  const r = matchTemplates('雨夜屋顶拔刀，敌人偷袭', { culture: 'jp', genre: '恐怖', limit: 5 });
+  return r.results.length > 0 && r.results.every((t) => t.tags.includes('恐怖'));
+})());
+ok('matchTemplates 题材=不限时不受影响',
+  matchTemplates('雨夜屋顶拔刀', { culture: 'jp', genre: 'all', limit: 5 }).results.length > 0);
 
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 

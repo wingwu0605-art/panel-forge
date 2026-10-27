@@ -102,6 +102,7 @@ export function createStaticApi() {
     async match(body = {}) {
       return matchTemplates(String(body.plot || ''), {
         culture: body.culture || 'all',
+        genre: body.genre || 'all',
         ratio: body.ratio || 'auto',
         limit: clamp(body.limit, 1, 50, 10),
         includeCore: body.includeCore !== false,
@@ -159,7 +160,8 @@ export function createStaticApi() {
       const candidateCount = clamp(body.candidates, 3, 16, 10);
 
       // ① 合法候选（模型只能在这里面挑）
-      const m = matchTemplates(plot, { culture, ratio, limit: candidateCount, includeCore: body.includeCore !== false });
+      const genre = body.genre || 'all';
+      const m = matchTemplates(plot, { culture, genre, ratio, limit: candidateCount, includeCore: body.includeCore !== false });
       const cfg = cfgFrom(body.llm);
 
       let decision;
@@ -172,7 +174,10 @@ export function createStaticApi() {
           culture,
           ratio,
           characterSheet: body.characterSheet ? String(body.characterSheet).slice(0, 600) : '',
-          extraNote: body.note ? String(body.note).slice(0, 500) : undefined,
+          extraNote: [
+            genre && genre !== 'all' ? `题材必须属于「${genre}」` : '',
+            body.note ? String(body.note).slice(0, 400) : '',
+          ].filter(Boolean).join('；') || undefined,
         });
       } catch (err) {
         return {
