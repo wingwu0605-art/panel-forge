@@ -157,13 +157,13 @@ ok('火山方舟：光看域名也能认出来（即使用户把服务商选成 
   resolveImageEndpoint(cfgOf('https://ark.cn-beijing.volces.com/api/v3'))
     === 'https://ark.cn-beijing.volces.com/api/v3/images/generations');
 ok('火山方舟尺寸不接受 OpenAI 的 1792x1024',
-  fitImageSize('volcengine', '1600x900', 'doubao-seedream-4-0-250828') !== '1792x1024',
-  fitImageSize('volcengine', '1600x900', 'doubao-seedream-4-0-250828'));
+  fitImageSize('volcengine', '1600x900', 'doubao-seedream-5-0-pro-260628') !== '1792x1024',
+  fitImageSize('volcengine', '1600x900', 'doubao-seedream-5-0-pro-260628'));
 ok('火山方舟 1:1 走 1024x1024',
-  fitImageSize('volcengine', '1024x1024', 'doubao-seedream-4-0-250828') === '1024x1024');
+  fitImageSize('volcengine', '1024x1024', 'doubao-seedream-5-0-pro-260628') === '1024x1024');
 ok('火山方舟竖图走 832x1248 或 720x1280',
-  ['832x1248', '720x1280'].includes(fitImageSize('volcengine', '800x1200', 'doubao-seedream-4-0-250828')),
-  fitImageSize('volcengine', '800x1200', 'doubao-seedream-4-0-250828'));
+  ['832x1248', '720x1280'].includes(fitImageSize('volcengine', '800x1200', 'doubao-seedream-5-0-pro-260628')),
+  fitImageSize('volcengine', '800x1200', 'doubao-seedream-5-0-pro-260628'));
 
 /* 报错文案：404 的三种原因必须分开说，否则用户只会一直改 Key */
 const arkEp = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';

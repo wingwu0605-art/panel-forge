@@ -3544,10 +3544,12 @@ const KEY_PRESETS = {
   volcengine: {
     name: '火山方舟（豆包）', protocol: 'openai',
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    model: 'doubao-seed-1-6-250615',
+    // 对话模型留空：账号里有哪些模型只有控制台知道，填死一个不存在的 ID 只会让人以为配置错了
+    model: '',
     imgProvider: 'volcengine',
-    imgModel: 'doubao-seedream-4-0-250828',
-    imgHint: '方舟生图走 seedream 系列（4.0 质量最好）；模型要先在控制台「开通管理」里开通，否则 404',
+    imgModel: 'doubao-seedream-5-0-pro-260628',
+    imgHint: 'Model ID 从方舟「模型广场」复制（带日期后缀，如 doubao-seedream-5-0-pro-260628）；'
+      + '生图不需要对话模型，想用 AI 排戏/切分再填一个对话模型的 ID',
   },
   dashscope: {
     name: '通义百炼', protocol: 'openai',
