@@ -1953,6 +1953,94 @@ const scenarios = [
   },
 
   {
+    name: 'rails',
+    title: '㉚ 左右侧栏收回成图标条：单点看一个功能，点右上角才展开全部',
+    async run(page, shot, { check }) {
+      await page.viewport(1400, 980);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const res = {};
+        const left = document.querySelector('.rail.left');
+        const right = document.querySelector('#railRight');
+        const pops = () => [...document.querySelectorAll('.rail-pop')].filter((p) => !p.classList.contains('hidden'));
+
+        res.toggles = { left: !!document.querySelector('.rail.left .rail-toggle'), right: !!document.querySelector('#railRight .rail-toggle') };
+
+        // 收起两条
+        document.querySelector('.rail.left .rail-toggle').click();
+        await wait(250);
+        document.querySelector('#railRight .rail-toggle').click();
+        await wait(250);
+        res.mini = {
+          leftW: Math.round(left.getBoundingClientRect().width),
+          rightW: Math.round(right.getBoundingClientRect().width),
+          leftIcons: [...document.querySelectorAll('.rail.left .rail-ico')].map((b) => b.dataset.key),
+          rightIcons: [...document.querySelectorAll('#railRight .rail-ico')].map((b) => b.dataset.key),
+          cardVisible: getComputedStyle(document.querySelector('.rail.left > .card')).display !== 'none',
+        };
+
+        // 悬停气泡
+        const ico = document.querySelectorAll('.rail.left .rail-ico')[2];
+        res.tip = { label: ico.dataset.label, tip: ico.querySelector('.rail-tip')?.textContent || '' };
+
+        // 单点一个图标 → 只这一个功能
+        document.querySelectorAll('.rail.left .rail-ico')[0].click();
+        await wait(350);
+        const open = pops();
+        res.single = {
+          n: open.length,
+          title: open[0]?.querySelector('.rail-pop-head b')?.textContent || '',
+          cards: open[0]?.querySelectorAll('.rail-pop-body > .card').length || 0,
+          belowTopbar: open[0] ? open[0].getBoundingClientRect().top >= (document.querySelector('.topbar')?.getBoundingClientRect().height || 0) : null,
+        };
+
+        // 点另一侧图标 → 同时只留一个
+        document.querySelectorAll('#railRight .rail-ico')[0].click();
+        await wait(350);
+        res.switch = { n: pops().length, title: pops()[0]?.querySelector('.rail-pop-head b')?.textContent || '' };
+
+        // 点右上角 → 展开全部，气泡关闭
+        document.querySelector('#railRight .rail-toggle').click();
+        await wait(320);
+        res.expand = {
+          rightMini: right.classList.contains('mini'),
+          rightW: Math.round(right.getBoundingClientRect().width),
+          pops: pops().length,
+          stripShown: getComputedStyle(document.querySelector('#railRight .rail-strip')).display !== 'none',
+        };
+        document.querySelector('.rail.left .rail-toggle').click();
+        await wait(320);
+        res.leftExpanded = !left.classList.contains('mini');
+        return res;
+      })()`);
+
+      check('左右侧栏都有「展开 / 收起」按钮',
+        out.toggles.left && out.toggles.right, JSON.stringify(out.toggles));
+      check('收起后两条侧栏都缩成 56px 图标条',
+        out.mini.leftW <= 60 && out.mini.rightW <= 60, `${out.mini.leftW} / ${out.mini.rightW}`);
+      check('左栏保留 7 个功能 logo',
+        out.mini.leftIcons.join(',') === 'auto,style,plot,ai,chars,browse,help', out.mini.leftIcons.join(','));
+      check('右栏保留 7 个功能 logo（含分镜表/导出/气泡）',
+        out.mini.rightIcons.join(',') === 'text,board,image,ai,script,export,bubbles', out.mini.rightIcons.join(','));
+      check('收起后卡片本体隐藏', out.mini.cardVisible === false);
+      check('每个图标带悬停小气泡（写功能名）',
+        out.tip.label.length > 0 && out.tip.tip === out.tip.label, `${out.tip.tip}`);
+      check('单击一个 logo 只弹出这一个功能',
+        out.single.n === 1 && out.single.cards === 1, `${out.single.title} · ${out.single.cards} 卡`);
+      check('单功能气泡出现在顶栏下方（不压住顶栏）', out.single.belowTopbar === true);
+      check('点另一侧 logo 时前一个气泡自动关掉（同时只留一个）',
+        out.switch.n === 1 && /这一格|分镜|图片|AI/.test(out.switch.title), `${out.switch.n} 个 · ${out.switch.title}`);
+      check('点右上角按钮才展开全部，并关掉气泡',
+        out.expand.rightMini === false && out.expand.rightW > 200 && out.expand.pops === 0, `宽 ${out.expand.rightW}`);
+      check('展开后图标条隐藏，回到完整卡片', out.expand.stripShown === false && out.leftExpanded === true);
+      await shot('rails');
+    },
+  },
+
+  {
     name: 'style-follow',
     title: '㉙ 风格跟随（人设图 / 样图 / 都参考）+ AI 生成可收起 + 模板库默认收起',
     async run(page, shot, { check }) {

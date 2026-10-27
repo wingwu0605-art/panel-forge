@@ -3,6 +3,7 @@
  * 零框架；渲染内核与后端共用同一份 /lib/svg.mjs，保证「所见即导出」。
  */
 import { estimateLayout, splitTextIntoPages, buildAutoSteps, imageQueueForPage, imageQueueAll, estimateCostHint } from './lib/auto.mjs';
+import { installRails } from './rails.mjs';
 import { renderTemplateSVG, imageAttrs } from './lib/svg.mjs';
 import { createCellPainter, localPoly } from './paint.mjs';
 import { createKlecksHost } from './paint-host.mjs';
@@ -3090,6 +3091,7 @@ window.__pfAutoSet = (m) => setAutoMode(m);
   window.__pfFlush = () => flushSave();
   bindSlotZoom();
   bindInboxUI();
+  installRails();
 
 /* ================================================================== *
  * 交互收件箱：拖放 / 粘贴 / 气泡拖入 / 候选大图 / 右键菜单

@@ -2573,3 +2573,106 @@ body.pf-lp #canvas svg{transform:scale(1.015)}
 .sample-add:hover{border-color:var(--tint);color:var(--tint)}
 /* 样图区是拖放目标时也亮一下 */
 body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outline-offset:4px;border-radius:14px}
+
+/* 左右侧栏：收回成图标条 + 单功能气泡 */
+.rail{position:relative}
+
+/* 展开/收起按钮（贴在侧栏右上角） */
+.rail-toggle{
+  position:absolute; top:8px; z-index:6;
+  width:26px; height:26px; padding:0; border:0; border-radius:8px; cursor:pointer;
+  display:grid; place-items:center; color:var(--label-3);
+  background:var(--fill-2); box-shadow:inset 0 0 0 .5px var(--sep);
+  transition:color .18s var(--ease), background .18s var(--ease), transform .18s var(--ease);
+}
+.rail.left .rail-toggle{right:8px}
+.rail.right .rail-toggle{left:8px}
+.rail-toggle:hover{color:var(--tint); background:var(--fill-hover); transform:rotate(90deg)}
+.rail-toggle:active{transform:scale(.92)}
+
+/* 图标条：只在 mini 状态出现 */
+.rail-strip{display:none; flex-direction:column; align-items:center; gap:6px; padding:44px 0 12px}
+.rail.mini .rail-strip{display:flex}
+.rail.mini{padding-left:0;padding-right:0}
+.rail.mini > .card{display:none}
+/* mini 状态只保留图标条和右上角按钮，其它直接子节点一律收起 */
+.rail.mini > *:not(.rail-strip):not(.rail-toggle){display:none !important}
+.rail.mini > .rail-strip{display:flex}
+
+.rail.mini{width:56px !important; min-width:56px !important; flex:0 0 56px !important}
+body.rail-left-mini .rail.left{width:56px !important}
+
+.rail-ico{
+  position:relative; width:38px; height:38px; padding:0; border:0; border-radius:12px; cursor:pointer;
+  display:grid; place-items:center; color:var(--label-2);
+  background:transparent;
+  transition:color .18s var(--ease), background .18s var(--ease), transform .18s var(--ease);
+}
+.rail-ico svg{transition:transform .22s var(--spring), stroke-dashoffset .35s var(--ease)}
+.rail-ico:hover{color:var(--tint); background:var(--fill-hover); transform:translateY(-1px)}
+.rail-ico:hover svg{
+  transform:scale(1.12);
+  stroke-dasharray:34;
+  animation:railDash .6s var(--ease) forwards;
+}
+@keyframes railDash{
+  from{stroke-dashoffset:34}
+  to{stroke-dashoffset:0}
+}
+.rail-ico:active{transform:scale(.94)}
+.rail-ico.on{color:var(--on-tint); background:var(--tint)}
+.rail-ico.on svg{stroke-dasharray:none}
+
+/* 悬停小气泡：写上这个功能叫什么 */
+.rail-tip{
+  position:absolute; left:calc(100% + 8px); top:50%; transform:translateY(-50%) translateX(-4px);
+  padding:5px 9px; border-radius:8px; white-space:nowrap; pointer-events:none;
+  font-size:11.5px; line-height:1.3; color:var(--label);
+  background:var(--material-thick); box-shadow:var(--shadow-2), inset 0 0 0 .5px var(--sep);
+  -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+  opacity:0; transition:opacity .16s var(--ease), transform .16s var(--ease);
+  z-index:5;
+}
+.rail.right .rail-tip{left:auto; right:calc(100% + 8px); transform:translateY(-50%) translateX(4px)}
+.rail-ico:hover .rail-tip{opacity:1; transform:translateY(-50%) translateX(0)}
+
+/* 单功能气泡面板 */
+.rail-pop{
+  position:fixed; z-index:300; display:flex; flex-direction:column;
+  background:var(--bg-elev); border-radius:14px; overflow:hidden;
+  box-shadow:var(--shadow-3), inset 0 0 0 .5px var(--sep);
+  animation:railPopIn .16s var(--ease);
+}
+.rail-pop.hidden{display:none}
+@keyframes railPopIn{from{opacity:0;transform:translateY(4px) scale(.99)}to{opacity:1;transform:none}}
+.rail-pop-head{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:10px 12px; border-bottom:1px solid var(--sep);
+}
+.rail-pop-head b{font-size:13px}
+.rail-pop-close{
+  width:22px; height:22px; border:0; border-radius:7px; cursor:pointer;
+  background:var(--fill-2); color:var(--label-2); font:600 13px/1 var(--font);
+}
+.rail-pop-close:hover{background:var(--fill-hover); color:var(--label)}
+.rail-pop-body{padding:10px 12px 14px; overflow:auto; flex:1; min-height:0}
+.rail-pop-body > .card,
+.rail-pop-body > .slot-sec,
+.rail-pop-body > .tab-body{
+  border:0; box-shadow:none; background:transparent; padding:0; margin:0;
+  /* 气泡里一律显示：mini 状态下卡片被 display:none，搬进气泡后要能看见 */
+  display:flex !important;
+  flex-direction:column;
+}
+.rail-pop-body .card-head,
+.rail-pop-body .sec-head{display:none}
+.rail-pop-body .tab-body.hidden{display:block !important}
+
+/* 手机：气泡改成底部抽屉，别挡住画布 */
+@media (max-width:720px){
+  .rail-pop{
+    left:8px !important; right:8px; bottom:8px; top:auto !important; width:auto !important;
+    max-height:70vh;
+  }
+  .rail-tip{display:none}
+}
