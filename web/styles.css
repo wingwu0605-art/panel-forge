@@ -2492,3 +2492,11 @@ body[data-drop-zone="text"] #plot{outline:2px dashed var(--tint);outline-offset:
 .cc-warn{color:var(--orange-ink);font-size:11.5px}
 .cc-sheet{padding:8px 10px;margin-bottom:10px;border-radius:8px;background:var(--fill);
   font-size:12px;color:var(--label-2);line-height:1.55}
+
+/* 手机长按反馈：整块画布轻微放大一下（配合震动），让人知道"按到了" */
+#canvas svg{transition:transform .18s var(--ease)}
+body.pf-lp #canvas svg{transform:scale(1.015)}
+/* 触屏上关掉文字选择与系统长按菜单，否则长按会弹"拷贝图片" */
+@media (hover:none) and (pointer:coarse){
+  #canvas{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+}

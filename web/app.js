@@ -1891,6 +1891,54 @@ function slotAt(pt) {
   return null;
 }
 
+/* ---------------- 手机长按：震动 + 进这一格的编辑页 ---------------- */
+const LP_MS = 460;          // 长按多久算长按（太短容易和拖图冲突）
+const LP_SLOP = 8;          // 手指抖动容差（px）
+
+function haptic(ms = 18) {
+  // Android Chrome 支持；iOS Safari 没有 vibrate，静默跳过（靠视觉反馈兜底）
+  try { navigator.vibrate?.(ms); } catch { /* ignore */ }
+}
+
+function lpPulse() {
+  document.body.classList.add('pf-lp');
+  clearTimeout(lpPulse._t);
+  lpPulse._t = setTimeout(() => document.body.classList.remove('pf-lp'), 320);
+}
+
+function cancelLongPress() {
+  const lp = state._lp;
+  if (!lp) return;
+  clearTimeout(lp.timer);
+  state._lp = null;
+}
+
+/** 长按某一格：震动 → 选中它 → 进编辑页 */
+function fireLongPress(slot) {
+  state._lp = null;
+  haptic(22);
+  lpPulse();
+  state.selectedId = slot.id;
+  state.selBubble = null;
+  renderStage();
+  renderSlotPanel();
+  // 手机上「编辑」是一个底部抽屉视图；桌面没有长按路径，但真触屏平板也走这里
+  setView('edit', { animate: true });
+  const order = state.tpl?.slots?.find((x) => x.id === slot.id)?.order;
+  toast(`长按进入第 ${order ?? '?'} 格的编辑`);
+}
+
+function startLongPress(slot, ev) {
+  if (!slot || ev.pointerType === 'mouse') return;   // 桌面用右键菜单，不长按
+  cancelLongPress();
+  const timer = setTimeout(() => {
+    const lp = state._lp;
+    if (!lp || lp.moved) return;
+    fireLongPress(slot);
+  }, LP_MS);
+  state._lp = { slot, timer, x: ev.clientX, y: ev.clientY, moved: false };
+}
+
 function bindUI() {
   const canvas = $('#canvas');
 
@@ -1911,6 +1959,7 @@ function bindUI() {
     const slot = slotAt(pt);
     drag = { slot, moved: false, x0: ev.clientX, y0: ev.clientY, start: pt };
     if (slot) canvas.setPointerCapture?.(ev.pointerId);
+    startLongPress(slot, ev);   // 手机：长按这一格 → 震动 + 进编辑页
   });
 
   canvas.addEventListener('pointermove', (ev) => {
@@ -1923,6 +1972,7 @@ function bindUI() {
       return;
     }
     const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
+    if (state._lp && Math.hypot(dx, dy) > LP_SLOP) cancelLongPress();
     if (!drag.moved && Math.hypot(dx, dy) > 4) {
       drag.moved = true;
       document.body.classList.add('pf-dragging');
@@ -1954,6 +2004,7 @@ function bindUI() {
   });
 
   const endDrag = (ev) => {
+    cancelLongPress();   // 松手就不算长按了
     document.body.classList.remove('pf-dragging');
     if (!drag) return;
     if (drag.bubble) {
@@ -1973,12 +2024,13 @@ function bindUI() {
     drag = null;
   };
   canvas.addEventListener('pointerup', endDrag);
-  canvas.addEventListener('pointercancel', () => { drag = null; document.body.classList.remove('pf-dragging'); });
+  canvas.addEventListener('pointercancel', () => { cancelLongPress(); drag = null; document.body.classList.remove('pf-dragging'); });
   canvas.addEventListener('pointerleave', () => {
     if (state.hoverId) { state.hoverId = null; renderStage(); }
   });
 
   canvas.addEventListener('wheel', (ev) => {
+    cancelLongPress();
     if (!state.tpl || state.hollow) return;
     if (!ev.altKey && !ev.ctrlKey && !ev.metaKey) return;
     const slot = slotAt(pagePoint(ev));
@@ -3492,6 +3544,7 @@ function installContextMenu() {
   const hide = () => menu.classList.add('hidden');
 
   document.addEventListener('contextmenu', (ev) => {
+    cancelLongPress();
     const spec = buildContextMenu(ev);
     if (!spec || !spec.items?.length) return;   // 没有我们的上下文 → 保留浏览器菜单
     ev.preventDefault();

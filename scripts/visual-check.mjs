@@ -1845,6 +1845,76 @@ const scenarios = [
   },
 
   {
+    name: 'long-press',
+    title: '㉗ 手机长按某一格：震动 + 直接进这一格的编辑页',
+    async run(page, shot, { check }) {
+      await page.viewport(430, 900);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        let vib = 0;
+        navigator.vibrate = (ms) => { vib++; return true; };
+        const svg = document.querySelector('#canvas svg');
+        const r = svg.getBoundingClientRect();
+        const at = (fx, fy) => ({ clientX: r.left + r.width * fx, clientY: r.top + r.height * fy });
+        const ev = (type, fx, fy, pointerType = 'touch') => svg.dispatchEvent(new PointerEvent(type, {
+          bubbles: true, cancelable: true, pointerId: 1, pointerType, isPrimary: true, ...at(fx, fy),
+        }));
+        const res = { startView: document.body.dataset.view || '' };
+
+        // ① 长按 620ms 不动
+        ev('pointerdown', 0.5, 0.25);
+        await wait(620);
+        res.long = {
+          view: document.body.dataset.view,
+          vib,
+          pulse: document.body.classList.contains('pf-lp'),
+          toast: document.querySelector('#toast')?.textContent || '',
+          selected: !!document.querySelector('#slotRole')?.textContent.trim(),
+        };
+        ev('pointerup', 0.5, 0.25);
+        await wait(180);
+
+        // ② 短按不触发
+        const v0 = vib;
+        ev('pointerdown', 0.3, 0.7);
+        await wait(80);
+        ev('pointerup', 0.3, 0.7);
+        await wait(260);
+        res.tap = { vib: vib - v0 };
+
+        // ③ 长按中途移动 → 取消
+        const v1 = vib;
+        ev('pointerdown', 0.5, 0.5);
+        await wait(120);
+        ev('pointermove', 0.62, 0.56);
+        await wait(520);
+        res.drag = { vib: vib - v1 };
+        ev('pointerup', 0.62, 0.56);
+
+        // ④ 鼠标长按不触发（桌面走右键）
+        const v2 = vib;
+        ev('pointerdown', 0.5, 0.25, 'mouse');
+        await wait(620);
+        res.mouse = { vib: vib - v2 };
+        ev('pointerup', 0.5, 0.25, 'mouse');
+        return res;
+      })()`);
+
+      check('长按某一格会触发震动', out.long.vib === 1, String(out.long.vib));
+      check('长按后直接进入编辑视图', out.long.view === 'edit', out.long.view || '(空)');
+      check('长按有视觉反馈（画布脉冲 + 提示）',
+        out.long.pulse === true && /长按进入/.test(out.long.toast), out.long.toast);
+      check('短按不会震动（避免误触）', out.tap.vib === 0, String(out.tap.vib));
+      check('长按过程中移动会取消（拖图不被误判成长按）', out.drag.vib === 0, String(out.drag.vib));
+      check('鼠标长按不触发（桌面用右键菜单）', out.mouse.vib === 0, String(out.mouse.vib));
+      await shot('long-press');
+    },
+  },
+
+  {
     name: 'inbox',
     title: '㉕ 拖放/粘贴图片 + 气泡拖入 + 大图预览 + 右键菜单',
     async run(page, shot, { check }) {
