@@ -1692,6 +1692,63 @@ const scenarios = [
   },
 
   {
+    name: 'pin-cell',
+    title: '㉒ 生图锁定格子：生成期间切格子不串格',
+    async run(page, shot, { check }) {
+      await page.viewport(1400, 980);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      // 桩掉 imageGenerate：慢 900ms 返回一张 1x1 PNG，模拟真实生图耗时
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        window.confirm = () => true;
+        const api = window.__pfApi();
+        const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        let askedFor = null;
+        api.imageGenerate = async (body) => {
+          askedFor = body.slotId;
+          await wait(900);
+          return { ok: true, b64: png, provider: 'fake', size: '1024x1024', model: 'fake', refsUsed: 0, refsIgnored: 0 };
+        };
+        window.__pfSel('p1');
+        await wait(150);
+        document.querySelector('#btnAiImage').click();
+        await wait(120);
+        const running = Object.keys(window.__pfJobs());
+        const btn = document.querySelector('#btnAiImage');
+        const labelWhileRunning = btn.textContent.trim();
+        const disabledWhileRunning = btn.disabled;
+        // 生成期间切到第二格
+        window.__pfSel('p2');
+        await wait(120);
+        const labelAfterSwitch = document.querySelector('#btnAiImage').textContent.trim();
+        const enabledAfterSwitch = !document.querySelector('#btnAiImage').disabled;
+        await wait(1400);
+        return {
+          askedFor, running, labelWhileRunning, disabledWhileRunning,
+          labelAfterSwitch, enabledAfterSwitch,
+          images: Object.keys(window.__pfImages()),
+          jobsLeft: Object.keys(window.__pfJobs()).length,
+          toast: (document.querySelector('#toast') || {}).textContent || '',
+        };
+      })()`);
+
+      check('点下去就把格子钉住（请求里是 p1）', out.askedFor === 'p1', String(out.askedFor));
+      check('生成中有该格的作业标记', out.running.includes('p1'), out.running.join(','));
+      check('生成中按钮被禁用且写明「这一格正在生图」',
+        out.disabledWhileRunning === true && /正在生图/.test(out.labelWhileRunning), out.labelWhileRunning);
+      check('生成期间切到别的格子，按钮恢复可用（互不影响）',
+        out.enabledAfterSwitch === true && /生这一格/.test(out.labelAfterSwitch), out.labelAfterSwitch);
+      check('结果仍然落在最初那一格，没有串到新选中的格子',
+        out.images.includes('p1') && !out.images.includes('p2'), out.images.join(','));
+      check('完成提示点名是哪一格', /第\s*\d+\s*格/.test(out.toast) || /已生成/.test(out.toast), out.toast);
+      check('作业标记已清理', out.jobsLeft === 0, String(out.jobsLeft));
+      await shot('pin-cell');
+    },
+  },
+
+  {
     name: 'prompt-source',
     title: '⑱ 提示词三源共存（规则 / AI / 自己写）+ 开头词保留 + 手机分镜表不重叠',
     async run(page, shot, { check }) {

@@ -1319,6 +1319,10 @@ function showErrorDetail(title, err, extra = '') {
 window.__pfShowError = showErrorDetail;
 // 调试钩子：查看当前实际生效的 LLM 配置（排查「配了却没生效」这类问题）
 window.__pfLlm = () => ({ ...state.llm });
+window.__pfApi = () => api;
+window.__pfJobs = () => ({ ...(state.imgJobs || {}) });
+window.__pfImages = () => ({ ...state.images });
+window.__pfSel = (id) => { state.selectedId = id; renderStage(); renderSlotPanel(); refreshGenButtons(); };
 
 
 /**
@@ -2470,7 +2474,7 @@ function bindUI() {
     if (!b) return;
     state.slotAiMode = b.dataset.m;
     for (const x of document.querySelectorAll('#slotAiMode button')) x.classList.toggle('on', x === b);
-    $('#btnAiImage').textContent = state.slotAiMode === 'prompt' ? '只写这一格的提示词' : '生这一格';
+    refreshGenButtons();
   });
   $('#btnAiImage')?.addEventListener('click', () => {
     if (state.slotAiMode === 'prompt') generateSlotPromptOnly();
@@ -3215,9 +3219,21 @@ function syncZoomSlider() {
   $('#zoomVal').textContent = Math.round(img.zoom * 100) + '%';
 }
 
-function currentPlanPanel() {
+/** 生图按钮的文案/禁用状态只看「当前选中的那一格」有没有在跑 */
+function refreshGenButtons() {
+  const btn = $('#btnAiImage');
+  if (!btn) return;
+  const running = !!(state.imgJobs && state.imgJobs[state.selectedId]);
+  const aiMode = state.slotAiMode === 'prompt';
+  btn.disabled = running;
+  btn.textContent = running
+    ? (aiMode ? 'AI 正在写这一格…' : '这一格正在生图…（10–60 秒）')
+    : (aiMode ? '只写这一格的提示词' : '生这一格');
+}
+
+function currentPlanPanel(slotId = state.selectedId) {
   const page = pagePlan();
-  return (page?.panels || []).find((p) => p.id === state.selectedId) || null;
+  return (page?.panels || []).find((p) => p.id === slotId) || null;
 }
 
 /** 取当前页的分镜计划：AI 导演的结果优先于规则引擎 */
@@ -4288,11 +4304,14 @@ function copyShapePrefixZh() {
 }
 
 /** 只让 AI 写这一格的提示词（不生图） */
-async function generateSlotPromptOnly() {
-  if (!state.tpl || !state.selectedId) { toast('先点一个格子'); return; }
-  const btn = $('#btnAiImage');
-  const old = btn.textContent;
-  btn.disabled = true; btn.textContent = 'AI 正在写…';
+async function generateSlotPromptOnly(targetId = state.selectedId) {
+  if (!state.tpl || !targetId) { toast('先点一个格子'); return; }
+  // 同样锁定格子：写提示词期间切格子，结果也只写回这一格
+  const sid = targetId;
+  state.imgJobs = state.imgJobs || {};
+  if (state.imgJobs[sid]) { toast('这一格正在处理，等它出来'); return; }
+  state.imgJobs[sid] = true;
+  refreshGenButtons();
   saveLlm();
   try {
     const page = pagePlan();
@@ -4306,30 +4325,36 @@ async function generateSlotPromptOnly() {
       llm: state.llm,
     });
     if (!res?.ok) throw new Error((res?.code ? res.code + '：' : '') + (res?.error || 'AI 没返回'));
-    const want = res.plan?.panels?.find((p) => p.id === state.selectedId);
+    const want = res.plan?.panels?.find((p) => p.id === sid);
     if (!want) throw new Error('这一格没拿到提示词');
-    const target = currentPlanPanel();
+    const target = currentPlanPanel(sid);
     if (target) { target.promptEnRule = target.promptEnRule || target.promptEn; target.promptEn = want.promptEn; target.aiOptimized = true; }
-    if (state.promptEdits[state.selectedId]?.prompt != null) { commit(); delete state.promptEdits[state.selectedId].prompt; if (!Object.keys(state.promptEdits[state.selectedId]).length) delete state.promptEdits[state.selectedId]; }
+    if (state.promptEdits[sid]?.prompt != null) { commit(); delete state.promptEdits[state.selectedId].prompt; if (!Object.keys(state.promptEdits[state.selectedId]).length) delete state.promptEdits[state.selectedId]; }
     renderSlotPanel(); renderScript();
-    toast('这一格的提示词已由 AI 改写');
+    toast(state.selectedId === sid ? '这一格的提示词已由 AI 改写' : '提示词已写回原来的那一格');
   } catch (e) {
     toast('写提示词失败：' + e.message);
-  } finally { btn.disabled = false; btn.textContent = old; }
+  } finally {
+    delete state.imgJobs[sid];
+    refreshGenButtons();
+  }
 }
 
 /** 用用户自己的生图模型，直接生成当前这一格 */
-async function generateSlotImage() {
-  if (!state.tpl || !state.selectedId) { toast('先点一个格子'); return; }
-  const panel = currentPlanPanel();
-  const slot = state.tpl.slots.find((s) => s.id === state.selectedId);
-  const btn = $('#btnAiImage');
-  const old = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '正在生图…（10–60 秒）';
+async function generateSlotImage(targetId = state.selectedId) {
+  if (!state.tpl || !targetId) { toast('先点一个格子'); return; }
+  // 锁定格子：生成期间你点别的格子，结果也只回到这一格（以前是回到「点击时选中的那格」→ 会串格）
+  const sid = targetId;
+  const panel = currentPlanPanel(sid);
+  const slot = state.tpl.slots.find((s) => s.id === sid);
+  const cellLabel = slot ? `第 ${slot.order} 格` : '这一格';
+  state.imgJobs = state.imgJobs || {};
+  if (state.imgJobs[sid]) { toast(`${cellLabel}正在生成，等它出来`); return; }
+  state.imgJobs[sid] = true;
+  refreshGenButtons();
   saveLlm();
   try {
-    const built = buildImagePrompt(state.selectedId);
+    const built = buildImagePrompt(sid);
     const charPayload = built.chars;
     if (!charPayload.block) {
       const ok = confirm('还没启用角色参考图，生成的图可能每格长得不一样。\n\n建议先去左边「角色参考图」加一张。\n\n仍然继续生图吗？');
@@ -4343,14 +4368,13 @@ async function generateSlotImage() {
       provider: state.llm.imageProvider || 'openai',
       llm: state.llm,
       templateId: state.tpl.id,
-      slotId: state.selectedId,
+      slotId: sid,
     });
     if (!res?.ok) throw new Error((res?.code ? res.code + '：' : '') + (res?.error || '生图失败'));
     let href = res.href;
     if (!href && res.b64) href = 'data:image/png;base64,' + res.b64;
     if (!href && res.url) href = await api.proxyImage ? await blobToDataURL(await api.proxyImage(res.url)) : res.url;
     if (!href) throw new Error('生图接口没有返回可用的图片');
-    const sid = state.selectedId;
     const list = candsOf(sid);
     list.unshift(href);
     if (list.length > 8) list.pop();
@@ -4358,11 +4382,15 @@ async function generateSlotImage() {
     state.images[sid] = await imageAsset(href, { name: 'ai' });
     renderStage(); renderSlotPanel(); refreshScript(); renderCands();
     const ignoredRefs = Number(res?.refsIgnored) || 0;
+    const stillOnCell = state.selectedId === sid;
     if (ignoredRefs) {
       // 模型不吃参考图（如 dall-e-3）：生成了，但要说清楚参考图没生效
-      toast(`已生成，但 ${ignoredRefs} 张参考图被忽略：当前模型不支持图生图`);
+      toast(`${cellLabel}已生成，但 ${ignoredRefs} 张参考图被忽略：当前模型不支持图生图`);
+    } else if (stillOnCell) {
+      toast('已生成并填入这一格（候选里还留着，可以换一张）');
     } else {
-    toast('已生成并填入这一格（候选里还留着，可以换一张）');
+      // 生成期间你切了格子：结果照样回到原来那一格，明说一句免得你以为没反应
+      toast(`${cellLabel}已生成（没有跳过去，还停在你现在看的这格）`);
     }
   } catch (e) {
     // 短提示 + 完整面板：toast 装不下长错误，用户报过「报错信息不全」
@@ -4371,8 +4399,9 @@ async function generateSlotImage() {
     showErrorDetail('生图失败', e);
     if ($('#footMsg')) $('#footMsg').textContent = '生图失败：' + (e?.message || e);
   } finally {
-    btn.disabled = false;
-    btn.textContent = old;
+    // 只清这一格的作业标记；按钮状态跟着「当前选中的格子」走（用户可能已经切走了）
+    if (state.imgJobs) delete state.imgJobs[sid];
+    refreshGenButtons();
   }
 }
 
