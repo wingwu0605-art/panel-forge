@@ -21,19 +21,25 @@
 - ⚠️ 历史包袱：本仓库早期是 MIT 且在 GitHub 公开过 —— **已经按 MIT 拿到的副本收不回来**，
   新许可只对之后的版本生效。要「干净」，得从新仓库 / 新版本号开始。
 
-## 〇之二、仓库已转私有（2026-10）
+## 〇之二、仓库可见性的两次转折（2026-10）
 
-- 可见性：**private**；开源许可（MIT → 非商业 → 专有）的演进史在 git 历史里。
-- **线上 GitHub Pages 已随私有化停用**（Free 账号的 Pages 只支持公开仓库）。
-  原地址 `https://wingwu0605-art.github.io/panel-forge/` 不再可用。
-- `.github/workflows/pages.yml` 已删除（Pages 不可用，留着每次 push 都会失败）；
-  需要恢复时从历史里取回：`git show <旧提交>:.github/workflows/pages.yml > .github/workflows/pages.yml`
-- 想重新上线，三条路（详见当轮对话）：
-  1. 升级 GitHub Pro（约 $4/月）→ 私有仓库也能发 Pages，URL 不变
-  2. 换免费托管（Cloudflare Pages / Vercel / Netlify）→ 连私有仓库，构建命令
-     `node scripts/build-static.mjs`，输出目录 `site`；URL 会变
-  3. Actions 构建后把 `site/` 推到另一个**公开**仓库发布（源码私有、产物公开）
-- 提醒：闭源只藏源码，藏不住产物 —— 前端代码一定会发到浏览器。
+**第一次：转私有（闭源）** —— 已作废，仅留记录。
+
+- 曾把仓库设为 private，Pages 因此停用（Free 账号的 Pages 只支持公开仓库），
+  `.github/workflows/pages.yml` 被删除。
+
+**第二次：重新开源（当前状态）** —— 用户决定「临时开源」：
+
+- 可见性：**public**；线上地址恢复：<https://wingwu0605-art.github.io/panel-forge/>
+- `.github/workflows/pages.yml` 已恢复，且**发布前先跑三道闸**：
+  `test-units` / `validate` / `check-contrast`，任一失败不发布。
+- 许可：**PolyForm Noncommercial 1.0.0** —— 代码禁商用，**产出物可商用**。
+  完整说明见 `LICENSE-OUTPUTS.md`（含"什么情况要商业授权"的边界清单）。
+- 措辞纪律：这是 **source-available（源码可见）**，不要说成 "OSI 开源"
+  —— OSI 许可证不允许禁止商用，两者不可兼得。
+- 提醒仍然成立：开源只公开源码，**产物本来也是公开的**；不要把 API Key 写进仓库
+  （我们的 Key 只存在浏览器 localStorage，构建产物里没有）。
+- 若以后要再转私有：记得同时删/关 Pages 工作流，否则 push 会红。
 
 ## 一、跑起来（Windows，node 不在 PATH）
 

@@ -2,6 +2,10 @@
 
 **138 套中日韩漫画分镜模板 · 镂空填充网页编辑器 · 剧情匹配 API**
 
+> 🌐 在线试用：<https://wingwu0605-art.github.io/panel-forge/>
+> 📜 许可：**代码禁商用，产出物可商用** —— 见 [LICENSE-OUTPUTS.md](LICENSE-OUTPUTS.md)
+> 📦 Android 壳：`native/`（Capacitor，可装 APK）
+
 给 AI 漫画一副「像人画的」版面骨架：格子有大小差、有斜切、有留白、有越界、有叠压插入格——
 而不是九宫格平铺。每一格还带景别、构图意图和可直接喂给文生图模型的提示词。
 

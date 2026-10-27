@@ -8,6 +8,22 @@
 
 ---
 
+## [Unreleased]
+
+### 变更（许可）
+
+- **重新开源**：仓库转回公开，恢复 GitHub Pages 自动部署
+  （<https://wingwu0605-art.github.io/panel-forge/>）。
+- **许可换成 PolyForm Noncommercial 1.0.0**：代码禁止商用；产出物可商用。
+  新增 [LICENSE-OUTPUTS.md](LICENSE-OUTPUTS.md) 把「代码」与「产出物」彻底分开，
+  并列出「需要商业授权 / 不需要」的边界清单。
+- 明确说明：本项目是 **source-available（源码可见）**，不是 OSI 开源
+  —— OSI 许可不允许禁止商用，二者不可兼得。
+- CI 加固：Pages 工作流在发布前先跑单测 / 模板体检 / 配色对比度三道闸，任一失败不发布。
+- 发布前做了敏感信息扫描（sk-/token/私钥/本地路径）：无命中。
+
+---
+
 ## [0.9.0] — 2026-10-26
 
 本轮主题：**收口 + 版本基建 + 两套配色皮肤**。
