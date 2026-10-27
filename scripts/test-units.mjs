@@ -2,7 +2,7 @@
  * 纯函数单测（不启服务器、不连模型）：node scripts/test-units.mjs
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
-import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError, planImageRequest } from '../lib/llm-core.mjs';
+import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError, planImageRequest, imageRoute } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
 import { splitClauses, assignSegments, buildPlan } from '../lib/matcher.mjs';
 import { TEMPLATES } from '../lib/library.mjs';
@@ -238,7 +238,27 @@ ok('硅基流动仍走自己的地址',
   planImageRequest({ baseUrl: 'https://api.siliconflow.cn/v1', imageProvider: 'siliconflow' }, 'Kwai-Kolors/Kolors').endpoint
     === 'https://api.siliconflow.cn/v1/images/generations');
 
+/* 参考图 / 无参考图：四条分支各自该打到哪、该带什么，全部用纯函数钉住 */
+const arkCfg = { baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', imageProvider: 'volcengine' };
+ok('方舟无参考图 → 纯 generations', imageRoute(arkCfg, 'doubao-seedream-5-0-flash-260915', 0).mode === 'generations');
+ok('方舟有参考图 → 同端点 + body.image（不去 /images/edits）',
+  (() => { const r = imageRoute(arkCfg, 'doubao-seedream-5-0-flash-260915', 2); return r.mode === 'ark-image' && r.endpoint.includes('/api/v3/images/generations'); })());
+ok('服务商误选 OpenAI 但模型是方舟 → 也走 ark-image（这次修的就是这条）',
+  imageRoute({ baseUrl: 'https://api.deepseek.com/v1', imageProvider: 'openai' }, 'doubao-seedream-5-0-flash-260915', 2).mode === 'ark-image');
+ok('OpenAI gpt-image 有参考图 → /images/edits',
+  (() => { const r = imageRoute({ baseUrl: 'https://api.openai.com/v1', imageProvider: 'openai' }, 'gpt-image-1', 1); return r.mode === 'openai-edits' && r.endpoint.endsWith('/images/edits'); })());
+ok('OpenAI dall-e-3 有参考图 → 忽略参考图而不是硬发 edits',
+  (() => { const r = imageRoute({ baseUrl: 'https://api.openai.com/v1', imageProvider: 'openai' }, 'dall-e-3', 1); return r.mode === 'generations' && r.refsIgnored === 1 && r.refsUsed === 0; })());
+ok('Stability 无参考图 → 走 aspect_ratio 模式', imageRoute({ baseUrl: 'https://api.stability.ai', imageProvider: 'stability' }, 'sd3', 0).mode === 'generations');
+ok('Stability 有参考图 → init_image 模式',
+  imageRoute({ baseUrl: 'https://api.stability.ai', imageProvider: 'stability' }, 'sd3', 1).mode === 'stability-init');
+ok('硅基流动有参考图 → siliconflow-image',
+  imageRoute({ baseUrl: 'https://api.siliconflow.cn/v1', imageProvider: 'siliconflow' }, 'Kwai-Kolors/Kolors', 1).mode === 'siliconflow-image');
+ok('参考图数量超过 4 张时也不会崩（由分支内部 slice）',
+  imageRoute(arkCfg, 'doubao-seedream-5-0-flash-260915', 9).refsUsed === 9);
+
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
+
 
 
 process.exit(fail ? 1 : 0);

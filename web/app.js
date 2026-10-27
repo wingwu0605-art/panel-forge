@@ -4355,7 +4355,13 @@ async function generateSlotImage() {
     commit();
     state.images[sid] = await imageAsset(href, { name: 'ai' });
     renderStage(); renderSlotPanel(); refreshScript(); renderCands();
+    const ignoredRefs = Number(res?.refsIgnored) || 0;
+    if (ignoredRefs) {
+      // 模型不吃参考图（如 dall-e-3）：生成了，但要说清楚参考图没生效
+      toast(`已生成，但 ${ignoredRefs} 张参考图被忽略：当前模型不支持图生图`);
+    } else {
     toast('已生成并填入这一格（候选里还留着，可以换一张）');
+    }
   } catch (e) {
     // 短提示 + 完整面板：toast 装不下长错误，用户报过「报错信息不全」
     const code = e?.code ? `（${e.code}）` : '';
