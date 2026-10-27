@@ -2295,7 +2295,21 @@ function bindUI() {
     $('#ksProtocol').value = p.protocol;
     $('#ksBase').value = p.baseUrl;
     $('#ksModel').value = p.model;
-    if (p.imgModel) $('#ksImgModel').value = p.imgModel;
+    if ('imgModel' in p) $('#ksImgModel').value = p.imgModel || '';
+    if ('imgProvider' in p) $('#ksImgProvider').value = p.imgProvider || 'openai';
+    // 每个服务商一句话提示（模型名/版本段各不相同，写死在选项里就会互相误导）
+    const baseHint = $('#ksBaseHint');
+    if (baseHint) {
+      const hints = [];
+      if (/\/api\/v\d/.test(p.baseUrl)) hints.push('这个服务商的版本段在 /api/v3，不是 /v1');
+      if (p.imgHint) hints.push(p.imgHint);
+      if (p.name === '自定义') hints.push('Base URL 填到 OpenAI 兼容的版本段为止（如 https://host/v1），模型填真实 model id');
+      baseHint.textContent = hints.join('；');
+      baseHint.classList.toggle('hidden', !hints.length);
+    }
+    // 填完自动把「模型」这一栏高亮一下，避免只改 Base URL 忘了改模型
+    $('#ksModel')?.classList.add('needs-check');
+    setTimeout(() => $('#ksModel')?.classList.remove('needs-check'), 1600);
   });
   $('#ksList')?.addEventListener('click', (ev) => {
     const item = ev.target.closest('.ks-item');
@@ -3524,6 +3538,24 @@ const KEY_PRESETS = {
   siliconflow: { name: '硅基流动', protocol: 'openai', baseUrl: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-72B-Instruct', imgModel: 'Kwai-Kolors/Kolors' },
   anthropic: { name: 'Anthropic', protocol: 'anthropic', baseUrl: 'https://api.anthropic.com', model: 'claude-3-5-sonnet-latest', imgModel: '' },
   moonshot: { name: 'Moonshot', protocol: 'openai', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', imgModel: '' },
+  // 火山方舟（豆包）：版本段是 /api/v3，不是 /v1；模型要填 model id 或接入点 ep-xxxx。
+  // 这里的默认值只是「能跑通的最小示例」，具体以你控制台里开通的模型为准。
+  volcengine: {
+    name: '火山方舟（豆包）', protocol: 'openai',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    model: 'doubao-seed-1-6-250615',
+    imgProvider: 'openai',
+    imgModel: 'doubao-seedream-4-0-250828',
+    imgHint: '方舟的生图模型常是 seedream 系列；也可填控制台给你的接入点 ID（ep-...）',
+  },
+  dashscope: {
+    name: '通义百炼', protocol: 'openai',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen-plus',
+    imgProvider: 'openai',
+    imgModel: 'wanx2.1-t2i-turbo',
+    imgHint: '百炼兼容模式：文本 qwen-plus；生图用 wanx2.1-t2i-turbo（异步任务在部分模型上不支持，失败就换 wanx2.1-t2i-plus）',
+  },
   custom: { name: '自定义', protocol: 'openai', baseUrl: '', model: '', imgModel: '' },
 };
 

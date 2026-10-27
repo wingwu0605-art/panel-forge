@@ -619,6 +619,8 @@
               <option value="siliconflow">硅基流动 SiliconFlow</option>
               <option value="anthropic">Anthropic</option>
               <option value="moonshot">Moonshot</option>
+              <option value="volcengine">火山方舟（豆包）</option>
+              <option value="dashscope">通义百炼</option>
               <option value="custom">自定义 / 中转</option>
             </select>
           </label>
@@ -632,6 +634,7 @@
         <label class="field"><span>Base URL</span>
           <input id="ksBase" type="text" spellcheck="false" placeholder="https://api.deepseek.com/v1">
         </label>
+        <div class="ks-hint muted small hidden" id="ksBaseHint"></div>
         <label class="field"><span>对话模型</span>
           <input id="ksModel" type="text" spellcheck="false" placeholder="deepseek-chat">
         </label>

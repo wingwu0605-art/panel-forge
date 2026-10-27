@@ -2331,3 +2331,7 @@ html[data-skin="minimal"] .chip[aria-pressed="true"]{
 
 /* 外观面板底部：版本号 */
 .pop-foot{padding:10px 2px 2px;opacity:.7;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+
+/* Key 面板：服务商一句话提示 + 需要复核的字段高亮 */
+.ks-hint{padding:2px 2px 6px;line-height:1.5;color:var(--label-3)}
+.needs-check{box-shadow:0 0 0 2px color-mix(in srgb,var(--tint) 45%,transparent) !important;transition:box-shadow .2s var(--ease)}

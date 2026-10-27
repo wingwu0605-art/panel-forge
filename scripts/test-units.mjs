@@ -2,7 +2,7 @@
  * 纯函数单测（不启服务器、不连模型）：node scripts/test-units.mjs
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
-import { fitImageSize } from '../lib/llm-core.mjs';
+import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
 import { splitClauses, assignSegments, buildPlan } from '../lib/matcher.mjs';
 import { TEMPLATES } from '../lib/library.mjs';
@@ -109,6 +109,45 @@ ok('提示词里出现原文（英文版 subject）', plan.panels[0].promptEn.in
 ok('可复制的提示词里不再有 {{占位符}}', !/\{\{/.test(JSON.stringify(plan.panels)), '');
 ok('没分到内容的格子用节拍提示兜底（不留空）',
   plan.panels.filter((x) => !x.content).every((x) => x.promptZh.includes('画面：')), '');
+
+/* ------------------------------------------------------------------ *
+ * 端点拼接：这类 bug 很隐蔽 —— 界面上看不出问题，只回报 404。
+ * 真实踩过的坑：火山方舟是 /api/v3，只认 /v1 会拼成 /api/v3/v1/...；
+ * 用户把完整端点粘进 Base URL 时，聊天和生图会各自拼错。
+ * ------------------------------------------------------------------ */
+const cfgOf = (baseUrl, extra = {}) => ({ baseUrl, protocol: 'openai', imageProvider: 'openai', ...extra });
+
+ok('版本段识别：/api/v3 算已带版本',
+  isVersionedBase('https://ark.cn-beijing.volces.com/api/v3') === true);
+ok('版本段识别：裸域名不算',
+  isVersionedBase('https://api.openai.com') === false);
+ok('baseRoot 把完整生图端点截回版本段',
+  baseRoot('https://ark.cn-beijing.volces.com/api/v3/images/generations')
+    === 'https://ark.cn-beijing.volces.com/api/v3',
+  baseRoot('https://ark.cn-beijing.volces.com/api/v3/images/generations'));
+ok('baseRoot 保留 /v1（不误删）',
+  baseRoot('https://api.siliconflow.cn/v1') === 'https://api.siliconflow.cn/v1');
+
+ok('火山方舟 chat 端点 = /api/v3/chat/completions',
+  resolveEndpoint(cfgOf('https://ark.cn-beijing.volces.com/api/v3'))
+    === 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
+  resolveEndpoint(cfgOf('https://ark.cn-beijing.volces.com/api/v3')));
+ok('火山方舟 image 端点 = /api/v3/images/generations',
+  resolveImageEndpoint(cfgOf('https://ark.cn-beijing.volces.com/api/v3'))
+    === 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+  resolveImageEndpoint(cfgOf('https://ark.cn-beijing.volces.com/api/v3')));
+ok('粘了完整生图端点时，chat 端点仍然正确',
+  resolveEndpoint(cfgOf('https://ark.cn-beijing.volces.com/api/v3/images/generations'))
+    === 'https://ark.cn-beijing.volces.com/api/v3/chat/completions');
+ok('裸域名补 /v1（OpenAI 官方）',
+  resolveEndpoint(cfgOf('https://api.openai.com')) === 'https://api.openai.com/v1/chat/completions');
+ok('已带 /v1 不重复补',
+  resolveEndpoint(cfgOf('https://api.deepseek.com/v1')) === 'https://api.deepseek.com/v1/chat/completions');
+ok('Anthropic 走 /v1/messages',
+  resolveEndpoint(cfgOf('https://api.anthropic.com', { protocol: 'anthropic' })) === 'https://api.anthropic.com/v1/messages');
+ok('Stability 走 v2beta/stable-image/generate/core',
+  resolveImageEndpoint(cfgOf('https://api.stability.ai', { imageProvider: 'stability' }))
+    === 'https://api.stability.ai/v2beta/stable-image/generate/core');
 
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 
