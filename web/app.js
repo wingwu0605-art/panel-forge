@@ -1275,6 +1275,51 @@ function initShareIn() {
 }
 
 /**
+ * 生图/写提示词失败时，把完整错误摊开给人看。
+ * toast 是胶囊形，长文本会被截断（用户反馈「报错信息不全」就是这么来的），
+ * 所以长错误一律进这个面板：可滚动、可选中、可一键复制。
+ */
+function showErrorDetail(title, err, extra = '') {
+  const old = document.querySelector('#errSheet');
+  if (old) old.remove();
+  const msg = String(err?.message || err || '未知错误');
+  const hint = err?.hint || '';
+  const code = err?.code || '';
+  const rid = err?.requestId ? `\nrequest_id=${err.requestId}` : '';
+  const body = `${msg}${rid}${hint ? '\n\n建议：' + hint : ''}${extra ? '\n' + extra : ''}`;
+  const sheet = document.createElement('div');
+  sheet.className = 'keysheet';
+  sheet.id = 'errSheet';
+  sheet.innerHTML = `
+    <div class="ks-panel" style="max-width:560px">
+      <div class="ks-head">
+        <b>${escapeHtml(title)}${code ? ` · ${escapeHtml(code)}` : ''}</b>
+        <span class="muted small">完整信息（可选中复制）</span>
+        <button class="btn tiny" data-close>关闭</button>
+      </div>
+      <div class="ks-body">
+        <pre class="err-pre"></pre>
+        <div class="row2">
+          <button class="btn tiny primary" data-copy>复制错误信息</button>
+          <button class="btn tiny" data-close2>知道了</button>
+        </div>
+      </div>
+    </div>`;
+  sheet.querySelector('.err-pre').textContent = body;
+  document.body.appendChild(sheet);
+  const close = () => sheet.remove();
+  sheet.addEventListener('click', (ev) => {
+    if (ev.target === sheet || ev.target.closest('[data-close]') || ev.target.closest('[data-close2]')) { close(); return; }
+    if (ev.target.closest('[data-copy]')) copyText(body, '错误信息已复制');
+  });
+  return sheet;
+}
+
+// 调试/自动化钩子：不产生真实请求就能看错误面板长什么样
+window.__pfShowError = showErrorDetail;
+
+
+/**
  * 把这一格做成「给别的 App 画」的画布：包围盒尺寸 + 白底（或已有底图）+ 形状参考。
  * 形状参考 = 多边形外面压 12% 灰 + 边界虚线。回填时按同一个多边形裁切，外面的灰会被裁掉，
  * 所以它既能告诉你边界在哪，又不会污染成图。
@@ -4304,8 +4349,11 @@ async function generateSlotImage() {
     renderStage(); renderSlotPanel(); refreshScript(); renderCands();
     toast('已生成并填入这一格（候选里还留着，可以换一张）');
   } catch (e) {
-    toast('生图失败：' + e.message);
-    $('#footMsg') && ($('#footMsg').textContent = '生图失败：' + e.message);
+    // 短提示 + 完整面板：toast 装不下长错误，用户报过「报错信息不全」
+    const code = e?.code ? `（${e.code}）` : '';
+    toast(`生图失败${code} · 已弹出详情`);
+    showErrorDetail('生图失败', e);
+    if ($('#footMsg')) $('#footMsg').textContent = '生图失败：' + (e?.message || e);
   } finally {
     btn.disabled = false;
     btn.textContent = old;

@@ -2,7 +2,7 @@
  * 纯函数单测（不启服务器、不连模型）：node scripts/test-units.mjs
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
-import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg } from '../lib/llm-core.mjs';
+import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
 import { splitClauses, assignSegments, buildPlan } from '../lib/matcher.mjs';
 import { TEMPLATES } from '../lib/library.mjs';
@@ -192,6 +192,29 @@ ok('两把 Key 都能被 normalizeCfg 保留',
     return c.apiKey === 'k1' && c.imgKey === 'k2' && c.imgBaseUrl === 'https://b/api/v3';
   })(),
   'imgKey 与 imgBaseUrl');
+
+/* 生图报错必须「信息齐全」：用户报过「报错信息不全」——方舟 404 时响应体可能是空的 */
+const arkImg = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
+const errEmpty = imageHttpError({ status: 404, bodyText: '', json: null, endpoint: arkImg, model: 'doubao-seedream-5-0-pro-260628', key: 'k', provider: 'volcengine' });
+ok('空响应体也会写明原因，而不是留一个空冒号',
+  errEmpty.message.includes('响应体为空'), errEmpty.message.split('\n')[0]);
+ok('生图报错带上真实端点', errEmpty.message.includes('images/generations'));
+ok('生图报错带上模型名', errEmpty.message.includes('doubao-seedream-5-0-pro-260628'));
+ok('空响应体 + 方舟 → 提示去开通管理',
+  /开通管理/.test(errEmpty.hint || ''), String(errEmpty.hint).slice(0, 40));
+
+const body404 = { error: { message: 'The model or endpoint doubao-seedream-4-0 does not exist', request_id: 'req-9' } };
+const errBody = imageHttpError({ status: 404, bodyText: JSON.stringify(body404), json: body404, endpoint: arkImg, model: 'doubao-seedream-4-0', key: 'k', provider: 'volcengine' });
+ok('有响应体时把服务端原话带出来',
+  errBody.message.includes('does not exist'));
+ok('响应体里的 request_id 会被保留', errBody.requestId === 'req-9', String(errBody.requestId));
+
+const b400 = { error: { message: 'invalid size: 1792x1024' } };
+const err400 = imageHttpError({ status: 400, bodyText: JSON.stringify(b400), json: b400, endpoint: arkImg, model: 'm', key: 'k' });
+ok('尺寸类 400 → 指向尺寸而不是 Key', /尺寸/.test(err400.hint || ''), String(err400.hint).slice(0, 30));
+
+const errKey = imageHttpError({ status: 401, bodyText: 'Your api key: sk-secret-abcdef is invalid', json: null, endpoint: arkImg, model: 'm', key: 'sk-secret-abcdef' });
+ok('401 报错里不泄露完整 Key', !errKey.message.includes('sk-secret-abcdef'), errKey.message.split('\n')[0]);
 
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 

@@ -2347,3 +2347,13 @@ html[data-skin="minimal"] .chip[aria-pressed="true"]{
 /* 生图就绪状态：ok=1 走成功色，ok=0 走提醒色 */
 #ksImgReady[data-ok="1"]{color:var(--green-ink)}
 #ksImgReady[data-ok="0"]{color:var(--orange-ink)}
+
+/* 错误详情面板：等宽、可选中、可滚动（toast 装不下长错误） */
+.err-pre{
+  margin:0 0 10px;padding:10px 12px;border-radius:10px;background:var(--fill-2);
+  font-family:var(--font-mono);font-size:12px;line-height:1.55;white-space:pre-wrap;
+  word-break:break-word;max-height:52vh;overflow:auto;user-select:text;
+  box-shadow:inset 0 0 0 .5px var(--sep);
+}
+/* toast 也不允许把字裁掉：太长就换行 + 内部滚动 */
+.toast{white-space:pre-wrap;word-break:break-word;max-height:32vh;overflow:auto}
