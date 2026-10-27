@@ -3069,6 +3069,7 @@ window.__pfAutoSet = (m) => setAutoMode(m);
 
   bindAutoUI();
   bindInboxUI();
+  bindSlotZoom();
 
 /* ================================================================== *
  * 交互收件箱：拖放 / 粘贴 / 气泡拖入 / 候选大图 / 右键菜单
@@ -3185,6 +3186,115 @@ async function acceptTextFiles(files, { targetSel } = {}) {
   }
 }
 
+/* ---------------- 选中格子的悬浮缩放条 ---------------- */
+function slotZoomEls() {
+  return { box: $('#slotZoom'), range: $('#slotZoomRange'), val: $('#slotZoomVal') };
+}
+
+/** 把缩放条贴到「当前选中格子」的正右侧；没有图就藏起来 */
+function syncSlotZoom() {
+  const { box, range, val } = slotZoomEls();
+  if (!box) return;
+  const canvas = $('#canvas');
+  const svg = canvas?.querySelector('svg');
+  const slot = state.tpl?.slots?.find((x) => x.id === state.selectedId);
+  const img = state.selectedId ? state.images[state.selectedId] : null;
+  const view = document.body.dataset.view || '';
+  const showIt = !!(svg && slot && img && !state.hollow && view !== 'edit');
+  if (!showIt) { box.classList.add('hidden'); return; }
+
+  const cRect = canvas.getBoundingClientRect();
+  const sRect = svg.getBoundingClientRect();
+  const tpl = state.tpl.page;
+  const kx = sRect.width / tpl.w;
+  const ky = sRect.height / tpl.h;
+  const x = sRect.left - cRect.left + (slot.x + slot.w) * kx + 10;
+  const y = sRect.top - cRect.top + (slot.y + slot.h / 2) * ky;
+
+  box.classList.remove('hidden');
+  box.style.left = Math.round(x) + 'px';
+  box.style.top = Math.round(y) + 'px';
+  box.style.transform = 'translateY(-50%)';
+
+  const pct = Math.round((img.zoom || 1) * 100);
+  if (val) val.textContent = pct + '%';
+  if (range && document.activeElement !== range) range.value = String(Math.min(400, Math.max(30, pct)));
+}
+
+/** 设置当前格的缩放（30%–400%），走热路径只改这一张图 */
+function setSlotZoom(pct) {
+  const id = state.selectedId;
+  const img = id ? state.images[id] : null;
+  if (!img) return;
+  const next = clamp(Number(pct) / 100, 0.3, 4);
+  if (Math.abs(next - (img.zoom || 1)) < 0.001) return;
+  img.zoom = next;
+  if (typeof refreshSlotImage === 'function') refreshSlotImage(id);
+  else renderStage();
+  syncSlotZoom();
+  const zv = $('#zoomVal');
+  if (zv) zv.textContent = Math.round(next * 100) + '%';
+  const zr = $('#zoom');
+  if (zr) zr.value = String(Math.round(next * 100));
+  queueSave();
+}
+
+function bindSlotZoom() {
+  const { box, range, val } = slotZoomEls();
+  if (!box || box.dataset.ready) return;
+  box.dataset.ready = '1';
+  range?.addEventListener('input', (ev) => setSlotZoom(ev.target.value));
+  box.addEventListener('click', (ev) => {
+    const step = ev.target.closest('[data-step]');
+    if (step) {
+      const img = state.images[state.selectedId];
+      const cur = Math.round((img?.zoom || 1) * 100);
+      setSlotZoom(cur + Number(step.dataset.step) * 8);
+      return;
+    }
+    if (ev.target.closest('#slotZoomVal')) setSlotZoom(100);
+  });
+  window.addEventListener('resize', syncSlotZoom);
+  document.addEventListener('scroll', syncSlotZoom, { passive: true, capture: true });
+  // 画布每次重绘（换页/换格/改图）都会替换 svg —— 盯住它，重算缩放条位置
+  const canvasEl = $('#canvas');
+  if (canvasEl && !canvasEl.dataset.zoomObserver) {
+    canvasEl.dataset.zoomObserver = '1';
+    let raf = 0;
+    new MutationObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => { try { syncSlotZoom(); } catch { /* ignore */ } });
+    }).observe(canvasEl, { childList: true });
+  }
+  syncSlotZoom();
+}
+
+/* ---------------- 拖放提示：毛玻璃卡片 + 格式说明 ---------------- */
+const DROP_KINDS = {
+  image: { title: '放入图片', formats: 'JPG / PNG / WebP / GIF / AVIF / SVG', ico: '▤' },
+  text: { title: '放入原文文件', formats: 'TXT / MD / CSV / TSV / LOG', ico: '🅃' },
+  bubble: { title: '放入气泡', formats: '松手就放到画面上', ico: '💬' },
+};
+
+function showDropHint(kind, targetEl) {
+  const el = $('#dropHint');
+  if (!el || !targetEl) return;
+  const spec = DROP_KINDS[kind] || DROP_KINDS.image;
+  $('#dhIco').textContent = spec.ico;
+  $('#dhTitle').textContent = spec.title;
+  $('#dhFormats').textContent = spec.formats;
+  const r = targetEl.getBoundingClientRect();
+  el.classList.remove('hidden');
+  el.style.left = Math.round(r.left) + 'px';
+  el.style.top = Math.round(r.top) + 'px';
+  el.style.width = Math.round(r.width) + 'px';
+  el.style.height = Math.round(r.height) + 'px';
+}
+
+function hideDropHint() {
+  $('#dropHint')?.classList.add('hidden');
+}
+
 function installImageInbox() {
   const canvas = $('#canvas');
 
@@ -3206,17 +3316,25 @@ function installImageInbox() {
     if (!hasImages && !hasText && !isBubble) return;
     // 文本文件优先落在文本框上
     const textSel = hasText && !hasImages ? textTargetOf(ev.target) : null;
-    const zone = textSel ? 'text' : dropZoneOf(ev.target);
+    // 合成事件的 target 可能是 document，用坐标兜底判断落在画布上
+    const zone = textSel
+      ? 'text'
+      : (dropZoneOf(ev.target) || (Number.isFinite(ev.clientX) && $('#canvas svg') ? 'canvas' : null));
     if (!zone) return;
     ev.preventDefault();
     ev.dataTransfer.dropEffect = 'copy';
     document.body.dataset.dropZone = zone;
+    // 毛玻璃提示：盖在目标区域上，写明能放什么格式
+    if (textSel) showDropHint('text', $(textSel));
+    else if (isBubble && !hasImages) showDropHint('bubble', $('#canvas svg') || $('#canvas'));
+    else showDropHint('image', zone === 'char' ? $('.chars') : ($('#canvas svg') || $('#canvas')));
   });
   document.addEventListener('dragleave', (ev) => {
-    if (ev.target === document || !ev.relatedTarget) delete document.body.dataset.dropZone;
+    if (ev.target === document || !ev.relatedTarget) { delete document.body.dataset.dropZone; hideDropHint(); }
   });
 
   document.addEventListener('drop', async (ev) => {
+    hideDropHint();
     const bubbleType = ev.dataTransfer?.getData('text/pf-bubble');
     // 事件可能派发在 document 上（合成事件 / 某些浏览器），这时用坐标兜底判断落在画布
     const zone = dropZoneOf(ev.target)
@@ -3280,6 +3398,7 @@ function makeBubbleLibDraggable() {
   lib.addEventListener('dragend', (ev) => {
     ev.target.closest(SEL)?.classList.remove('dragging');
     delete document.body.dataset.dropZone;
+    hideDropHint();
   });
   // 气泡项是 .bub-item[data-id]，标记成可拖（每次重渲染后都要补）
   const mark = () => {

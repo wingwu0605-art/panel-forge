@@ -710,7 +710,7 @@ kbd{
 .stage-empty p.muted{font-size:12.5px;color:var(--label-3)}
 .empty-art{color:var(--label-4);margin-bottom:8px}
 .empty-art svg{width:110px;height:88px}
-.canvas{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.canvas{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
 .canvas svg{
   max-width:100%;max-height:100%;width:auto;height:auto;
   background:#fff;box-shadow:var(--page-shadow);
@@ -2499,4 +2499,59 @@ body.pf-lp #canvas svg{transform:scale(1.015)}
 /* 触屏上关掉文字选择与系统长按菜单，否则长按会弹"拷贝图片" */
 @media (hover:none) and (pointer:coarse){
   #canvas{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+}
+
+/* 该格缩放条：浮在选中格子正右侧 */
+.slot-zoom{
+  position:absolute; z-index:170; display:flex; flex-direction:column; align-items:center; gap:6px;
+  padding:8px 6px; border-radius:14px;
+  background:var(--material-thick); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+  box-shadow:var(--shadow-3), inset 0 0 0 .5px var(--sep);
+  transform:translateX(8px);
+  transition:opacity .16s var(--ease), transform .16s var(--ease);
+}
+.slot-zoom.hidden{display:none}
+.slot-zoom .sz-btn{
+  width:24px; height:24px; border:0; border-radius:8px; cursor:pointer;
+  background:var(--fill-2); color:var(--label); font:600 14px/1 var(--font);
+  display:grid; place-items:center;
+}
+.slot-zoom .sz-btn:hover{background:var(--fill-hover)}
+.slot-zoom .sz-btn:active{transform:scale(.92)}
+.slot-zoom .sz-track{height:96px; width:24px; display:grid; place-items:center}
+.slot-zoom .sz-track input[type="range"]{
+  width:96px; height:24px; margin:0; transform:rotate(-90deg); accent-color:var(--tint);
+  background:transparent;
+}
+.slot-zoom .sz-val{
+  min-width:44px; padding:3px 4px; border:0; border-radius:8px; cursor:pointer;
+  background:var(--tint-soft); color:var(--tint); font:600 11px/1.4 var(--font-mono);
+  font-variant-numeric:tabular-nums;
+}
+.slot-zoom .sz-val:hover{background:color-mix(in srgb,var(--tint) 24%,transparent)}
+
+/* 拖放提示：毛玻璃卡片 */
+.drop-hint{
+  position:fixed; z-index:190; pointer-events:none;
+  display:grid; place-items:center;
+  border-radius:16px;
+  background:color-mix(in srgb,var(--bg) 30%,transparent);
+  -webkit-backdrop-filter:blur(14px) saturate(150%); backdrop-filter:blur(14px) saturate(150%);
+  box-shadow:inset 0 0 0 2px var(--tint);
+  transition:opacity .12s var(--ease);
+}
+.drop-hint.hidden{display:none}
+.dh-card{
+  padding:14px 18px; border-radius:14px; text-align:center;
+  background:var(--material-thick); box-shadow:var(--shadow-3), inset 0 0 0 .5px var(--sep);
+  -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+}
+.dh-ico{font-size:22px; line-height:1; margin-bottom:6px; color:var(--tint)}
+.dh-title{font-size:13.5px; font-weight:600; color:var(--label)}
+.dh-formats{margin-top:4px; font-size:11.5px; color:var(--label-3); font-family:var(--font-mono); letter-spacing:.3px}
+
+@media (max-width:720px){
+  .slot-zoom{padding:6px 5px; gap:5px; transform:translateX(2px) scale(.94); transform-origin:left center}
+  .slot-zoom .sz-track{height:76px}
+  .slot-zoom .sz-track input[type="range"]{width:76px}
 }

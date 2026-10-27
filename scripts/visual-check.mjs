@@ -1845,6 +1845,106 @@ const scenarios = [
   },
 
   {
+    name: 'slot-zoom',
+    title: '㉘ 该格缩放条贴在格子右侧 + 拖放毛玻璃提示写清格式',
+    async run(page, shot, { check }) {
+      await page.viewport(1280, 900);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        const mk = (name, type = 'image/png') => {
+          const bin = atob(png); const arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          return new File([arr], name, { type });
+        };
+        const res = {};
+        const box = document.querySelector('#slotZoom');
+        res.hiddenBeforeImage = box.classList.contains('hidden');
+
+        // 拖一张图进来
+        const svg0 = document.querySelector('#canvas svg');
+        const r0 = svg0.getBoundingClientRect();
+        const dt = new DataTransfer(); dt.items.add(mk('pic.png'));
+        document.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt,
+          clientX: r0.left + r0.width * 0.45, clientY: r0.top + r0.height * 0.25 }));
+        await wait(650);
+
+        const svg = document.querySelector('#canvas svg');
+        const r = svg.getBoundingClientRect();
+        const br = box.getBoundingClientRect();
+        res.show = {
+          visible: !box.classList.contains('hidden'),
+          pct: document.querySelector('#slotZoomVal')?.textContent || '',
+          rightOfCanvas: br.left > r.left + r.width - 60,
+          centered: Math.abs((br.top + br.height / 2) - (r.top + r.height / 2)) < r.height / 2,
+        };
+
+        // + 号放大
+        box.querySelector('[data-step="1"]').click();
+        await wait(200);
+        res.plus = document.querySelector('#slotZoomVal')?.textContent || '';
+        // 滑杆到 200%
+        const range = document.querySelector('#slotZoomRange');
+        range.value = '200';
+        range.dispatchEvent(new Event('input', { bubbles: true }));
+        await wait(200);
+        res.slider = document.querySelector('#slotZoomVal')?.textContent || '';
+        // 点百分比复位
+        document.querySelector('#slotZoomVal').click();
+        await wait(200);
+        res.reset = document.querySelector('#slotZoomVal')?.textContent || '';
+
+        // 拖放毛玻璃提示：图片
+        const dt2 = new DataTransfer(); dt2.items.add(mk('x.png'));
+        document.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt2,
+          clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
+        await wait(220);
+        const hint = document.querySelector('#dropHint');
+        res.imgHint = {
+          shown: hint && !hint.classList.contains('hidden'),
+          title: document.querySelector('#dhTitle')?.textContent || '',
+          formats: document.querySelector('#dhFormats')?.textContent || '',
+          blur: (getComputedStyle(hint).backdropFilter || getComputedStyle(hint).webkitBackdropFilter || 'none'),
+        };
+
+        // 文档提示
+        window.__pfAutoSet('story');
+        await wait(220);
+        const ta = document.querySelector('#autoText');
+        const dt3 = new DataTransfer();
+        dt3.items.add(new File(['原文'], 'a.md', { type: 'text/markdown' }));
+        ta.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt3 }));
+        await wait(200);
+        res.docHint = {
+          title: document.querySelector('#dhTitle')?.textContent || '',
+          formats: document.querySelector('#dhFormats')?.textContent || '',
+        };
+        document.dispatchEvent(new DragEvent('dragleave', { bubbles: true }));
+        window.__pfAutoSet('off');
+        return res;
+      })()`);
+
+      check('没有图时缩放条不出现', out.hiddenBeforeImage === true);
+      check('有图后缩放条出现在画布右侧', out.show.visible && out.show.rightOfCanvas === true,
+        out.show.visible ? 'right ok' : 'hidden');
+      check('缩放条显示百分比', /^\d+%$/.test(out.show.pct), out.show.pct);
+      check('点「+」放大并同步百分比', out.plus !== out.show.pct, `${out.show.pct} → ${out.plus}`);
+      check('拖滑杆到 200% 生效', out.slider === '200%', out.slider);
+      check('点百分比可复位到 100%', out.reset === '100%', out.reset);
+      check('拖图片时出现毛玻璃提示并写明格式',
+        out.imgHint.shown && /图片/.test(out.imgHint.title) && /PNG/.test(out.imgHint.formats), out.imgHint.formats);
+      check('提示面板真的是毛玻璃（backdrop-filter 生效）',
+        /blur/.test(out.imgHint.blur), out.imgHint.blur);
+      check('拖文档时提示换成原文格式（TXT/MD…）',
+        /原文/.test(out.docHint.title) && /TXT/.test(out.docHint.formats), `${out.docHint.title} · ${out.docHint.formats}`);
+      await shot('slot-zoom');
+    },
+  },
+
+  {
     name: 'long-press',
     title: '㉗ 手机长按某一格：震动 + 直接进这一格的编辑页',
     async run(page, shot, { check }) {
