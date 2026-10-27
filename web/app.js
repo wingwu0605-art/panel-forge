@@ -2656,14 +2656,17 @@ function setAutoMode(mode, opts = {}) {
   state.autoMode = m;
   const root = document.documentElement;
   if (m === 'off') delete root.dataset.auto; else root.dataset.auto = m;
-  const panel = $('#autoPanel');
+  const autoCard = $('#autoCard');
   const plotBox = $('#plot')?.closest('.card') || null;
-  if (panel) panel.classList.toggle('hidden', m === 'off');
+  // 注意：两块是**并列的卡片**。曾经把全自动面板塞进剧情卡片里再隐藏卡片，面板跟着一起消失（bug）
+  if (autoCard) autoCard.classList.toggle('hidden', m === 'off');
   if (plotBox) plotBox.classList.toggle('hidden', m !== 'off');
   $$('#autoSeg button').forEach((b) => b.classList.toggle('on', (b.dataset.auto || 'off') === m));
   const name = $('#autoModeName');
+  const title = $('#autoModeTitle');
   const desc = $('#autoModeDesc');
   if (name) name.textContent = m === 'full' ? '真正全自动' : '分镜全自动';
+  if (title) title.textContent = m === 'full' ? '真正全自动' : '分镜全自动';
   if (desc) {
     desc.textContent = m === 'full'
       ? '从分镜、提示词、出图到台词与气泡全由 AI 完成，全程前台可见、随时可停'

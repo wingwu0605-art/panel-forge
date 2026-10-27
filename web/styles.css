@@ -2413,3 +2413,13 @@ html[data-skin="minimal"] .chip[aria-pressed="true"]{
   .fab-stack{right:10px;bottom:calc(10px + var(--tabbar-h))}
   .fab .fab-txt{font-size:11px}
 }
+
+/* 顶栏全自动开关：禁止换行溢出 */
+.topbar{flex-wrap:nowrap}
+.auto-switch{flex:0 0 auto;white-space:nowrap;gap:4px}
+.auto-switch .auto-seg{display:inline-flex;flex-wrap:nowrap}
+.auto-switch .auto-seg button{padding:3px 8px;font-size:11.5px;line-height:1.5;white-space:nowrap}
+.auto-card{display:flex;flex-direction:column}
+.auto-card.hidden{display:none}
+@media (max-width:1180px){.auto-switch-label{display:none}}
+@media (max-width:860px){.auto-switch .auto-seg button{padding:2px 6px;font-size:11px}}

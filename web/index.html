@@ -107,16 +107,16 @@
 
   <!-- ============================== 左栏：匹配 + 模板库 ============================== -->
   <aside class="rail left">
-    <section class="card match" data-panel="plot" data-panel-name="剧情 → 分镜" data-collapse="match">
+    <!-- 全自动：独立卡片，切到全自动时替代下面的「剧情 → 分镜」卡片 -->
+    <section class="card auto-card hidden" id="autoCard" data-panel="auto" data-panel-name="全自动" data-collapse="auto">
       <div class="card-head">
-        <h2>剧情 → 分镜</h2>
-        <span class="hint" id="analyzeHint">本地规则引擎</span>
+        <h2>全自动</h2>
+        <span class="hint" id="autoModeName">分镜全自动</span>
       </div>
-      <!-- 全自动：直接把全文丢进来，剩下的由工作流决定 -->
-      <section class="auto-panel hidden" id="autoPanel">
+      <div class="sec-body auto-panel" id="autoPanel">
         <div class="auto-head">
-          <b id="autoModeName">分镜全自动</b>
-          <span class="muted small" id="autoModeDesc">决定画几页、每页怎么切，你只改提示词和角色</span>
+          <b id="autoModeTitle">分镜全自动</b>
+          <span class="muted small" id="autoModeDesc">决定画几页、每页怎么切；你只改提示词和男女主形象</span>
         </div>
         <textarea id="autoText" rows="10" placeholder="把全文粘到这里（小说／剧本／大纲都行）。开始后我会自己决定画几页、每页怎么分。"></textarea>
         <div class="row2">
@@ -138,7 +138,14 @@
           <button class="btn danger" id="btnAutoStop" type="button" disabled>停止</button>
         </div>
         <div class="auto-log hidden" id="autoLog" aria-live="polite"></div>
-      </section>
+      </div>
+    </section>
+    <section class="card match" data-panel="plot" data-panel-name="剧情 → 分镜" data-collapse="match">
+      <div class="card-head">
+        <h2>剧情 → 分镜</h2>
+        <span class="hint" id="analyzeHint">本地规则引擎</span>
+      </div>
+
       <textarea id="plot" rows="5" placeholder="粘贴一段剧情，越具体越准。例如：雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋，两人在积水里僵持。"></textarea>
       <div class="row2">
         <label class="field"><span>排戏范围</span>

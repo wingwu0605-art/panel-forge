@@ -1772,8 +1772,10 @@ const scenarios = [
         window.__pfAutoSet('story');
         await wait(150);
         res.story = {
-          panelVisible: !document.querySelector('#autoPanel').classList.contains('hidden'),
+          panelVisible: !document.querySelector('#autoCard').classList.contains('hidden')
+            && Math.round(document.querySelector('#autoPanel').getBoundingClientRect().height) > 100,
           plotHidden: document.querySelector('#plot').closest('.card').classList.contains('hidden'),
+          topOverflow: (() => { const t = document.querySelector('.topbar'); return t.scrollWidth > t.clientWidth + 2; })(),
           fabVisible: !document.querySelector('#fabStack').classList.contains('hidden'),
           label: document.querySelector('#autoModeName').textContent,
         };
@@ -1816,6 +1818,7 @@ const scenarios = [
       check('默认关闭，悬浮按钮不出现', out.defaultMode === 'off' && out.fabHiddenWhenOff === true);
       check('分镜模式：全自动面板出现、原剧情框收起',
         out.story.panelVisible && out.story.plotHidden, JSON.stringify(out.story));
+      check('顶栏的开关不再溢出', out.story.topOverflow === false, String(out.story.topOverflow));
       check('悬浮按钮在分镜模式下出现', out.story.fabVisible === true);
       check('估算页数给出页数与格数', /页/.test(out.estimate) && /格/.test(out.estimate), out.estimate);
       check('危险弹窗出现，且未勾选时「继续」禁用', out.danger.shown && out.danger.goDisabled && out.danger.hasAck);
