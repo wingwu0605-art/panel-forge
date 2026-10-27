@@ -1749,6 +1749,102 @@ const scenarios = [
   },
 
   {
+    name: 'auto-full',
+    title: '㉖ 右下角 vs 全自动的语义区别 + 角色确认关卡',
+    async run(page, shot, { check }) {
+      await page.viewport(1400, 980);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        window.confirm = () => true;
+        const api = window.__pfApi();
+        const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        const calls = { optimize: 0, images: 0 };
+        api.aiSplit = async () => { throw new Error('桩：走规则切分'); };
+        api.prompts = async () => { calls.optimize++; return { ok: true, applied: 6, total: 6 }; };
+        api.imageGenerate = async () => { calls.images++; return { ok: true, b64: png, provider: 'fake' }; };
+        const res = {};
+        res.fabLabels = [...document.querySelectorAll('#fabStack .fab')].map((b) => b.textContent.replace(/\s+/g, ' ').trim());
+
+        // 右下角「一键生成该页」的确认文案：必须强调「用现有提示词、不做 AI 优化」
+        window.__pfAutoSet('story');
+        await wait(200);
+        document.querySelector('#fabGenPage').click();
+        await wait(300);
+        res.fabBody = document.querySelector('#dangerBody').textContent.replace(/\s+/g, ' ');
+        document.querySelector('#dangerSheet [data-cancel]').click();
+        await wait(150);
+
+        // 全自动：警示 → 角色确认 → 开始
+        window.__pfAutoSet('full');
+        await wait(250);
+        document.querySelector('#autoText').value = '雨夜，他在屋顶拔刀。敌人从背后偷袭。';
+        document.querySelector('#autoHero').value = '黑短发、左眉疤';
+        document.querySelector('#btnAutoEstimate').click();
+        await wait(120);
+        document.querySelector('#btnAutoStart').click();
+        await wait(300);
+        res.autoWarn = document.querySelector('#dangerBody').textContent.replace(/\s+/g, ' ');
+        document.querySelector('#dangerAck').checked = true;
+        document.querySelector('#dangerAck').dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelector('#dangerGo').click();
+        await wait(400);
+        const cc = document.querySelector('#charConfirm');
+        res.cc = {
+          shown: !!cc,
+          sum: cc?.querySelector('.cc-sum')?.textContent || '',
+          sheet: cc?.querySelector('.cc-sheet')?.textContent || '',
+          btns: [...(cc?.querySelectorAll('.row2 button') || [])].map((b) => b.textContent.trim()),
+        };
+        cc?.querySelector('#ccGoFix')?.click();
+        await wait(300);
+        res.afterFix = { ccGone: !document.querySelector('#charConfirm'), images: calls.images };
+
+        // 再跑一次并确认角色
+        document.querySelector('#btnAutoStart').click();
+        await wait(300);
+        document.querySelector('#dangerAck').checked = true;
+        document.querySelector('#dangerAck').dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelector('#dangerGo').click();
+        await wait(400);
+        document.querySelector('#charConfirm #ccGo')?.click();
+        await wait(5200);
+        res.run = {
+          optimize: calls.optimize,
+          images: calls.images,
+          log: [...document.querySelectorAll('#autoLog .al-row')].map((r) => r.textContent),
+        };
+        return res;
+      })()`);
+
+      check('右下角按钮叫「一键生成该页 / 一键生成全部分镜」',
+        /一键生成\s*该页/.test(out.fabLabels[0]) && /一键生成\s*全部分镜/.test(out.fabLabels[1]),
+        out.fabLabels.join(' / '));
+      check('该页确认里写明「用每格现在的提示词，不做 AI 优化」',
+        /现有|现在的提示词|原样/.test(out.fabBody) && /不会/.test(out.fabBody) && /AI 优化/.test(out.fabBody),
+        out.fabBody.slice(0, 80));
+      check('全自动警示里写明会先用 AI 优化提示词',
+        /AI 优化/.test(out.autoWarn), out.autoWarn.slice(0, 80));
+      check('警示之后弹「角色确认」（含页数/分镜数/设定/两个按钮）',
+        out.cc.shown && /页/.test(out.cc.sum) && /角色设定/.test(out.cc.sheet) && out.cc.btns.length === 2,
+        `${out.cc.sum} · ${out.cc.btns.join(' / ')}`);
+      check('点「先去补角色」不会生成任何图',
+        out.afterFix.ccGone && out.afterFix.images === 0, String(out.afterFix.images));
+      check('确认角色后：先优化提示词，再出图',
+        out.run.optimize >= 1 && out.run.images >= 1, `优化 ${out.run.optimize} 次 / 出图 ${out.run.images} 张`);
+      check('日志里能看到「提示词已用 AI 优化过」排在出图之前',
+        (() => {
+          const iOpt = out.run.log.findIndex((x) => /AI 优化过/.test(x));
+          const iImg = out.run.log.findIndex((x) => /逐格生成图片/.test(x));
+          return iOpt >= 0 && iImg > iOpt;
+        })(), out.run.log.slice(0, 10).join(' | '));
+      await shot('auto-full');
+    },
+  },
+
+  {
     name: 'inbox',
     title: '㉕ 拖放/粘贴图片 + 气泡拖入 + 大图预览 + 右键菜单',
     async run(page, shot, { check }) {

@@ -2692,8 +2692,10 @@ async function genPageImages() {
   const ok = await confirmDanger({
     title: '生成这一页的 ' + queue.length + ' 张图',
     body: '<ul class="danger-list">'
-      + '<li><b>点了就会一路做完这一页</b>，中途不会停（关掉页面会中断，但已发出的请求照样扣费）</li>'
-      + '<li>我们做的是「发一条指令 → 检查返回 → 再发下一条」的循环 —— 大多数模型没法一次吐出全部图片</li>'
+      + '<li><b>一键生成该页</b>：把这一页每个还没图的分镜依次生成</li>'
+      + '<li>用的就是<b>每格现在的提示词</b> —— 你手改过的、规则生成的，都按原样发出去，'
+      + '<b>不会</b>先做 AI 优化（要 AI 优化请用顶栏「全自动」）</li>'
+      + '<li>点了就会一路做完，中途不会停（关掉页面会中断，但已发出的请求照样扣费）</li>'
       + '<li>每张图都会进候选，不满意的可以单独换</li>'
       + '</ul>',
     images: queue.length,
@@ -2719,7 +2721,8 @@ async function genAllImages() {
   const first = await confirmDanger({
     title: '生成全部 ' + queue.length + ' 张图（跨 ' + pagesTouched + ' 页）',
     body: '<ul class="danger-list">'
-      + '<li>一共 <b>' + state.pages.length + ' 页</b>，其中 <b>' + pagesTouched + ' 页</b>缺图，共 <b>' + queue.length + ' 张</b></li>'
+      + '<li><b>一键生成全部分镜</b>：共 <b>' + state.pages.length + ' 页</b>，其中 <b>' + pagesTouched + ' 页</b>缺图，共 <b>' + queue.length + ' 张</b></li>'
+      + '<li>用的是<b>每格现有提示词</b>（含你手改过的），<b>不会</b>先做 AI 优化</li>'
       + '<li><b>开始后不会停</b>，直到这 ' + queue.length + ' 张全部跑完</li>'
       + '<li>会花掉大量 token / 额度，这是本项目里最贵的一个按钮</li>'
       + '</ul>',
@@ -2782,6 +2785,72 @@ function adoptAutoPlan(plan, segment) {
   renderSlotPanel();
 }
 
+/**
+ * 角色确认（真正全自动专用）
+ * 在花钱警示之后、开始生成之前，把「这一话会出现谁、设定是什么、有没有参考图」摊开确认。
+ * 返回 Promise<boolean>：true = 角色没问题，可以开始。
+ */
+function confirmCharacters({ pages = 1, panels = 0 } = {}) {
+  return new Promise((res) => {
+    document.querySelector('#charConfirm')?.remove();
+    const chars = (state.chars || []);
+    const active = new Set(state.activeChars || []);
+    const hero = ($('#autoHero')?.value || '').trim();
+    const heroine = ($('#autoHeroine')?.value || '').trim();
+    const sheet = ($('#charSheet')?.value || '').trim();
+    const rows = chars.length
+      ? chars.map((c) => {
+        const on = active.has(c.id);
+        const refs = (c.images || []).length;
+        const warn = on && !refs;
+        return '<div class="cc-row' + (on ? ' on' : '') + (warn ? ' warn' : '') + '">'
+          + '<span class="cc-dot">' + (on ? '●' : '○') + '</span>'
+          + '<b>' + escapeHtml(c.name || '未命名') + '</b>'
+          + (c.note ? '<span class="cc-note">' + escapeHtml(c.note) + '</span>' : '')
+          + '<span class="cc-refs">' + (refs ? '参考图 ' + refs + ' 张' : '没有参考图') + '</span>'
+          + (on ? '' : '<span class="cc-off">未启用</span>')
+          + (warn ? '<span class="cc-warn">⚠ 启用了但没有参考图，脸会飘</span>' : '')
+          + '</div>';
+      }).join('')
+      : '<div class="muted small">还没有角色卡。这一话的人物形象只靠下面的文字设定 —— 建议至少给主角加一张参考图。</div>';
+
+    const box = document.createElement('div');
+    box.className = 'keysheet';
+    box.id = 'charConfirm';
+    box.innerHTML = `
+      <div class="ks-panel" style="max-width:560px">
+        <div class="ks-head">
+          <b>先确认角色形象</b>
+          <span class="muted small">这一步不花钱，但少了它后面几十张图的脸会不一致</span>
+          <button class="btn tiny" data-cancel>关闭</button>
+        </div>
+        <div class="ks-body">
+          <div class="cc-sum">要做 ${pages} 页 · 约 ${panels} 个分镜、${panels} 张图</div>
+          <div class="cc-list">${rows}</div>
+          <div class="cc-sheet">角色设定：${escapeHtml(sheet || [hero ? '男主：' + hero : '', heroine ? '女主：' + heroine : ''].filter(Boolean).join('；') || '（空）')}</div>
+          <div class="row2">
+            <button class="btn tiny" id="ccGoFix">先去补角色</button>
+            <button class="btn primary" id="ccGo">角色没问题，开始生成</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(box);
+    const close = (val) => { box.remove(); res(val); };
+    box.addEventListener('click', (ev) => {
+      if (ev.target === box || ev.target.closest('[data-cancel]')) { close(false); return; }
+      if (ev.target.closest('#ccGoFix')) {
+        close(false);
+        // 把角色卡滚进视野并聚焦到名字输入框，让用户直接开始补
+        document.querySelector('.chars')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setTimeout(() => document.querySelector('#charName')?.focus(), 400);
+        toast('先去补角色：加参考图或改设定，再从「全自动」重新开始');
+        return;
+      }
+      if (ev.target.closest('#ccGo')) close(true);
+    });
+  });
+}
+
 async function autoRun() {
   const text = autoText();
   if (!text) { toast('先把全文粘进来'); return; }
@@ -2816,6 +2885,12 @@ async function autoRun() {
     llmCalls: steps.filter((x) => x.cost === 'llm').length,
   });
   if (!ok) return;
+
+  if (mode === 'full') {
+    // 花钱警示之后、真正开始之前：再确认一次角色形象（用户要求）
+    const charOk = await confirmCharacters({ pages: est.pages, panels: est.panels });
+    if (!charOk) { autoLog('已取消：先确认角色形象'); return; }
+  }
 
   state.autoStop = false;
   const btnStart = $('#btnAutoStart');
