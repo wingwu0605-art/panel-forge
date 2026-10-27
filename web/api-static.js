@@ -46,6 +46,9 @@ const llmError = (err, cfg) => ({
   hint: err.hint || (err.code === 'NO_LLM_KEY'
     ? '在左边「AI 导演」里填 baseUrl / apiKey / model 就能用（Key 只存在你浏览器里）'
     : undefined),
+  // 排查用：把「实际请求的地址 + 用的模型」带回去，用户一眼看出自己填的东西有没有生效
+  endpoint: err.endpoint || '',
+  model: err.model || cfg?.model || '',
   llm: llmStatusOf(cfg),
 });
 

@@ -2345,7 +2345,8 @@ function bindUI() {
         $('#ksMsg').textContent = '✅ 连接成功 · ' + (r.model || '') + ' · ' + (r.latencyMs || '?') + 'ms';
         state._lastTestOk = true;
       } else {
-        $('#ksMsg').textContent = '❌ ' + (r?.error || '失败') + (r?.hint ? ' · ' + r.hint : '');
+        const where = r?.endpoint ? ` · POST ${String(r.endpoint).replace(/^https?:\/\//, '')} · model=${r.model || '?'}` : '';
+        $('#ksMsg').textContent = '❌ ' + (r?.error || '失败') + where + (r?.hint ? ' · ' + r.hint : '');
         state._lastTestOk = false;
       }
     } catch (e) {

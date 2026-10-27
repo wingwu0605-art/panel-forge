@@ -2,7 +2,7 @@
  * 纯函数单测（不启服务器、不连模型）：node scripts/test-units.mjs
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
-import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase } from '../lib/llm-core.mjs';
+import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
 import { splitClauses, assignSegments, buildPlan } from '../lib/matcher.mjs';
 import { TEMPLATES } from '../lib/library.mjs';
@@ -164,6 +164,20 @@ ok('火山方舟 1:1 走 1024x1024',
 ok('火山方舟竖图走 832x1248 或 720x1280',
   ['832x1248', '720x1280'].includes(fitImageSize('volcengine', '800x1200', 'doubao-seedream-4-0-250828')),
   fitImageSize('volcengine', '800x1200', 'doubao-seedream-4-0-250828'));
+
+/* 报错文案：404 的三种原因必须分开说，否则用户只会一直改 Key */
+const arkEp = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+ok('方舟 404 + 模型不存在 → 提示去「开通管理」开通',
+  /开通管理/.test(chatErrorHint(404, 'The model or endpoint doubao-seed-1-6 does not exist', arkEp, 'doubao-seed-1-6')));
+ok('方舟 404 提示里带上真实请求地址和模型名',
+  chatErrorHint(404, 'model does not exist', arkEp, 'doubao-seed-1-6').includes('model=doubao-seed-1-6'));
+ok('非方舟 404 不误导去开通管理',
+  !/开通管理/.test(chatErrorHint(404, 'model not found', 'https://api.openai.com/v1/chat/completions', 'gpt-4o-mini')));
+ok('404 但内容不是模型问题时，指向 baseUrl 版本段',
+  /baseUrl/.test(chatErrorHint(404, 'Not Found', 'https://x.com/v1/chat/completions', 'm')));
+ok('401/403 指向 Key 与开通状态',
+  /Key/.test(chatErrorHint(401, 'Unauthorized', arkEp, 'm')));
+ok('429 提到额度/频率', /额度|频率/.test(chatErrorHint(429, 'rate limit', arkEp, 'm')));
 
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 
