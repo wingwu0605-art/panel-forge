@@ -2,7 +2,7 @@
  * 纯函数单测（不启服务器、不连模型）：node scripts/test-units.mjs
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
-import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError, planImageRequest, imageRoute } from '../lib/llm-core.mjs';
+import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError, planImageRequest, imageRoute, normalizeLineItems } from '../lib/llm-core.mjs';
 import { BUBBLES, BUBBLE_IDS, bubbleSVG, pickBubbleForText } from '../lib/bubbles.mjs';
 import { splitClauses, assignSegments, buildPlan, matchTemplates, filterTemplatesByGenre, isGenreTag, GENRE_TAGS } from '../lib/matcher.mjs';
 import { TEMPLATES } from '../lib/library.mjs';
@@ -275,6 +275,24 @@ ok('matchTemplates 按题材过滤（日式 + 恐怖 → 全是恐怖）', (() =
 })());
 ok('matchTemplates 题材=不限时不受影响',
   matchTemplates('雨夜屋顶拔刀', { culture: 'jp', genre: 'all', limit: 5 }).results.length > 0);
+
+
+/* AI 写台词：模型输出必须被归一化（防越界 slotId / 超长 / 假引号） */
+const LINES = normalizeLineItems({
+  lines: [
+    { slotId: 'p1', text: '「别追了。」', kind: '台词', why: '收束' },
+    { slotId: 'p9', text: '不存在的格子', kind: '台词' },
+    { slotId: 'p2', text: '', kind: '台词' },
+    { slotId: 'p3', text: '他说：走吧', kind: '瞎写' },
+    { slotId: 'p4', text: '啊'.repeat(80), kind: '内心' },
+  ],
+}, ['p1', 'p2', 'p3', 'p4']);
+ok('自动去掉模型加的引号', LINES.lines.p1.text === '别追了。', LINES.lines.p1.text);
+ok('越界的 slotId 被丢掉并计数', LINES.dropped === 1 && !LINES.lines.p9);
+ok('空句子的 kind 归为「空」', LINES.lines.p2.kind === '空' && LINES.lines.p2.text === '');
+ok('非法 kind 回落成「台词」', LINES.lines.p3.kind === '台词');
+ok('「他说：」前缀被剥掉', LINES.lines.p3.text === '走吧', LINES.lines.p3.text);
+ok('超长句子被截断', LINES.lines.p4.text.length <= 40, String(LINES.lines.p4.text.length));
 
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 

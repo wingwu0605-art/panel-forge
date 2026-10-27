@@ -350,6 +350,13 @@
                 <button class="btn tiny" id="btnBubbleFromLine" title="用这句话新建一个对话气泡">放进气泡</button>
               </div>
               <textarea id="slotLine" rows="2" placeholder="台词 / 旁白 / 内心独白（自动存到本机）"></textarea>
+              <div class="row2 line-ai-row">
+                <button class="btn tiny" id="btnAiLine" title="让模型按「这一格要表达什么」写一句台词/旁白">AI 写这一格</button>
+                <button class="btn tiny" id="btnAiLineReroll" title="换一句（告诉模型别重复刚才那句）">换一句</button>
+              </div>
+              <div class="row2 line-ai-row">
+                <button class="btn tiny" id="btnAiLinesPage" title="把这一页所有空格子的台词都交给模型写">AI 写整页</button>
+              </div>
               <div class="line-suggest" id="suggestBox">
                 <span class="ls-tag" id="suggestFrom">思路</span>
                 <span class="ls-text" id="suggestText">—</span>

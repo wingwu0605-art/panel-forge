@@ -2357,3 +2357,7 @@ html[data-skin="minimal"] .chip[aria-pressed="true"]{
 }
 /* toast 也不允许把字裁掉：太长就换行 + 内部滚动 */
 .toast{white-space:pre-wrap;word-break:break-word;max-height:32vh;overflow:auto}
+
+/* 台词区：AI 写台词按钮行（两行紧凑排布） */
+.line-ai-row{margin-top:6px;grid-template-columns:1fr 1fr}
+.line-ai-row:last-of-type{grid-template-columns:1fr}

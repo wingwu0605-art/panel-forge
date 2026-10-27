@@ -1749,6 +1749,63 @@ const scenarios = [
   },
 
   {
+    name: 'ai-lines',
+    title: '㉓ AI 写台词（单格 / 整页 / 自动挂气泡）',
+    async run(page, shot, { check }) {
+      await page.viewport(1400, 980);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const api = window.__pfApi();
+        const calls = [];
+        api.aiLines = async (body) => {
+          calls.push({ ids: body.ids, avoid: body.avoid || null });
+          const lines = {};
+          for (const id of body.ids) lines[id] = { text: '别追了，屋顶到头了。', kind: '台词', why: '收束情绪' };
+          return { ok: true, lines, dropped: 0, missing: [] };
+        };
+        window.__pfSel('p1');
+        await wait(120);
+        const btns = ['#btnAiLine', '#btnAiLineReroll', '#btnAiLinesPage'].map((x) => {
+          const b = document.querySelector(x); return b ? b.textContent.trim() : null;
+        });
+        document.querySelector('#btnAiLine').click();
+        await wait(400);
+        const one = {
+          textarea: (document.querySelector('#slotLine') || {}).value || '',
+          why: (document.querySelector('#suggestText') || {}).textContent || '',
+          fromAi: ((document.querySelector('#suggestFrom') || {}).textContent || '').includes('AI'),
+        };
+        // 换一句：应把刚才那句作为 avoid 发出去
+        document.querySelector('#btnAiLineReroll').click();
+        await wait(400);
+        const rerollAvoid = calls.length > 1 ? calls[1].avoid : null;
+        // 整页：只写空着的格子
+        document.querySelector('#btnAiLinesPage').click();
+        await wait(500);
+        const pageCall = calls[calls.length - 1];
+        return {
+          btns, one, rerollAvoid,
+          pageIdsCount: pageCall ? pageCall.ids.length : 0,
+          bubbles: Object.keys(window.__pfState ? window.__pfState().bubbles : {}).length,
+        };
+      })()`);
+
+      check('三个按钮都在（写这一格 / 换一句 / 写整页）',
+        out.btns[0] === 'AI 写这一格' && out.btns[1] === '换一句' && out.btns[2] === 'AI 写整页', out.btns.join(' / '));
+      check('单格：句子写进了输入框', out.one.textarea.includes('屋顶到头了'), out.one.textarea);
+      check('单格：显示「为什么这样写」，来源标成 AI 思路',
+        out.one.why.includes('收束') && out.one.fromAi === true, out.one.why);
+      check('换一句：把上一句作为 avoid 发出去（不许重复）',
+        !!out.rerollAvoid && Object.values(out.rerollAvoid).some((v) => String(v).includes('屋顶到头了')));
+      check('整页：只写还没有句子的格子', out.pageIdsCount > 0 && out.pageIdsCount <= 6, String(out.pageIdsCount));
+      await shot('ai-lines');
+    },
+  },
+
+  {
     name: 'prompt-source',
     title: '⑱ 提示词三源共存（规则 / AI / 自己写）+ 开头词保留 + 手机分镜表不重叠',
     async run(page, shot, { check }) {

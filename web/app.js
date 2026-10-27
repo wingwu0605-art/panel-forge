@@ -34,6 +34,7 @@ async function makeApi() {
     prompts: async (body) => (await directFirst('prompts', body)) || postJSON('/api/ai/prompts', body),
     // 版式已定，只让 AI 切原文（长剧本靠关键词切不准）
     aiSplit: async (body) => (await directFirst('aiSplit', body)) || postJSON('/api/ai/split', body),
+  aiLines: async (body) => (await directFirst('aiLines', body)) || postJSON('/api/ai/lines', body),
     llmStatus: () => getJSON('/api/llm/status'),
     llmTest: async (body) => (await directFirst('llmTest', body)) || postJSON('/api/llm/test', body),
     async imageGenerate(body) {
@@ -2480,6 +2481,10 @@ function bindUI() {
     if (state.slotAiMode === 'prompt') generateSlotPromptOnly();
     else generateSlotImage();
   });
+  // AI 写台词：单格 / 换一句 / 整页
+  $('#btnAiLine')?.addEventListener('click', () => aiWriteLines('one'));
+  $('#btnAiLineReroll')?.addEventListener('click', () => aiWriteLines('again'));
+  $('#btnAiLinesPage')?.addEventListener('click', () => aiWriteLines('page'));
   $('#btnCharPick')?.addEventListener('click', () => $('#charFiles').click());
   $('#charFiles')?.addEventListener('change', async (ev) => {
     const files = ev.target.files;
@@ -4341,6 +4346,93 @@ async function generateSlotPromptOnly(targetId = state.selectedId) {
 }
 
 /** 用用户自己的生图模型，直接生成当前这一格 */
+/**
+ * AI 写台词/旁白。
+ *   mode='one'   只写当前这一格
+ *   mode='page'  写这一页所有还没有句子的格子（已有内容的跳过）
+ *   mode='again' 换一句：连同刚才那句一起发给模型，让它别重复
+ * 写好的句子会落进 state.lines（和手打完全同一条路径），并顺手给一个气泡建议。
+ */
+async function aiWriteLines(mode = 'one') {
+  if (!state.tpl) { toast('先选一套版式'); return; }
+  const page = pagePlan();
+  const panels = page?.panels || [];
+  if (!panels.length) { toast('还没有分镜计划：先按规则匹配或让 AI 排戏'); return; }
+
+  const sel = state.selectedId;
+  let ids = [];
+  if (mode === 'page') {
+    ids = panels.filter((p) => !String(state.lines?.[p.id] || '').trim()).map((p) => p.id);
+    if (!ids.length) { toast('这一页每一格都有句子了'); return; }
+  } else {
+    if (!sel) { toast('先点一个格子'); return; }
+    ids = [sel];
+  }
+
+  const btn = $('#btnAiLine');
+  const btns = ['#btnAiLine', '#btnAiLineReroll', '#btnAiLinesPage'].map((x) => $(x)).filter(Boolean);
+  const labels = btns.map((b) => b.textContent);
+  btns.forEach((b, i) => { b.disabled = true; b.textContent = i === 0 ? 'AI 正在写…' : b.textContent; });
+  saveLlm();
+  try {
+    const avoid = mode === 'again'
+      ? { [sel]: String(state.lines?.[sel] || '') }
+      : Object.fromEntries(Object.entries(state.lines || {}).filter(([, v]) => String(v || '').trim()));
+    const res = await api.aiLines({
+      plot: $('#plot')?.value?.trim() || '',
+      plan: page,
+      characterSheet: state.charSheet,
+      style: $('#culture')?.selectedOptions?.[0]?.textContent || undefined,
+      ids,
+      avoid,
+      llm: state.llm,
+    });
+    if (!res?.ok) throw new Error((res?.code ? res.code + '：' : '') + (res?.error || 'AI 没返回'));
+
+    const lines = res.lines || {};
+    const got = Object.keys(lines);
+    if (!got.length) throw new Error('模型这次没写出可用的句子');
+
+    commit();
+    let filled = 0;
+    for (const id of got) {
+      const item = lines[id];
+      if (!item || !item.text) continue;
+      state.lines[id] = item.text;
+      filled++;
+      // 顺手给气泡建议：用已有的按文本选样式逻辑，不额外烧 token
+      const slot = state.tpl.slots.find((x) => x.id === id);
+      const panel = panels.find((x) => x.id === id);
+      const pick = pickBubbleForText(item.text, { role: slot?.role, beat: panel?.beat });
+      if (id === state.selectedId && pick?.type) {
+        state._lineBubbleHint = { type: pick.type, why: pick.why, kind: item.kind };
+      }
+      if (!String(state.bubbles?.[id] || '') && pick?.type && (item.kind === '台词' || item.kind === '内心')) {
+        // 该有气泡的格子直接挂上（台词/内心），旁白不挂
+        state.bubbles[id] = pick.type;
+      }
+    }
+    renderSlotPanel(); renderStage(); renderScript();
+
+    // 把「为什么这样写」显示在思路行里
+    const first = lines[ids[0]] || lines[got[0]];
+    if (first?.why) { state._suggest = first.why; state._suggestAi = true; syncSuggest(); }
+    if (state.selectedId === ids[0]) {
+      const ta = $('#slotLine');
+      if (ta) ta.value = state.lines[ids[0]] || '';
+    }
+    toast(mode === 'page'
+      ? `已给 ${filled} 格写好台词（空着的才写）`
+      : `已写好：${String(state.lines[ids[0]] || '').slice(0, 16)}`);
+  } catch (e) {
+    const code = e?.code ? `（${e.code}）` : '';
+    toast(`写台词失败${code}`);
+    showErrorDetail('写台词失败', e);
+  } finally {
+    btns.forEach((b, i) => { b.disabled = false; b.textContent = labels[i]; });
+  }
+}
+
 async function generateSlotImage(targetId = state.selectedId) {
   if (!state.tpl || !targetId) { toast('先点一个格子'); return; }
   // 锁定格子：生成期间你点别的格子，结果也只回到这一格（以前是回到「点击时选中的那格」→ 会串格）

@@ -18,7 +18,7 @@ import { matchTemplates, planStory, analyzePlot, buildPlan, RULES_VERSION, RULE_
 import { INTENTS, ROLES, STYLE_PACKS, COMMON_NEGATIVE, SCENES, TONES, DIRECTIVES, NEGATORS, VOCAB_STATS, BEAT_EN } from './lib/taxonomy.mjs';
 import { PAGE_PRESETS } from './lib/geometry.mjs';
 import { aiTools, systemPrompt, openapiSpec } from './lib/aidocs.mjs';
-import { readLlmConfig, llmStatus, testLlm, aiDecide, aiSplitPanels, optimizePrompts, generateImage } from './lib/llm.mjs';
+import { readLlmConfig, llmStatus, testLlm, aiDecide, aiSplitPanels, aiWriteLines, optimizePrompts, generateImage } from './lib/llm.mjs';
 import { SHAPES, SHAPE_IDS, classifyShape, prefixSnippet, shapeSummary } from './lib/shapes.mjs';
 import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble } from './lib/bubbles.mjs';
 
@@ -240,6 +240,26 @@ const routes = [
         hint: err.hint,
         fallback: { note: '规则版提示词已经在每格里（promptEn / promptShort），可以直接用' },
       };
+    }
+  }],
+
+  // AI 写台词/旁白：按「这一格要表达什么」来写（单格或整页），与切分/排戏相互独立
+  ['POST', /^\/api\/ai\/lines$/, async (req) => {
+    const body = await readBody(req);
+    const cfg = cfgOf(body.llm);
+    try {
+      const r = await aiWriteLines({
+        plot: body.plot,
+        plan: body.plan,
+        cfg,
+        characterSheet: body.characterSheet,
+        ids: Array.isArray(body.ids) ? body.ids : undefined,
+        avoid: body.avoid,
+        style: body.style,
+      });
+      return { ...r, mode: 'ai-lines' };
+    } catch (err) {
+      return llmFail(err, cfg);
     }
   }],
 

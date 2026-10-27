@@ -21,6 +21,7 @@ import {
   llmStatusOf,
   normalizeCfg,
   generateImage as generateImageCore,
+  aiWriteLines as aiWriteLinesCore,
 } from './lib/llm-core.mjs';
 
 const LLM_STORE = 'pf.llm.v1';
@@ -298,6 +299,25 @@ export function createStaticApi() {
 
     async proxyImage() {
       throw new Error('静态版没有图片代理：跨域图片无法栅格化导出，请改用本地上传');
+    },
+
+    /** AI 写台词/旁白：按每格要表达的东西来写 */
+    async aiLines(body = {}) {
+      const cfg = cfgFrom(body.llm);
+      try {
+        const r = await aiWriteLinesCore({
+          plot: body.plot,
+          plan: body.plan,
+          cfg,
+          characterSheet: body.characterSheet,
+          ids: Array.isArray(body.ids) ? body.ids : undefined,
+          avoid: body.avoid,
+          style: body.style,
+        });
+        return { ...r, mode: 'llm' };
+      } catch (err) {
+        return llmError(err, cfg);
+      }
     },
 
     /** AI 生图：浏览器直连用户的生图接口 */
