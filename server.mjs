@@ -683,6 +683,22 @@ const server = http.createServer(async (req, res) => {
   if (rel === '/app.js') rel = '/web/app.js';
   if (rel === '/styles.css') rel = '/web/styles.css';
 
+  // 开发服务器也给 ?v= 换成"真内容哈希"。
+  // 以前 index.html 里写死 ?v=0qqy5，CSS/JS 改了浏览器还是吃旧缓存（线上构建有哈希，开发没有）。
+  const devAssetVersion = async () => {
+    const { createHash } = await import('node:crypto');
+    const h = createHash('sha1');
+    for (const f of ['web/app.js', 'web/styles.css', 'web/api-static.js']) {
+      try { h.update(await readFile(path.join(__dirname, f))); } catch { /* ignore */ }
+    }
+    try {
+      for (const f of await readdir(path.join(__dirname, 'web'))) {
+        if (f.endsWith('.mjs')) h.update(await readFile(path.join(__dirname, 'web', f)));
+      }
+    } catch { /* ignore */ }
+    return h.digest('hex').slice(0, 8);
+  };
+
   const readStatic = async (p) => {
     const file = path.join(__dirname, path.normalize(p).replace(/^(\.\.[/\\])+/, ''));
     if (!file.startsWith(__dirname)) return null;
@@ -701,6 +717,17 @@ const server = http.createServer(async (req, res) => {
   if (!hit) return send(res, 404, `404 Not Found: ${routePath}`, { 'Content-Type': 'text/plain; charset=utf-8' });
 
   const ext = path.extname(hit.file).toLowerCase();
+  // HTML：把 ?v=xxx 换成本次内容哈希，改完 CSS 立刻生效
+  if (ext === '.html') {
+    try {
+      const v = await devAssetVersion();
+      const html = hit.buf.toString('utf8').replace(/(\.\/(?:styles\.css|app\.js))(\?v=[\w-]*)?(?=")/g, `$1?v=${v}`);
+      return send(res, 200, html, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+    } catch { /* 失败就退回原样 */ }
+  }
   return send(res, 200, hit.buf, {
     'Content-Type': MIME[ext] || 'application/octet-stream',
     'Cache-Control': ext === '.mjs' || ext === '.js' || ext === '.css' || ext === '.html' ? 'no-cache' : 'public, max-age=3600',

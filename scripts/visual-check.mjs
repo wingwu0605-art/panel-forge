@@ -1981,6 +1981,56 @@ const scenarios = [
   },
 
   {
+    name: 'auto-seg',
+    title: '㉛ 全自动开关：深浅两套主题下都看得见（浅色曾白底白字）',
+    async run(page, shot, { check }) {
+      await page.viewport(1200, 800);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
+      await page.ready();
+
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const seg = document.querySelector('#autoSeg');
+        const lum = (rgb) => {
+          const m = (rgb || '').match(/\\d+(\\.\\d+)?/g);
+          if (!m) return 0;
+          const f = m.slice(0, 3).map((v) => { const c = Number(v) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
+          return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2];
+        };
+        const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b); return Number(((Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05)).toFixed(2)); };
+        const res = {};
+        for (const theme of ['light', 'dark']) {
+          document.documentElement.dataset.theme = theme;
+          for (const mode of ['full', 'story', 'off']) {
+            seg.querySelector('[data-auto="' + mode + '"]').click();
+            await wait(240);
+            const onBtn = seg.querySelector('button.on');
+            const ind = seg.querySelector('.seg-ind');
+            const color = getComputedStyle(onBtn).color;
+            const indBg = getComputedStyle(ind).backgroundColor;
+            res[theme + '/' + mode] = { text: onBtn.textContent, color, indBg, ratio: ratio(color, indBg), segMode: seg.dataset.mode };
+          }
+        }
+        return res;
+      })()`);
+
+      const pairs = Object.entries(out);
+      const worst = pairs.reduce((m, [, v]) => Math.min(m, v.ratio), 99);
+      check('全自动开关三种模式在浅色下都够对比（曾经白底白字）',
+        out['light/full'].ratio >= 4.5 && out['light/story'].ratio >= 4.5 && out['light/off'].ratio >= 4.5,
+        pairs.filter(([k]) => k.startsWith('light')).map(([k, v]) => k + '=' + v.ratio).join(' · '));
+      check('全自动开关在深色下也够对比',
+        out['dark/full'].ratio >= 4.5 && out['dark/story'].ratio >= 4.5 && out['dark/off'].ratio >= 4.5,
+        pairs.filter(([k]) => k.startsWith('dark')).map(([k, v]) => k + '=' + v.ratio).join(' · '));
+      check('「全自动」激活时滑块用主色、文字用反色（不是透明底 + 白字）',
+        out['light/full'].indBg !== 'rgba(0, 0, 0, 0)' && out['light/full'].segMode === 'full',
+        `滑条 ${out['light/full'].indBg}`);
+      check('全部六个组合里最差的一档仍有 4.5:1', worst >= 4.5, String(worst));
+      await shot('auto-seg');
+    },
+  },
+
+  {
     name: 'rails',
     title: '㉚ 左右侧栏收回成图标条：单点看一个功能，点右上角才展开全部',
     async run(page, shot, { check }) {

@@ -2803,6 +2803,9 @@ function setAutoMode(mode, opts = {}) {
   if (autoCard) autoCard.classList.toggle('hidden', m === 'off');
   if (plotBox) plotBox.classList.toggle('hidden', m !== 'off');
   $$('#autoSeg button').forEach((b) => b.classList.toggle('on', (b.dataset.auto || 'off') === m));
+  // 指示条要按模式变色：把当前模式写进 data-mode（纯 CSS 无法知道哪个按钮是激活态）
+  const segEl = $('#autoSeg');
+  if (segEl) segEl.dataset.mode = m;
   const name = $('#autoModeName');
   const title = $('#autoModeTitle');
   const desc = $('#autoModeDesc');

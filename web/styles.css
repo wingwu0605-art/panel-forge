@@ -2743,3 +2743,17 @@ body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outlin
   body.rail-left-mini{--rail-w-left:320px}
   body.rail-right-mini{--rail-w-right:360px}
 }
+
+/* 全自动激活态：底是滑块 .seg-ind（浅色下是白底），所以不能给按钮设白字 ——
+   浅色模式会变成"白底白字"，看起来就是按钮被盖住。正确做法是给滑块本身换成主色。 */
+.seg.auto-seg[data-mode="full"] > .seg-ind{
+  background:var(--tint);
+  box-shadow:0 3px 10px color-mix(in srgb, var(--tint) 34%, transparent),0 0 0 .5px color-mix(in srgb, var(--tint) 55%, transparent);
+}
+.seg.auto-seg[data-mode="full"] > button[data-auto="full"].on{color:var(--on-tint)}
+/* 「分镜自动」激活：滑块保持默认底色，用主色描边区分 */
+.seg.auto-seg[data-mode="story"] > .seg-ind{
+  background:var(--bg-elev);
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--tint) 55%, transparent),0 3px 8px rgba(0,0,0,.10);
+}
+.seg.auto-seg[data-mode="story"] > button[data-auto="story"].on{color:var(--tint)}
