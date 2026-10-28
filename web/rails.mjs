@@ -161,14 +161,33 @@ function makeRail(railEl, side, itemsFn) {
   };
 
   /* ---- 迷你 / 展开 ---- */
+  /**
+   * 收起 / 展开。
+   * 性能要点：列宽切换是**布局变更**，一帧内完成即可；绝不能给 grid-template-columns 加过渡，
+   * 否则每帧都要重排卡片里的文字（真实窗口里就是严重卡顿）。
+   * 为了不让那一次布局抖动被看见，先给内容盖一层"挡板"（opacity:0，无过渡），
+   * 下一帧再落布局，再下一帧淡回来 —— 抖动发生在不可见的帧里。
+   */
   const applyMini = (mini, opts = {}) => {
     if (COMPACT_MQ.matches) mini = false;   // 窄屏强制展开
     st.mini = mini;
-    railEl.classList.toggle('mini', mini);
-    document.body.classList.toggle(side === 'left' ? 'rail-left-mini' : 'rail-right-mini', mini);
-    if (mini) rebuild();
-    else closePop();
-    if (!opts.silent) store.set(side, mini ? 'mini' : 'open');
+
+    const commit = () => {
+      railEl.classList.toggle('mini', mini);
+      document.body.classList.toggle(side === 'left' ? 'rail-left-mini' : 'rail-right-mini', mini);
+      if (mini) rebuild();
+      else closePop();
+      if (!opts.silent) store.set(side, mini ? 'mini' : 'open');
+    };
+
+    // 首次装配（silent）不需要挡板，直接落位
+    if (opts.silent) { commit(); return; }
+
+    document.body.classList.add('rail-hide');   // 挡板：opacity:0 且无过渡
+    requestAnimationFrame(() => {
+      commit();                                  // 布局只在这里发生一次
+      requestAnimationFrame(() => document.body.classList.remove('rail-hide'));
+    });
   };
 
   toggle.addEventListener('click', (ev) => {

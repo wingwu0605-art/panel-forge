@@ -236,8 +236,9 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.tpl:focus-visible{
 .layout{
   flex:1 1 auto;min-height:0;
   display:grid;grid-template-columns:var(--rail-w-left,320px) minmax(0,1fr) var(--rail-w-right,360px);
-  /* 侧栏收起/展开走这里：列宽自己动，画布区域就自然被"让"出来，不需要给画布做缩放 */
-  transition:grid-template-columns .52s var(--spring-soft);
+  /* 注意：这里**不能**给 grid-template-columns 加 transition。
+     布局属性的过渡会让每帧都对整棵子树重新排版（卡片里的文字逐行重排），
+     在真实窗口里就是肉眼可见的卡顿。列宽一次到位，观感交给下面的 opacity/transform。 */
 }
 body.rail-left-mini{--rail-w-left:56px}
 body.rail-right-mini{--rail-w-right:56px}
@@ -2757,3 +2758,17 @@ body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outlin
   box-shadow:0 0 0 1px color-mix(in srgb, var(--tint) 55%, transparent),0 3px 8px rgba(0,0,0,.10);
 }
 .seg.auto-seg[data-mode="story"] > button[data-auto="story"].on{color:var(--tint)}
+
+/* 侧栏切换：布局一次到位 + 挡板遮挡抖动（关键：不给任何布局属性加过渡）
+   · grid-template-columns 不做动画 —— 否则每帧重排卡片里的文字，真实窗口里非常卡
+   · .rail-hide 让内容瞬间不可见（无过渡），下一帧落布局，再淡回来 */
+.rail{contain:layout paint}
+.stage-wrap{contain:layout paint}
+body.rail-hide .rail{opacity:0 !important;transition:none !important}
+body.rail-hide .stage-wrap{opacity:.94;transition:none !important}
+.rail,.stage-wrap{transition:opacity .18s var(--ease)}
+/* 图标条淡入时带一点位移，观感不生硬（纯合成层属性） */
+.rail-strip{transition:transform .2s var(--spring-soft),opacity .16s var(--ease)}
+@media (prefers-reduced-motion:reduce){
+  .rail,.stage-wrap,.rail-strip{transition:none !important}
+}

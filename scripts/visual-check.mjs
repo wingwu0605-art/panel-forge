@@ -2110,12 +2110,17 @@ const scenarios = [
           || btnRect.bottom < tabsRect.top || btnRect.top > tabsRect.bottom);
 
         // 收起时舞台宽度的中间帧数量（>3 说明是动画而不是瞬移）
-        const widths = [];
-        const tick = setInterval(() => widths.push(Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().width)), 16);
+        const stageW = () => Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().width);
+        const fromW = stageW();
+        const transitionProps = getComputedStyle(document.querySelector('.layout')).transitionProperty;
         document.querySelector('#railRight .rail-toggle').click();
-        await wait(820);
-        clearInterval(tick);
-        res.grow = { frames: widths.length, distinct: new Set(widths).size, from: widths[0], to: widths[widths.length - 1] };
+        await wait(760);
+        res.grow = {
+          from: fromW,
+          to: stageW(),
+          transitionProps,
+          noLayoutTransition: !transitionProps.includes('grid-template-columns'),
+        };
 
         // 气泡动画类
         document.querySelectorAll('#railRight .rail-ico')[0]?.click();
@@ -2174,8 +2179,9 @@ const scenarios = [
       check('舞台区域跟着列宽自然延伸（收起后明显更宽）',
         out.layout.stageW > out.stageBefore + 150,
         `${out.stageBefore} → ${out.layout.stageW}px`);
-      check('列宽动画是平滑过渡而不是瞬移', out.grow.distinct >= 6 && out.grow.to > out.grow.from + 100,
-        `${out.grow.from} → ${out.grow.to} · ${out.grow.distinct} 个中间帧`);
+      check('侧栏切换靠一次布局完成，不靠动画布局属性（否则每帧重排文字会卡顿）',
+        out.grow.noLayoutTransition === true && out.grow.to > out.grow.from + 100,
+        `${out.grow.from} → ${out.grow.to} · 布局过渡=${out.grow.transitionProps || '(无)'}`);
       check('收起成图标条后，「展开」按钮仍然看得见（能再展开）',
         out.collapsedToggle.mini && out.collapsedToggle.leftBtn && out.collapsedToggle.rightBtn,
         JSON.stringify(out.collapsedToggle));
