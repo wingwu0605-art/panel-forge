@@ -2761,14 +2761,14 @@ body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outlin
 
 /* 侧栏切换：布局一次到位 + 挡板遮挡抖动（关键：不给任何布局属性加过渡）
    · grid-template-columns 不做动画 —— 否则每帧重排卡片里的文字，真实窗口里非常卡
-   · .rail-hide 让内容瞬间不可见（无过渡），下一帧落布局，再淡回来 */
 .rail{contain:layout paint}
 .stage-wrap{contain:layout paint}
-body.rail-hide .rail{opacity:0 !important;transition:none !important}
-body.rail-hide .stage-wrap{opacity:.94;transition:none !important}
-.rail,.stage-wrap{transition:opacity .18s var(--ease)}
 /* 图标条淡入时带一点位移，观感不生硬（纯合成层属性） */
 .rail-strip{transition:transform .2s var(--spring-soft),opacity .16s var(--ease)}
 @media (prefers-reduced-motion:reduce){
   .rail,.stage-wrap,.rail-strip{transition:none !important}
 }
+/* 侧栏切换：淡出 → 落布局 → 淡回（只用 opacity，不触碰布局属性） */
+.rail,.stage-wrap{transition:opacity .16s var(--ease)}
+body.rail-fade .rail{opacity:0}
+body.rail-fade .stage-wrap{opacity:.9}

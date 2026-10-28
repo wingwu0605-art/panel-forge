@@ -183,11 +183,14 @@ function makeRail(railEl, side, itemsFn) {
     // 首次装配（silent）不需要挡板，直接落位
     if (opts.silent) { commit(); return; }
 
-    document.body.classList.add('rail-hide');   // 挡板：opacity:0 且无过渡
-    requestAnimationFrame(() => {
+    // 点击后立刻开始淡出（纯合成层，无重排），在最暗的那一刻落布局，
+    // 再淡回来 —— 反馈是即时的，布局抖动被藏在中段，全程没有逐帧重排。
+    document.body.classList.add('rail-fade');
+    clearTimeout(applyMini._t);
+    applyMini._t = setTimeout(() => {
       commit();                                  // 布局只在这里发生一次
-      requestAnimationFrame(() => document.body.classList.remove('rail-hide'));
-    });
+      document.body.classList.remove('rail-fade');
+    }, 132);
   };
 
   toggle.addEventListener('click', (ev) => {
