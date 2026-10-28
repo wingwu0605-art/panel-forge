@@ -2599,7 +2599,7 @@ body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outlin
 .rail.mini{padding-left:0;padding-right:0;overflow:hidden}
 .rail.mini > .card{display:none}
 /* mini 状态只保留图标条和右上角按钮，其它直接子节点一律收起 */
-.rail.mini > *:not(.rail-strip):not(.rail-toggle){display:none !important}
+.rail.mini > *:not(.rail-strip):not(.rail-toggle):not(.rail-head){display:none !important}
 .rail.mini > .rail-strip{display:flex}
 
 
@@ -2732,3 +2732,14 @@ body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outlin
 
 /* 收起/展开时，画布区域跟着列宽平滑变化（页面本身不做缩放动画） */
 .stage-wrap{transition:margin .52s var(--spring-soft)}
+
+/* 窄屏：收起功能整体失效（单列布局 + 按视图隐藏区块，收起会导致"只剩一列图标"） */
+@media (max-width:1024px){
+  .rail-toggle{display:none !important}
+  .rail-strip{display:none !important}
+  .rail-head{display:none !important}
+  .rail.mini > *:not(.rail-strip):not(.rail-toggle):not(.rail-head){display:revert !important}
+  .rail.mini > .card{display:flex !important}
+  body.rail-left-mini{--rail-w-left:320px}
+  body.rail-right-mini{--rail-w-right:360px}
+}

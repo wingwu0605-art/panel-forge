@@ -2076,6 +2076,27 @@ const scenarios = [
         await wait(150);
         const popSwap = [...document.querySelectorAll('.rail-pop')].find((p) => !p.classList.contains('hidden'));
         res.popAnim = { open: popAnim, swap: popSwap ? getComputedStyle(popSwap).animationName : '' };
+
+        // 收起状态下按钮是否还看得见（之前被 mini 的隐藏规则连标题条一起藏了）
+        const ensureMini = async (rail) => {
+          const btn = rail.querySelector('.rail-toggle');
+          for (let i = 0; i < 2 && !rail.classList.contains('mini'); i++) { btn.click(); await wait(320); }
+          for (let i = 0; i < 2 && rail.classList.contains('mini') === false; i++) { btn.click(); await wait(320); }
+        };
+        await ensureMini(right);
+        await ensureMini(left);
+        const visEl = (el) => {
+          if (!el) return false;
+          const r = el.getBoundingClientRect();
+          const cs = getComputedStyle(el);
+          return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0;
+        };
+        res.collapsedToggle = {
+          mini: right.classList.contains('mini'),
+          leftBtn: visEl(document.querySelector('.rail.left .rail-toggle')),
+          rightBtn: visEl(document.querySelector('#railRight .rail-toggle')),
+          head: getComputedStyle(document.querySelector('#railRight .rail-head')).display,
+        };
         return res;
       })()`);
 
@@ -2105,6 +2126,9 @@ const scenarios = [
         `${out.stageBefore} → ${out.layout.stageW}px`);
       check('列宽动画是平滑过渡而不是瞬移', out.grow.distinct >= 6 && out.grow.to > out.grow.from + 100,
         `${out.grow.from} → ${out.grow.to} · ${out.grow.distinct} 个中间帧`);
+      check('收起成图标条后，「展开」按钮仍然看得见（能再展开）',
+        out.collapsedToggle.mini && out.collapsedToggle.leftBtn && out.collapsedToggle.rightBtn,
+        JSON.stringify(out.collapsedToggle));
       check('气泡有弹出动画、切换功能时另有一段动画',
         out.popAnim.open === 'railPopIn' && out.popAnim.swap === 'railPopSwap', `${out.popAnim.open} / ${out.popAnim.swap}`);
 
@@ -2119,6 +2143,31 @@ const scenarios = [
         check('静态产物完整性：app.js 引用的模块都在 site/ 里',
           missing.length === 0, missing.length ? '缺 ' + missing.join(',') : mods.length + ' 个模块齐全');
       }
+      // 窄屏：收起功能必须整体失效，否则「按视图隐藏区块」会让页面只剩一列图标
+      {
+        await page.viewport(900, 1200);
+        await page.goto('/?tpl=ref-4band-2col&slot=p1&reload=1');
+        await page.ready();
+        const narrow = await page.evaluate(`(async () => {
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          try { localStorage.setItem('pf.rail.left', 'mini'); localStorage.setItem('pf.rail.right', 'mini'); } catch {}
+          const vis = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0; };
+          return {
+            toggleVisible: vis(document.querySelector('.rail.left .rail-toggle')),
+            stripVisible: vis(document.querySelector('.rail.left .rail-strip')),
+            cards: [...document.querySelectorAll('.rail.left > .card')].filter((c) => getComputedStyle(c).display !== 'none').length,
+            canvas: !!document.querySelector('#canvas svg'),
+            tabbar: vis(document.querySelector('#tabbar')),
+            miniClass: document.querySelector('.rail.left').classList.contains('mini'),
+          };
+        })()`);
+        check('窄屏（手机模式）不显示收起按钮，卡片与画布都在（修掉"只剩一列图标"）',
+          narrow.toggleVisible === false && narrow.stripVisible === false
+            && narrow.cards >= 4 && narrow.canvas === true && narrow.miniClass === false,
+          `按钮=${narrow.toggleVisible} 卡=${narrow.cards} 画布=${narrow.canvas} mini=${narrow.miniClass}`);
+        await page.viewport(1400, 980);
+      }
+
       await shot('rails');
     },
   },

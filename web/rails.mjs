@@ -14,6 +14,9 @@
  */
 
 const RAIL_PREFIX = 'pf.rail.';
+// 紧凑布局（手机 / 窄窗）走的是单列 + 底部 tabbar，侧栏收起会与「按视图隐藏区块」打架：
+// 结果是左栏只剩一列图标、画布和右栏全被隐藏（真出现过这个 bug）。所以窄屏一律不收起。
+const COMPACT_MQ = (() => { try { return window.matchMedia('(max-width:1024px)'); } catch { return { matches: false, addEventListener() {} }; } })();
 const RAILS = [];   // 已安装的侧栏（开气泡时把别人的关掉）
 
 /** 每个功能一个 logo：24 网格，stroke 用 currentColor */
@@ -159,6 +162,7 @@ function makeRail(railEl, side, itemsFn) {
 
   /* ---- 迷你 / 展开 ---- */
   const applyMini = (mini, opts = {}) => {
+    if (COMPACT_MQ.matches) mini = false;   // 窄屏强制展开
     st.mini = mini;
     railEl.classList.toggle('mini', mini);
     document.body.classList.toggle(side === 'left' ? 'rail-left-mini' : 'rail-right-mini', mini);
@@ -191,6 +195,10 @@ function makeRail(railEl, side, itemsFn) {
   window.addEventListener('resize', () => { if (st.openKey) closePop(); });
 
   applyMini(st.mini, { silent: true });
+  // 从宽窗缩到窄窗：立刻退出收起态，避免"只剩一列图标"
+  const onMQ = () => applyMini(st.mini, { silent: true });
+  if (COMPACT_MQ.addEventListener) COMPACT_MQ.addEventListener('change', onMQ);
+  else if (COMPACT_MQ.addListener) COMPACT_MQ.addListener(onMQ);
   st.rebuild = rebuild;
   st.closePop = closePop;
   RAILS.push(st);
