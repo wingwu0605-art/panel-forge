@@ -2493,9 +2493,8 @@ body[data-drop-zone="text"] #plot{outline:2px dashed var(--tint);outline-offset:
 .cc-sheet{padding:8px 10px;margin-bottom:10px;border-radius:8px;background:var(--fill);
   font-size:12px;color:var(--label-2);line-height:1.55}
 
-/* 手机长按反馈：整块画布轻微放大一下（配合震动），让人知道"按到了" */
-#canvas svg{transition:transform .18s var(--ease)}
-body.pf-lp #canvas svg{transform:scale(1.015)}
+/* 画布不要加 transform 过渡：进/出编辑页用的是 holder 的 FLIP 动画，
+   在 svg 上再加一层过渡会让放大过程出现"闪一下"的观感 */
 /* 触屏上关掉文字选择与系统长按菜单，否则长按会弹"拷贝图片" */
 @media (hover:none) and (pointer:coarse){
   #canvas{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}

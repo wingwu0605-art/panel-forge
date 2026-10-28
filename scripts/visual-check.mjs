@@ -2188,6 +2188,26 @@ const scenarios = [
         await wait(450);
         res.double = { vib, view: document.body.dataset.view, toast: document.querySelector('#toast')?.textContent || '' };
 
+        // ②b 抽屉应从下方滑上来（单调向上），不是"先到位再回弹"
+        document.body.dataset.view = 'canvas';
+        await wait(250);
+        const tops = [];
+        const grabber = () => {
+          const d = document.querySelector('#railRight');
+          // 只统计"已经在编辑视图"之后的样本：canvas 视图下右栏本来就贴顶
+          if (d && document.body.dataset.view === 'edit') tops.push(Math.round(d.getBoundingClientRect().top));
+        };
+        const timer = setInterval(grabber, 16);
+        grabber();
+        await tap(0.5, 0.28);
+        await wait(120);
+        await tap(0.5, 0.28);
+        await wait(900);
+        clearInterval(timer);
+        let rebounds = 0;
+        for (let i = 2; i < tops.length; i++) if (tops[i] > tops[i - 1] + 6) rebounds++;
+        res.slide = { first: tops[0], last: tops[tops.length - 1], rebounds, view: document.body.dataset.view };
+
         // ③ 间隔太久不算双击
         document.body.dataset.view = 'canvas';
         const v0 = vib;
@@ -2226,6 +2246,9 @@ const scenarios = [
       check('双击某一格会震动', out.double.vib === 1, String(out.double.vib));
       check('双击后直接进入编辑视图', out.double.view === 'edit', out.double.view || '(空)');
       check('双击有提示', /双击进入/.test(out.double.toast), out.double.toast);
+      check('编辑抽屉是从下方滑上来的（不闪）',
+        out.slide.rebounds === 0 && out.slide.last < out.slide.first - 60,
+        `top ${out.slide.first} → ${out.slide.last} · 回弹 ${out.slide.rebounds} 次`);
       check('两下间隔太久不算双击', out.slow.dVib === 0, String(out.slow.dVib));
       check('触屏长按的 contextmenu 被吞掉、不弹我们的菜单',
         out.touchCtx.prevented === true && out.touchCtx.menuShown === false,

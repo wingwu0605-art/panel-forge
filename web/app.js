@@ -1933,7 +1933,8 @@ const LLM_TIMEOUT_MS = 60000;    // 文本：60s 还没回来基本就是挂了
 /** 双击某一格：震动 → 选中它 → 进编辑页 */
 function fireDoubleTap(slot) {
   haptic(22);
-  lpPulse();
+  // 注意：这里**不要**再调 lpPulse()。它会临时给 #canvas svg 加 scale(1.015)，
+  // 而进编辑页是一次 0.7s 的 FLIP 放大 —— 两个 transform 打架就会"闪一下"。
   state.selectedId = slot.id;
   state.selBubble = null;
   renderStage();
@@ -6803,11 +6804,17 @@ function enterEdit(fromCanvas, { instant = false } = {}) {
   const svg = holderEl()?.querySelector('svg');
   const A = fromCanvas && svg ? svg.getBoundingClientRect() : null;
   const body = document.body;
+  const animate = !(instant || !motionOK());
   clearEditZoom();
+  // ⚠️ 顺序很重要：先把动画类挂上，再切视图。
+  // 反过来的话抽屉会先出现在最终位置，然后动画又把它摆回屏幕下方再滑上来 —— 看上去就是"闪一下"。
+  if (animate) body.classList.add('zooming', 'sheet-in');
   applyView('edit');
-  if (instant || !motionOK()) { requestAnimationFrame(() => syncEditZoom(true)); return; }
-  body.classList.add('zooming');
-  replay(body, 'sheet-in');
+  if (!animate) { requestAnimationFrame(() => syncEditZoom(true)); return; }
+  // 不 replay：类在 applyView 之前就挂好了，动画会自然从动画起点开始
+  body.classList.remove('sheet-in');
+  void body.offsetWidth;
+  body.classList.add('sheet-in');
   requestAnimationFrame(() => {
     const g = untransformed();
     if (A && g) setHolderT(flipFrom(A, g));            // 先摆回原来整页的位置
