@@ -1077,7 +1077,12 @@ const scenarios = [
       await page.evaluate(openSheet);
       await sleep(250);
       const sheet = await page.evaluate(state);
-      check('「面板管理」能打开，列出 5 块', sheet.sheetOpen && (await page.evaluate("document.querySelectorAll('#panelList .panel-row').length")) === 5);
+      // 面板数量跟着左栏实际卡片走（后来加了「全自动」「风格跟随」，写死 5 会误报）
+      const panelRowCount = await page.evaluate("document.querySelectorAll('#panelList .panel-row').length");
+      const panelCardCount = await page.evaluate("document.querySelectorAll('.rail.left [data-panel]').length");
+      check('「面板管理」能打开，且把左栏每块都列出来',
+        sheet.sheetOpen && panelRowCount === panelCardCount && panelRowCount >= 5,
+        `${panelRowCount} 行 / ${panelCardCount} 块`);
       await shot('panels-sheet');
 
       await page.evaluate(`(() => {
@@ -1339,8 +1344,31 @@ const scenarios = [
 
       await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1&lang=en');
       await page.ready();
+      // 英文界面下：格子标签底框必须包住文字；切视图不应先闪中文
+      const enLabels = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const fits = [...document.querySelectorAll('#canvas svg .slot-label')].slice(0, 8).map((g) => {
+          const tx = g.querySelector('.slot-label-tx');
+          const bg = g.querySelector('.slot-label-bg');
+          const tw = tx && tx.getComputedTextLength ? tx.getComputedTextLength() : 0;
+          const bw = bg ? Number(bg.getAttribute('width')) : 0;
+          const pad = bg ? Number(bg.dataset.pad || 0) : 0;
+          return { text: (tx && tx.textContent || '').slice(0, 16), ok: bw >= tw + pad * 2 - 1.5 };
+        });
+        const zhCount = () => [...document.querySelectorAll('#canvas svg .slot-label-tx')]
+          .filter((t) => /[\\u4e00-\\u9fa5]/.test(t.textContent || '')).length;
+        const b = document.querySelector('#tabbar button[data-view="output"]');
+        if (b) b.click();
+        await wait(60);
+        return { fits, flashZh: zhCount() };
+      })()`);
+      const viaUrl2 = await page.evaluate("document.documentElement.lang");
       const viaUrl = await page.evaluate("document.documentElement.lang");
       check('?lang=en 链接可直接分享', viaUrl === 'en', viaUrl);
+      check('英文标签的底框包住文字（不再被边框穿过）',
+        enLabels.fits.length > 0 && enLabels.fits.every((l) => l.ok) === true,
+        enLabels.fits.map((l) => l.text + (l.ok ? '✓' : '✗')).join(' / '));
+      check('切视图时不再先闪中文（同步翻译）', enLabels.flashZh === 0, String(enLabels.flashZh));
 
       await page.evaluate(`document.querySelector('#langSeg button[data-lang="zh"]').click()`);
       await sleep(1000);
@@ -2056,7 +2084,7 @@ const scenarios = [
       check('收起后两条侧栏都缩成 56px 图标条',
         out.mini.leftW <= 60 && out.mini.rightW <= 60, `${out.mini.leftW} / ${out.mini.rightW}`);
       check('左栏保留 7 个功能 logo',
-        out.mini.leftIcons.join(',') === 'auto,style,plot,ai,chars,browse,help', out.mini.leftIcons.join(','));
+        out.mini.leftIcons.join(',') === 'auto,plot,ai,style,chars,browse,help', out.mini.leftIcons.join(','));
       check('右栏保留 7 个功能 logo（含分镜表/导出/气泡）',
         out.mini.rightIcons.join(',') === 'text,board,image,ai,script,export,bubbles', out.mini.rightIcons.join(','));
       check('收起后卡片本体隐藏', out.mini.cardVisible === false);
@@ -2174,8 +2202,9 @@ const scenarios = [
         return res;
       })()`);
 
-      check('风格跟随卡片在角色参考图之前',
-        out.order.indexOf('style') >= 0 && out.order.indexOf('style') < out.order.indexOf('chars'),
+      check('风格跟随卡片紧贴角色参考图上方（在 AI 导演之后）',
+        out.order.indexOf('style') >= 0 && out.order.indexOf('style') < out.order.indexOf('chars')
+          && out.order.indexOf('style') > out.order.indexOf('ai'),
         out.order.join(' → '));
       check('默认「跟人设图」，样图区收起',
         out.default.mode === 'char' && out.default.sampleBoxHidden === true, out.default.mode);

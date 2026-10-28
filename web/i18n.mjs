@@ -1039,20 +1039,58 @@ function applyAttrs(root) {
 export function retranslate(root = document.body) {
   applyTextNodes(root);
   applyAttrs(root);
+  try { refitSlotLabels(root); } catch { /* ignore */ }
 }
+
+let translatingFlag = false;   // 防止"翻译 → 触发 mutation → 再翻译"的回环
 
 function startObserver() {
   if (mo || typeof MutationObserver === 'undefined') return;
-  let queued = false;
-  mo = new MutationObserver(() => {
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(() => {
-      queued = false;
-      retranslate(document.body);
-    });
+  mo = new MutationObserver((records) => {
+    // 中文界面不需要翻译，别白跑
+    if (current === 'zh' || translatingFlag) return;
+    translatingFlag = true;
+    try {
+      // 同步翻译「新插入的节点」而不是等下一帧整页重扫：
+      // 等 rAF 的话，滑动/切页的那一两帧里新内容还是中文 —— 用户看到的就是"闪中文"
+      for (const rec of records) {
+        if (rec.type === 'childList') {
+          for (const node of rec.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) retranslate(node);
+            else if (node.nodeType === Node.TEXT_NODE && node.parentElement) retranslate(node.parentElement);
+          }
+        } else if (rec.type === 'characterData' && rec.target.parentElement) {
+          retranslate(rec.target.parentElement);
+        }
+      }
+      refitSlotLabels();
+    } finally {
+      translatingFlag = false;
+    }
   });
   mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+
+/** SVG 里的格子标签：文字变长/变短后要重算底框宽度，否则英文会压在边框上 */
+export function refitSlotLabels(root = document.body) {
+  for (const tx of root.querySelectorAll?.('.slot-label-tx') || []) {
+    const g = tx.closest('.slot-label');
+    const bg = g?.querySelector('.slot-label-bg');
+    if (!bg) continue;
+    const pad = Number(bg.dataset.pad) || 0;
+    let w = 0;
+    try { w = tx.getComputedTextLength(); } catch { w = 0; }
+    if (!w) {
+      // 还没渲染出来（或测量失败）：退回到按字符估宽
+      const fsz = Number(tx.getAttribute('font-size')) || 16;
+      w = [...(tx.textContent || '')].reduce((acc, ch) => {
+        if (/[\u3000-\u9fff\uff00-\uffef]/.test(ch)) return acc + fsz;
+        if (ch === ' ') return acc + fsz * 0.3;
+        return acc + fsz * 0.56;
+      }, 0);
+    }
+    bg.setAttribute('width', String(Math.round((w + pad * 2) * 10) / 10));
+  }
 }
 
 export function getLang() { return current; }

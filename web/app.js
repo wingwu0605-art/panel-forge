@@ -1560,6 +1560,28 @@ const layoutDefaults = () => (ARTIST
   ? { order: ['plot', 'browse', 'chars', 'help', 'ai'], hidden: ['ai'], ai: false }
   : { order: ['plot', 'ai', 'chars', 'browse', 'help'], hidden: [], ai: true });
 
+/** 左栏面板在 HTML 里的真实顺序（新增卡片的落位依据） */
+function orderFromDom() {
+  return [...document.querySelectorAll('.rail.left [data-panel]')].map((el) => el.dataset.panel);
+}
+
+/**
+ * 把「用户保存的顺序」和「HTML 里的顺序」合并。
+ * 关键：新加的面板（老用户存里没有）要落在它 HTML 里的位置，
+ * 否则 applyLayout 的 appendChild 会把它挤到最前面 —— 之前"风格跟随跑到 AI 导演上面"就是这么来的。
+ */
+function mergeOrder(stored, dom) {
+  const known = new Set(dom);
+  const out = (stored || []).filter((id) => known.has(id));
+  dom.forEach((id, i) => {
+    if (out.includes(id)) return;
+    const prev = dom.slice(0, i).reverse().find((p) => out.includes(p));
+    if (prev) out.splice(out.indexOf(prev) + 1, 0, id);
+    else out.unshift(id);
+  });
+  return out;
+}
+
 function readLayouts() {
   try {
     const raw = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}');
@@ -1571,8 +1593,11 @@ function currentLayout() {
   const key = ARTIST ? 'artist' : 'main';
   const d = layoutDefaults();
   const v = all[key] || {};
+  const dom = orderFromDom();
+  const stored = Array.isArray(v.order) && v.order.length ? v.order : d.order;
   return {
-    order: Array.isArray(v.order) && v.order.length ? v.order : d.order,
+    // DOM 是"默认顺序"的真相：新卡片按 HTML 位置落位，老用户的自定义顺序照旧
+    order: mergeOrder(stored, dom.length ? dom : stored),
     hidden: Array.isArray(v.hidden) ? v.hidden : d.hidden,
     ai: typeof v.ai === 'boolean' ? v.ai : d.ai,
   };
