@@ -1969,11 +1969,14 @@ const scenarios = [
 
         res.toggles = { left: !!document.querySelector('.rail.left .rail-toggle'), right: !!document.querySelector('#railRight .rail-toggle') };
 
+        res.stageBefore = Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().width);
+
         // 收起两条
         document.querySelector('.rail.left .rail-toggle').click();
         await wait(250);
         document.querySelector('#railRight .rail-toggle').click();
         await wait(250);
+        await wait(520);   // 列宽过渡 0.52s，等它走完再量
         res.mini = {
           leftW: Math.round(left.getBoundingClientRect().width),
           rightW: Math.round(right.getBoundingClientRect().width),
@@ -1981,6 +1984,8 @@ const scenarios = [
           rightIcons: [...document.querySelectorAll('#railRight .rail-ico')].map((b) => b.dataset.key),
           cardVisible: getComputedStyle(document.querySelector('.rail.left > .card')).display !== 'none',
         };
+
+        res.stageAfterMini = Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().width);
 
         // 悬停气泡
         const ico = document.querySelectorAll('.rail.left .rail-ico')[2];
@@ -2014,6 +2019,35 @@ const scenarios = [
         document.querySelector('.rail.left .rail-toggle').click();
         await wait(320);
         res.leftExpanded = !left.classList.contains('mini');
+
+        // 贴边 / 不重叠 / 舞台随列宽平滑延伸
+        res.layout = {
+          rightFlush: Math.abs(right.getBoundingClientRect().right - window.innerWidth) < 1.5,
+          stageW: res.stageAfterMini || 0,
+          cols: getComputedStyle(document.querySelector('.layout')).gridTemplateColumns,
+        };
+        const btnRect = document.querySelector('#railRight .rail-toggle').getBoundingClientRect();
+        const tabsRect = document.querySelector('#tabs').getBoundingClientRect();
+        res.overlap = !(btnRect.right < tabsRect.left || btnRect.left > tabsRect.right
+          || btnRect.bottom < tabsRect.top || btnRect.top > tabsRect.bottom);
+
+        // 收起时舞台宽度的中间帧数量（>3 说明是动画而不是瞬移）
+        const widths = [];
+        const tick = setInterval(() => widths.push(Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().width)), 16);
+        document.querySelector('#railRight .rail-toggle').click();
+        await wait(820);
+        clearInterval(tick);
+        res.grow = { frames: widths.length, distinct: new Set(widths).size, from: widths[0], to: widths[widths.length - 1] };
+
+        // 气泡动画类
+        document.querySelectorAll('#railRight .rail-ico')[0]?.click();
+        await wait(150);
+        const popOpen = [...document.querySelectorAll('.rail-pop')].find((p) => !p.classList.contains('hidden'));
+        const popAnim = popOpen ? getComputedStyle(popOpen).animationName : '';
+        document.querySelectorAll('#railRight .rail-ico')[1]?.click();
+        await wait(150);
+        const popSwap = [...document.querySelectorAll('.rail-pop')].find((p) => !p.classList.contains('hidden'));
+        res.popAnim = { open: popAnim, swap: popSwap ? getComputedStyle(popSwap).animationName : '' };
         return res;
       })()`);
 
@@ -2036,6 +2070,15 @@ const scenarios = [
       check('点右上角按钮才展开全部，并关掉气泡',
         out.expand.rightMini === false && out.expand.rightW > 200 && out.expand.pops === 0, `宽 ${out.expand.rightW}`);
       check('展开后图标条隐藏，回到完整卡片', out.expand.stripShown === false && out.leftExpanded === true);
+      check('展开/收起后右栏始终贴住视口右边（不再留缝）', out.layout.rightFlush === true, `右边缘=${out.layout.rightFlush}`);
+      check('收起按钮不再压在「格子/分镜表/导出」标签上', out.overlap === false);
+      check('舞台区域跟着列宽自然延伸（收起后明显更宽）',
+        out.layout.stageW > out.stageBefore + 150,
+        `${out.stageBefore} → ${out.layout.stageW}px`);
+      check('列宽动画是平滑过渡而不是瞬移', out.grow.distinct >= 6 && out.grow.to > out.grow.from + 100,
+        `${out.grow.from} → ${out.grow.to} · ${out.grow.distinct} 个中间帧`);
+      check('气泡有弹出动画、切换功能时另有一段动画',
+        out.popAnim.open === 'railPopIn' && out.popAnim.swap === 'railPopSwap', `${out.popAnim.open} / ${out.popAnim.swap}`);
 
       // 静态产物自检：app.js 里 import 的每个相对模块，site/ 下必须真的存在
       {

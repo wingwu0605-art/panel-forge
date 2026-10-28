@@ -71,13 +71,18 @@ function makeRail(railEl, side, itemsFn) {
   };
 
   /* ---- 顶部按钮：展开全部 / 收起 ---- */
+  // 独立标题条：按钮放在这里，就不会压住右栏的「格子 / 分镜表 / 导出」
+  const head = document.createElement('div');
+  head.className = 'rail-head';
+  railEl.insertBefore(head, railEl.firstChild);
+
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.className = 'rail-toggle';
   toggle.title = '收起 / 展开全部功能';
   toggle.setAttribute('aria-label', '收起或展开全部功能');
   toggle.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9 4.8v14.4"/></svg>';
-  railEl.appendChild(toggle);
+  head.appendChild(toggle);
 
   /* ---- 图标条 ---- */
   const strip = document.createElement('div');
@@ -121,13 +126,24 @@ function makeRail(railEl, side, itemsFn) {
     if (st.openKey === key) { closePop(); return; }
     // 同时只留一个功能气泡：先把其它侧栏的关掉（键盘/脚本触发 click 时也要成立）
     for (const other of RAILS) if (other !== st) other.closePop();
+
+    const swap = !!st.openKey && !pop.classList.contains('hidden');
     closePop();
     const item = st.itemsFn().find((i) => i.key === key);
     if (!item || !item.node) return;
     st.moved = { node: item.node, parent: item.node.parentNode, next: item.node.nextSibling };
     $('.rail-pop-body', pop).appendChild(item.node);
     $('.rail-pop-head b', pop).textContent = item.label;
+
+    // 切换功能：内容换掉后重新播一次"弹入"，并给内容一个从上滑入的小非线性动画
     pop.classList.remove('hidden');
+    pop.classList.remove('swap-in', 'pop-in');
+    void pop.offsetWidth;
+    pop.classList.add(swap ? 'swap-in' : 'pop-in');
+    const bodyEl = $('.rail-pop-body', pop);
+    bodyEl.classList.remove('content-in');
+    void bodyEl.offsetWidth;
+    bodyEl.classList.add('content-in');
     // 位置：贴着侧栏那一侧
     const r = railEl.getBoundingClientRect();
     const pw = Math.min(360, window.innerWidth * 0.86);
