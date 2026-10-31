@@ -3,10 +3,11 @@
  * 零框架；渲染内核与后端共用同一份 /lib/svg.mjs，保证「所见即导出」。
  */
 import { estimateLayout, splitTextIntoPages, buildAutoSteps, imageQueueForPage, imageQueueAll, estimateCostHint } from './lib/auto.mjs';
-import { $, $$, PERF, perf, perfPush, perfStats, perfNow, perfDone, withTimeout, blobToDataURL, clamp, escapeHtml, debounce, sysReduceMQ, motionOK, stagger, replay } from './util.mjs';
-import { state, HIST_MAX, snapshot, restore, commit, undo, redo, resetHistory } from './state.mjs';
+import { $, $$, PERF, perf, perfPush, perfStats, perfNow, perfDone, withTimeout, blobToDataURL, clamp, escapeHtml, debounce, sysReduceMQ, motionOK, stagger, replay , withTransition } from './util.mjs';
+import { state, installHistoryDeps, HIST_MAX, snapshot, restore, commit, undo, redo, resetHistory } from './state.mjs';
 import { imageAsset, rehydrateImages, exportImageMap, urlForBlob } from './assets.mjs';
 import { autoPromptOf, promptParts, effectivePrompt, buildImagePrompt, setPromptEdit, installPromptDeps } from './prompt.mjs';
+import { setView, applyView, initViews, setEditMod, syncEditHead, syncEditZoom, clearEditZoom, stepSlot, enterEdit, exitEdit, installViewDeps } from './mobile.mjs';
 import { installRails } from './rails.mjs';
 import { renderTemplateSVG, imageAttrs } from './lib/svg.mjs';
 import { createCellPainter, localPoly } from './paint.mjs';
@@ -67,11 +68,6 @@ const CULTURE_LABEL = { jp: '日', cn: '中', kr: '韩', core: '通' };
 const CULTURE_ZH = { jp: '日式页漫', cn: '中式漫画', kr: '韩式条漫', core: '通用/跨界' };
 
 /* 外观层常量（init() 在顶层就跑，所以必须放在这里，不能放文件末尾） */
-const VIEW_ORDER = ['library', 'story', 'canvas', 'edit', 'output'];
-const VIEW_ALIAS = { inspect: 'edit' };
-const ZOOM_EASE = 'cubic-bezier(.32,.72,0,1)';
-let zoomT = { tx: 0, ty: 0, k: 1 };   // #canvas 当前的变换
-let zoomKey = '';
 const ACCENTS = [
   { id: 'blue', zh: '蓝色', l: '#007aff', d: '#0a84ff' },
   { id: 'indigo', zh: '靛蓝', l: '#5856d6', d: '#5e5ce6' },
@@ -100,7 +96,6 @@ const store = {
 const REPO_URL = 'https://github.com/wingwu0605-art/panel-forge';
 const THEME_KEY = 'pf.theme';
 const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
-const compactMQ = window.matchMedia('(max-width:1024px)');
 /** ?dbg=1：底栏换成一行动调试信息（排查多页 / 面板问题时用） */
 const DBG = new URLSearchParams(location.search).get('dbg') === '1';
 
@@ -233,6 +228,8 @@ async function init() {
   initPerfHud();
   bindUI();
   installPromptDeps({ pagePlan, activeCharPayload, queueSave });
+  installViewDeps({ renderStage, renderSlotPanel, activateTab, currentPlanPanel });
+  installHistoryDeps({ renderStage, renderSlotPanel, renderBubbles, toast });
   bindStyleFollow();
   initCollapsibles();
   api = await makeApi();
@@ -6167,16 +6164,6 @@ function initChrome() {
   initStaticLinks();
 }
 
-/** 用 View Transitions 包一层；不支持或用户要求减弱动效时直接执行 */
-function withTransition(kind, fn) {
-  if (!document.startViewTransition || !motionOK()) { fn(); return null; }
-  const root = document.documentElement;
-  root.dataset.vt = kind;
-  const t = document.startViewTransition(fn);
-  t.finished.finally(() => { if (root.dataset.vt === kind) delete root.dataset.vt; });
-  return t;
-}
-
 /** 当前强调色（画布里的选中框 / 格号跟着变） */
 function currentTint() {
   const v = getComputedStyle(document.documentElement).getPropertyValue('--tint').trim();
@@ -6441,206 +6428,6 @@ function initMoreMenu() {
 }
 
 /** 手机 / 平板竖屏：底部标签栏切换「模板库 / 剧情 / 画布 / 编辑 / 分镜与导出」 */
-function setView(view, opts = {}) {
-  view = VIEW_ALIAS[view] || view;
-  if (!VIEW_ORDER.includes(view)) return;
-  const prev = document.body.dataset.view;
-  const compact = compactMQ.matches;
-  if (view === 'edit' && state.tpl && !state.selectedId) {
-    state.selectedId = state.tpl.slots[0]?.id || null;
-    renderStage(); renderSlotPanel();
-  }
-  if (opts.animate && prev && prev !== view && compact) {
-    replay($(`#tabbar button[data-view="${view}"]`), 'bounce');
-    // 画布 ⇄ 编辑：页面直接放大 / 缩回这一格，比整页滑动更有空间感
-    if (view === 'edit') { enterEdit(prev === 'canvas'); return; }
-    if (prev === 'edit') { exitEdit(view); return; }
-    const dir = VIEW_ORDER.indexOf(view) > VIEW_ORDER.indexOf(prev) ? 'view-fwd' : 'view-back';
-    withTransition(dir, () => applyView(view));
-    return;
-  }
-  if (view === 'edit' && compact) { enterEdit(false, { instant: !opts.animate }); return; }
-  if (prev === 'edit') clearEditZoom();
-  applyView(view);
-}
-function applyView(view) {
-  const body = document.body;
-  body.dataset.view = view;
-  body.classList.toggle('sheet-on', view === 'edit');
-  $$('#tabbar button').forEach((b) => {
-    const on = b.dataset.view === view;
-    b.classList.toggle('on', on);
-    b.setAttribute('aria-current', on ? 'page' : 'false');
-  });
-  if (view === 'output') {
-    const cur = $('#tabs button.on')?.dataset.tab;
-    if (!cur || cur === 'slot') activateTab('script');
-  }
-  if (view === 'edit') { activateTab('slot'); setEditMod(state.editMod || 'text', { quiet: true }); syncEditHead(); }
-  if (view === 'canvas' || view === 'edit') renderStage();
-}
-function goCanvasOnCompact() { if (compactMQ.matches) setView('canvas', { animate: true }); }
-
-/* ---------------- 编辑页：放大到选中的格子 ---------------- */
-
-function holderEl() { return $('#canvas'); }
-function setHolderT(t, transition) {
-  const h = holderEl();
-  if (!h) return;
-  zoomT = t;
-  h.style.transition = transition || 'none';
-  h.style.transform = (t.k === 1 && !t.tx && !t.ty) ? '' : `translate(${t.tx}px, ${t.ty}px) scale(${t.k})`;
-}
-/** 不受当前变换影响的几何：holder 左上角 + 页面 svg 的位置（反算 zoomT） */
-function untransformed() {
-  const h = holderEl(), svg = h?.querySelector('svg');
-  if (!svg) return null;
-  const hr = h.getBoundingClientRect(), sr = svg.getBoundingClientRect();
-  const { tx, ty, k } = zoomT;
-  const hl = hr.left - tx, ht = hr.top - ty;
-  return {
-    hl, ht,
-    svg: { left: hl + (sr.left - hl - tx) / k, top: ht + (sr.top - ht - ty) / k, width: sr.width / k, height: sr.height / k },
-  };
-}
-/** 选中格子放大填满上半屏需要的变换 */
-function zoomTargetFor(slotId) {
-  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
-  const g = untransformed();
-  const stage = $('#stage')?.getBoundingClientRect();
-  if (!slot || !g || !stage?.width) return { tx: 0, ty: 0, k: 1 };
-  const pw = state.tpl.page.w, ph = state.tpl.page.h, R = g.svg;
-  const sw = (slot.w / pw) * R.width, sh = (slot.h / ph) * R.height;
-  const cx = R.left + ((slot.x + slot.w / 2) / pw) * R.width;
-  const cy = R.top + ((slot.y + slot.h / 2) / ph) * R.height;
-  const pad = 18;
-  const k = clamp(Math.min((stage.width - pad * 2) / sw, (stage.height - pad * 2) / sh), 1, 6);
-  const scx = stage.left + stage.width / 2, scy = stage.top + stage.height / 2;
-  return { tx: scx - g.hl - (cx - g.hl) * k, ty: scy - g.ht - (cy - g.ht) * k, k };
-}
-/** 选中格变了 / 尺寸变了就平滑移过去 */
-function syncEditZoom(force = false) {
-  if (document.body.dataset.view !== 'edit' || !compactMQ.matches || document.body.classList.contains('zooming')) return;
-  const key = [state.selectedId, state.tpl?.id, $('#stage')?.clientWidth, $('#stage')?.clientHeight].join('|');
-  if (!force && key === zoomKey) return;
-  zoomKey = key;
-  const t = zoomTargetFor(state.selectedId);
-  setHolderT(t, motionOK() ? `transform .62s ${ZOOM_EASE}` : 'none');
-}
-function clearEditZoom() { zoomKey = ''; setHolderT({ tx: 0, ty: 0, k: 1 }); }
-
-/** FLIP：从 rect A 看起来的位置，变到 rect B 现在的位置所需的起始变换 */
-function flipFrom(A, g) {
-  const k0 = A.width / g.svg.width;
-  return { tx: A.left - g.hl - (g.svg.left - g.hl) * k0, ty: A.top - g.ht - (g.svg.top - g.ht) * k0, k: k0 };
-}
-
-function enterEdit(fromCanvas, { instant = false } = {}) {
-  const svg = holderEl()?.querySelector('svg');
-  const A = fromCanvas && svg ? svg.getBoundingClientRect() : null;
-  const body = document.body;
-  const animate = !(instant || !motionOK());
-  clearEditZoom();
-  // ⚠️ 顺序很重要：先把动画类挂上，再切视图。
-  // 反过来的话抽屉会先出现在最终位置，然后动画又把它摆回屏幕下方再滑上来 —— 看上去就是"闪一下"。
-  if (animate) body.classList.add('zooming', 'sheet-in');
-  applyView('edit');
-  if (!animate) { requestAnimationFrame(() => syncEditZoom(true)); return; }
-  // 不 replay：类在 applyView 之前就挂好了，动画会自然从动画起点开始
-  body.classList.remove('sheet-in');
-  void body.offsetWidth;
-  body.classList.add('sheet-in');
-  requestAnimationFrame(() => {
-    const g = untransformed();
-    if (A && g) setHolderT(flipFrom(A, g));            // 先摆回原来整页的位置
-    void holderEl().offsetWidth;
-    const t = zoomTargetFor(state.selectedId);
-    zoomKey = [state.selectedId, state.tpl?.id, $('#stage')?.clientWidth, $('#stage')?.clientHeight].join('|');
-    setHolderT(t, `transform .7s ${ZOOM_EASE}`);       // 再放大到这一格
-    setTimeout(() => body.classList.remove('zooming', 'sheet-in'), 720);
-  });
-}
-
-function exitEdit(toView) {
-  const body = document.body;
-  const svg = holderEl()?.querySelector('svg');
-  const E = svg ? svg.getBoundingClientRect() : null;
-  if (!motionOK() || toView !== 'canvas' || !E) {
-    clearEditZoom();
-    withTransition(VIEW_ORDER.indexOf(toView) > VIEW_ORDER.indexOf('edit') ? 'view-fwd' : 'view-back', () => applyView(toView));
-    return;
-  }
-  // 抽屉往下收，页面从这一格缩回整页
-  body.classList.add('sheet-on', 'sheet-out', 'zooming');
-  clearEditZoom();
-  body.dataset.view = toView;
-  $$('#tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.view === toView));
-  renderStage();
-  requestAnimationFrame(() => {
-    const g = untransformed();
-    if (g) setHolderT(flipFrom(E, g));
-    void holderEl().offsetWidth;
-    setHolderT({ tx: 0, ty: 0, k: 1 }, `transform .6s ${ZOOM_EASE}`);
-    setTimeout(() => {
-      body.classList.remove('sheet-on', 'sheet-out', 'zooming');
-      applyView(toView);
-      setHolderT({ tx: 0, ty: 0, k: 1 });
-    }, 620);
-  });
-}
-
-function setEditMod(m, { quiet = false } = {}) {
-  state.editMod = m;
-  const rail = $('#railRight');
-  if (!rail) return;
-  const changed = rail.dataset.mod !== m;
-  rail.dataset.mod = m;
-  $$('#editSeg button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
-  if (changed && !quiet) { replay(rail, 'mod-swap'); rail.scrollTo({ top: 0, behavior: motionOK() ? 'smooth' : 'auto' }); }
-}
-
-function syncEditHead() {
-  const slot = state.tpl?.slots?.find((s) => s.id === state.selectedId);
-  if (!slot) return;
-  const panel = currentPlanPanel();
-  $('#editIndex').textContent = slot.order;
-  $('#editRole').textContent = panel ? panel.roleZh : slot.role;
-  $('#editShot').textContent = panel ? `${panel.shot} · ${panel.beat || '通用'}` : '';
-  const idx = state.tpl.slots.findIndex((s) => s.id === slot.id);
-  $('#btnEditPrev').disabled = idx <= 0;
-  $('#btnEditNext').disabled = idx >= state.tpl.slots.length - 1;
-}
-
-function stepSlot(dir) {
-  if (!state.tpl) return;
-  const list = state.tpl.slots;
-  const i = list.findIndex((s) => s.id === state.selectedId);
-  const next = list[clamp(i + dir, 0, list.length - 1)];
-  if (!next || next.id === state.selectedId) return;
-  state.selectedId = next.id; state.selBubble = null;
-  renderStage(); renderSlotPanel();
-}
-
-function initViews() {
-  $$('#tabbar button').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view, { animate: true })));
-  $('#btnEditSlot')?.addEventListener('click', () => setView('edit', { animate: true }));
-  $('#btnEditDone')?.addEventListener('click', () => setView('canvas', { animate: true }));
-  $('#btnEditPrev')?.addEventListener('click', () => stepSlot(-1));
-  $('#btnEditNext')?.addEventListener('click', () => stepSlot(1));
-  $('#editSeg')?.addEventListener('click', (ev) => {
-    const b = ev.target.closest('button[data-m]');
-    if (b) setEditMod(b.dataset.m);
-  });
-  // 上半屏尺寸变了（旋转屏幕、键盘弹出）就重新对准
-  if (window.ResizeObserver) new ResizeObserver(() => syncEditZoom()).observe($('#stage'));
-  compactMQ.addEventListener?.('change', () => {
-    if (!compactMQ.matches) { clearEditZoom(); document.body.classList.remove('sheet-on', 'sheet-in', 'sheet-out', 'zooming'); }
-    else if (document.body.dataset.view === 'edit') { applyView('edit'); syncEditZoom(true); }
-  });
-  const want = new URLSearchParams(location.search).get('view');
-  setView(VIEW_ALIAS[want] || (VIEW_ORDER.includes(want) ? want : 'canvas'));
-}
-
 function syncSlotFab(has) {
   document.body.classList.toggle('has-slot', !!has);
   if (!has) return;

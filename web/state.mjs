@@ -7,6 +7,15 @@
  * 为什么值得单独一个文件：以前它埋在 7000 行的 app.js 中间，
  * 谁也说不清"到底有哪些状态"，新增字段容易重复或漏改。
  */
+/** 撤销/重做会重绘界面并弹提示，这两件事属于 app.js，用注入而不是反向 import */
+const ui = {
+  renderStage: () => {},
+  renderSlotPanel: () => {},
+  renderBubbles: () => {},
+  toast: () => {},
+};
+export function installHistoryDeps(next) { Object.assign(ui, next); }
+
 export const state = {
   items: [],          // 轻量模板列表
   filtered: [],
@@ -76,9 +85,9 @@ export function restore(snap) {
   state.promptEdits = JSON.parse(JSON.stringify(snap.promptEdits || {}));
   state.selectedId = snap.selectedId;
   state.selBubble = snap.selBubble;
-  renderStage();
-  renderSlotPanel();
-  renderBubbles();
+  ui.renderStage();
+  ui.renderSlotPanel();
+  ui.renderBubbles();
 }
 
 /** 在改动之前调用：把当前状态压进历史 */
@@ -90,17 +99,17 @@ export function commit() {
 }
 
 export function undo() {
-  if (!state.history.past.length) { toast('没有可撤销的操作'); return; }
+  if (!state.history.past.length) { ui.toast('没有可撤销的操作'); return; }
   state.history.future.push(snapshot());
   restore(state.history.past.pop());
-  toast('已撤销');
+  ui.toast('已撤销');
 }
 
 export function redo() {
-  if (!state.history.future.length) { toast('没有可重做的操作'); return; }
+  if (!state.history.future.length) { ui.toast('没有可重做的操作'); return; }
   state.history.past.push(snapshot());
   restore(state.history.future.pop());
-  toast('已重做');
+  ui.toast('已重做');
 }
 
 export function resetHistory() {

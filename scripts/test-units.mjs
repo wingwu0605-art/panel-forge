@@ -2,6 +2,7 @@
  * 纯函数单测（不启服务器、不连模型）：node scripts/test-units.mjs
  * 现在主要盯生图尺寸映射 —— 尺寸选错是最常见的一类「接口 400」。
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { estimateLayout, splitTextIntoPages, buildAutoSteps, imageQueueForPage, imageQueueAll, estimateCostHint, MAX_AUTO_PAGES } from '../lib/auto.mjs';
 import { fitImageSize, resolveEndpoint, resolveImageEndpoint, baseRoot, isVersionedBase, chatErrorHint, normalizeCfg, imageHttpError, planImageRequest, imageRoute, normalizeLineItems } from '../lib/llm-core.mjs';
@@ -342,6 +343,15 @@ const appSrc2 = ['web/app.js', 'web/util.mjs', 'web/state.mjs']
   .join('\n');
 const DD_CHAIN = appSrc2.match(/[$][$]\([^)]*\)\s*\.\s*(querySelector|querySelectorAll|closest)/g) || [];
 ok('没有把单个元素查询误写成 $(...)（数组没有 querySelector，会让渲染函数整段抛错）', DD_CHAIN.length === 0, DD_CHAIN.slice(0, 2).map((m) => m[0]).join(' | '));
+/* 模块依赖自检：拆模块时"函数搬走了、依赖没搬"会只在运行到那条路径时炸 */
+let depCheck = { code: 0, out: '' };
+try {
+  depCheck.out = execFileSync(process.execPath, ['scripts/check-module-deps.mjs'], { encoding: 'utf8' });
+} catch (e) {
+  depCheck.code = e.status || 1;
+  depCheck.out = String(e.stdout || '');
+}
+ok('各模块的依赖都能解析（没有未定义/未导入）', depCheck.code === 0, depCheck.out.trim().split('\n').slice(-2).join(' | '));
 ok('存在 withTimeout 工具', /function withTimeout\(/.test(appSrc2));
 ok('生图请求套了超时', /withTimeout\(api\.imageGenerate\(/.test(appSrc2));
 ok('有 IMG_TIMEOUT_MS 常量', /IMG_TIMEOUT_MS\s*=/.test(appSrc2));

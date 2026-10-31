@@ -86,3 +86,13 @@ export function replay(el, cls) {
   void el.offsetWidth;
   el.classList.add(cls);
 }
+
+export /** 用 View Transitions 包一层；不支持或用户要求减弱动效时直接执行 */
+function withTransition(kind, fn) {
+  if (!document.startViewTransition || !motionOK()) { fn(); return null; }
+  const root = document.documentElement;
+  root.dataset.vt = kind;
+  const t = document.startViewTransition(fn);
+  t.finished.finally(() => { if (root.dataset.vt === kind) delete root.dataset.vt; });
+  return t;
+}
