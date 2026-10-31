@@ -104,7 +104,7 @@ execFileSync(process.execPath, ['scripts/set-version.mjs', version], { stdio: 'i
 
 /* ---------- 6) 闸门（可选） ---------- */
 if (!skipTests) {
-  for (const cmd of [['scripts/test-units.mjs'], ['scripts/validate.mjs'], ['scripts/check-contrast.mjs']]) {
+  for (const cmd of [['scripts/test-units.mjs'], ['scripts/validate.mjs'], ['scripts/check-contrast.mjs'], ['scripts/visual-all.mjs', '--shards=3']]) {
     process.stdout.write(`跑闸门 ${cmd[0]} … `);
     try {
       execFileSync(process.execPath, cmd, { stdio: 'ignore' });

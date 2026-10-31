@@ -580,7 +580,8 @@ const scenarios = [
     title: '⑥ 图片拖动热路径 / 草稿往返 / 导出（手机宽度 430）',
     async run(page, shot, { check }) {
       await page.viewport(430, 900);
-      await page.goto('/?perf=1&tpl=ref-4band-2col');
+      // fresh=1：不恢复任何草稿，保证"3 张图"就是这轮自己灌的（与场景执行顺序无关）
+      await page.goto('/?perf=1&fresh=1&tpl=ref-4band-2col');
       await page.ready();
 
       // 灌 3 张 2400×3000 的真图（走真实 drop 入口）

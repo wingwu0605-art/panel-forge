@@ -18,8 +18,17 @@ const argv = process.argv.slice(2);
 const shardsArg = argv.find((a) => a.startsWith('--shards='));
 const SHARDS = Math.max(1, Number(shardsArg ? shardsArg.split('=')[1] : 3) || 3);
 
+/* --fast：只跑这 10 个"一改就容易坏"的场景（提交前用，约 15 秒） */
+const FAST_NAMES = [
+  'board-desktop', 'hotpath', 'paint-klecks', 'script-tab', 'auto-mode',
+  'auto-full', 'rails', 'inbox', 'double-tap', 'style-follow',
+];
+const FAST = argv.includes('--fast');
+const filters = FAST ? FAST_NAMES : [];
+
 const runShard = (index) => new Promise((resolve) => {
-  const child = spawn(process.execPath, ['scripts/visual-check.mjs', `--shard=${index}/${SHARDS}`], {
+  const extra = FAST ? filters : [];
+  const child = spawn(process.execPath, ['scripts/visual-check.mjs', `--shard=${index}/${SHARDS}`, ...extra], {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -30,7 +39,7 @@ const runShard = (index) => new Promise((resolve) => {
 });
 
 const t0 = Date.now();
-console.log(`并行跑 ${SHARDS} 片…`);
+console.log(FAST ? `快速模式：${FAST_NAMES.length} 个核心场景，分 ${SHARDS} 片并行…` : `并行跑 ${SHARDS} 片…`);
 const results = await Promise.all(Array.from({ length: SHARDS }, (_, i) => runShard(i + 1)));
 
 let pass = 0;
