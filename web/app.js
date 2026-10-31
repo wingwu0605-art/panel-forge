@@ -5,6 +5,8 @@
 import { estimateLayout, splitTextIntoPages, buildAutoSteps, imageQueueForPage, imageQueueAll, estimateCostHint } from './lib/auto.mjs';
 import { $, $$, PERF, perf, perfPush, perfStats, perfNow, perfDone, withTimeout, blobToDataURL, clamp, escapeHtml, debounce, sysReduceMQ, motionOK, stagger, replay } from './util.mjs';
 import { state, HIST_MAX, snapshot, restore, commit, undo, redo, resetHistory } from './state.mjs';
+import { imageAsset, rehydrateImages, exportImageMap, urlForBlob } from './assets.mjs';
+import { autoPromptOf, promptParts, effectivePrompt, buildImagePrompt, setPromptEdit, installPromptDeps } from './prompt.mjs';
 import { installRails } from './rails.mjs';
 import { renderTemplateSVG, imageAttrs } from './lib/svg.mjs';
 import { createCellPainter, localPoly } from './paint.mjs';
@@ -230,6 +232,7 @@ async function init() {
   initChrome();
   initPerfHud();
   bindUI();
+  installPromptDeps({ pagePlan, activeCharPayload, queueSave });
   bindStyleFollow();
   initCollapsibles();
   api = await makeApi();
@@ -3939,78 +3942,6 @@ function activateTab(tab) {
  * 为什么存小图：手机上内存/解码是硬约束。长边 2000 够 2× 屏和 2000px 导出，
  * 又比原图（往往 4000×3000）省一个数量级的解码开销。
  */
-const IMG_MAX_SIDE = 2000;
-const IMG_QUALITY = 0.9;
-const dataHrefCache = new WeakMap(); // Blob → data URL，导出时用一次就够
-const blobUrlCache = new WeakMap();  // Blob → blob URL，同一个 blob 永远拿同一个 URL（换页不会越攒越多）
-
-const urlForBlob = (blob) => {
-  let u = blobUrlCache.get(blob);
-  if (!u) { u = URL.createObjectURL(blob); blobUrlCache.set(blob, u); }
-  return u;
-};
-
-const loadImgEl = (src) => new Promise((res, rej) => {
-  const img = new Image();
-  img.onload = () => res(img);
-  img.onerror = () => rej(new Error('图片读不出来'));
-  img.src = src;
-});
-const blobOf = async (src) => (src instanceof Blob ? src : (await fetch(src)).blob());
-
-/** 任何来源（File / data URL / blob URL / http）→ 统一的图片资产 */
-async function imageAsset(src, { name = 'image', maxSide = IMG_MAX_SIDE } = {}) {
-  const blob = await blobOf(src);
-  const tmpUrl = URL.createObjectURL(blob);
-  let el;
-  try {
-    el = await loadImgEl(tmpUrl);
-  } catch (e) {
-    URL.revokeObjectURL(tmpUrl);
-    throw e;
-  }
-  const iw = el.naturalWidth || 1000;
-  const ih = el.naturalHeight || 1000;
-  const k = Math.min(1, maxSide / Math.max(iw, ih));
-  let display = blob;
-  if (k < 1) {
-    const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(iw * k));
-    c.height = Math.max(1, Math.round(ih * k));
-    c.getContext('2d').drawImage(el, 0, 0, c.width, c.height);
-    display = (await new Promise((res) => c.toBlob(res, 'image/jpeg', IMG_QUALITY))) || blob;
-  }
-  URL.revokeObjectURL(tmpUrl);
-  return {
-    blob: display,
-    href: urlForBlob(display),
-    iw, ih, zoom: 1, panX: 0, panY: 0, mode: 'cover', name,
-  };
-}
-
-/** 草稿里取回来时 blob URL 已失效：按 blob 重建（老的 data URL 草稿原样保留） */
-function rehydrateImages(map) {
-  const out = {};
-  for (const [k, v] of Object.entries(map || {})) {
-    if (!v) continue;
-    out[k] = v.blob ? { ...v, href: urlForBlob(v.blob) } : { ...v };
-  }
-  return out;
-}
-
-/** 导出用：把 blob 转回 data URL（结果按 Blob 缓存，重复导出不再转） */
-async function exportImageMap(map = state.images) {
-  const out = {};
-  for (const [k, v] of Object.entries(map || {})) {
-    if (!v) continue;
-    if (!v.blob) { out[k] = { ...v }; continue; }
-    let data = dataHrefCache.get(v.blob);
-    if (!data) { data = await blobToDataURL(v.blob); dataHrefCache.set(v.blob, data); }
-    out[k] = { ...v, href: data };
-  }
-  return out;
-}
-
 async function putImage(slotId, file, opts = {}) {
   if (!opts.noCommit) commit();
   let asset;
@@ -4136,65 +4067,7 @@ function initSlotSections() {
 }
 
 /* ---------------- 生图提示词：自动生成 + 用户可改 ---------------- */
-function autoPromptOf(slot, panel) {
-  if (panel?.promptEn) return panel.promptEn;
-  const shape = panel?.shape || slot?.shape || null;
-  return [shape?.prefixEn, 'single panel, no text'].filter(Boolean).join(', ');
-}
-/** 这一格的三份提示词：规则切分 / AI 生成 / 用户自己写（前两份由 plan 带下来） */
-function promptParts(slotId) {
-  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
-  const panel = (pagePlan()?.panels || []).find((p) => p.id === slotId) || null;
-  const edit = state.promptEdits?.[slotId] || {};
-  // 规则版：AI 覆盖前的那份；AI 版：AI 改写过的那份
-  const rule = panel?.promptEnRule || panel?.promptEn || autoPromptOf(slot, panel);
-  const ai = panel?.aiOptimized && panel?.promptEn ? panel.promptEn : '';
-  const prefix = panel?.shape?.prefixEn || slot?.shape?.prefixEn || '';
-  return { rule: rule || '', ai, mine: edit.prompt ?? '', prefix, panel, slot, edit };
-}
 
-/** 这一格最终用的提示词：按用户选的来源；手写时也要把「形状开头词」保留在最前面 */
-function effectivePrompt(slotId) {
-  const parts = promptParts(slotId);
-  const src = state.promptSrc?.[slotId] || 'rule';
-  const base = src === 'mine' ? parts.mine : (src === 'ai' ? (parts.ai || parts.rule) : parts.rule);
-  const usePrefix = state.promptPrefix?.[slotId] !== false;
-  let prompt = base || '';
-  if (usePrefix && parts.prefix && !prompt.startsWith(parts.prefix)) {
-    prompt = prompt ? `${parts.prefix}, ${prompt}` : parts.prefix;
-  }
-  const edit = parts.edit;
-  const autoNeg = parts.panel?.negative || '';
-  return {
-    prompt,
-    negative: edit.negative ?? autoNeg,
-    autoPrompt: parts.rule,
-    autoNeg,
-    src,
-    usePrefix,
-    hasAi: !!parts.ai,
-    rule: parts.rule,
-    ai: parts.ai,
-    mine: parts.mine,
-    prefix: parts.prefix,
-    edited: src === 'mine' ? parts.mine.trim() !== '' : edit.prompt != null,
-  };
-}
-/** 真正发给生图模型的那一段（角色一致性 + 提示词 + 避免项），预览和生图共用 */
-function buildImagePrompt(slotId) {
-  const e = effectivePrompt(slotId);
-  const chars = activeCharPayload();
-  const body = [chars.block, e.prompt].filter(Boolean).join(' ');
-  return { ...e, chars, full: e.negative ? `${body} | avoid: ${e.negative}` : body };
-}
-function setPromptEdit(slotId, field, value) {
-  const e = effectivePrompt(slotId);
-  const cur = { ...(state.promptEdits[slotId] || {}) };
-  const auto = field === 'prompt' ? e.autoPrompt : e.autoNeg;
-  if (value.trim() === auto.trim()) delete cur[field]; else cur[field] = value;
-  if (Object.keys(cur).length) state.promptEdits[slotId] = cur; else delete state.promptEdits[slotId];
-  queueSave?.();
-}
 function syncPromptMeta() {
   const id = state.selectedId;
   if (!id) return;
