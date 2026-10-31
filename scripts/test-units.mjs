@@ -322,7 +322,7 @@ ok('花费提示给出区间与张数', (() => {
 
 
 /* 语法级防呆：$ 与 $ 是两个不同函数，误写会让整站启动失败（真踩过） */
-const SRC_FILES = ['web/app.js', 'web/rails.mjs', 'web/api-static.js'];
+const SRC_FILES = ['web/app.js', 'web/util.mjs', 'web/state.mjs', 'web/rails.mjs', 'web/api-static.js'];
 const FOR_EACH_DOLLAR = /[^$]\$\([^)]*\)\.forEach/;
 const FOR_OF_DOLLAR = /for \(const \w+ of \$\(/;
 const dollarBugs = [];
@@ -337,7 +337,9 @@ const D1 = String.fromCharCode(36);
 ok("没有把两个 $ 误写成一个 $（否则整站启动失败）", dollarBugs.length === 0, dollarBugs.slice(0, 3).join(" | "));
 
 /* 请求超时与逃生门：挂住的请求会让按钮永远停在「生成中」，看起来就是卡死 */
-const appSrc2 = readFileSync(new URL('../web/app.js', import.meta.url), 'utf8');
+const appSrc2 = ['web/app.js', 'web/util.mjs', 'web/state.mjs']
+  .map((f) => { try { return readFileSync(new URL('../' + f, import.meta.url), 'utf8'); } catch { return ''; } })
+  .join('\n');
 const DD_CHAIN = appSrc2.match(/[$][$]\([^)]*\)\s*\.\s*(querySelector|querySelectorAll|closest)/g) || [];
 ok('没有把单个元素查询误写成 $(...)（数组没有 querySelector，会让渲染函数整段抛错）', DD_CHAIN.length === 0, DD_CHAIN.slice(0, 2).map((m) => m[0]).join(' | '));
 ok('存在 withTimeout 工具', /function withTimeout\(/.test(appSrc2));

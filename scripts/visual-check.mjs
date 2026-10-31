@@ -28,6 +28,20 @@ const BASE = process.env.PF_BASE || 'http://127.0.0.1:7311';
 const argv = process.argv.slice(2);
 const filters = argv.filter((a) => !a.startsWith('-'));
 const SHOW = filters.length ? filters : null;
+
+/** --shard=2/3 → 只跑第 2 份（共 3 份）。用于把 9 分钟的整套拆成多进程并行。 */
+const SHARD = (() => {
+  const m = argv.find((a) => a.startsWith('--shard='));
+  if (!m) return null;
+  const [idxStr, totalStr] = m.slice('--shard='.length).split('/');
+  const index = Number(idxStr);
+  const total = Number(totalStr);
+  if (!Number.isInteger(index) || !Number.isInteger(total) || index < 1 || total < 1 || index > total) {
+    console.error('--shard 用法：--shard=1/3（第 1 份，共 3 份）');
+    process.exit(2);
+  }
+  return { index, total };
+})();
 const CHROME_CANDIDATES = [
   process.env.CHROME_PATH,
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -2834,9 +2848,28 @@ export async function launch({ width = 1440, height = 900 } = {}) {
 
 /* ------------------------------------------------------------------ 主流程 */
 async function main() {
-  const picked = SHOW
+  let picked = SHOW
     ? scenarios.filter((s) => SHOW.some((f) => s.name.includes(f) || s.title.includes(f)))
     : scenarios;
+
+  if (SHARD) {
+    // 按"预计耗时"做负载均衡：重的（含多个 goto/等待的）先分，避免某一片特别慢
+    const weightOf = (sc) => {
+      const src = String(sc.run);
+      return 1 + (src.match(/page\.goto|\.viewport\(|page\.ready\(|wait\(|sleep\(/g) || []).length * 0.35;
+    };
+    const buckets = Array.from({ length: SHARD.total }, () => ({ items: [], weight: 0 }));
+    [...picked]
+      .map((sc) => ({ sc, w: weightOf(sc) }))
+      .sort((a, b) => b.w - a.w)
+      .forEach(({ sc, w }) => {
+        const lightest = buckets.reduce((m, b) => (b.weight < m.weight ? b : m), buckets[0]);
+        lightest.items.push(sc);
+        lightest.weight += w;
+      });
+    picked = buckets[SHARD.index - 1].items;
+    console.log(`[分片 ${SHARD.index}/${SHARD.total}] ${picked.length} 个场景`);
+  }
 
   if (!picked.length) {
     console.error('没有匹配的场景。可选：' + scenarios.map((s) => s.name).join(', '));

@@ -3,6 +3,8 @@
  * 零框架；渲染内核与后端共用同一份 /lib/svg.mjs，保证「所见即导出」。
  */
 import { estimateLayout, splitTextIntoPages, buildAutoSteps, imageQueueForPage, imageQueueAll, estimateCostHint } from './lib/auto.mjs';
+import { $, $$, PERF, perf, perfPush, perfStats, perfNow, perfDone, withTimeout, blobToDataURL, clamp, escapeHtml, debounce, sysReduceMQ, motionOK, stagger, replay } from './util.mjs';
+import { state, HIST_MAX, snapshot, restore, commit, undo, redo, resetHistory } from './state.mjs';
 import { installRails } from './rails.mjs';
 import { renderTemplateSVG, imageAttrs } from './lib/svg.mjs';
 import { createCellPainter, localPoly } from './paint.mjs';
@@ -59,57 +61,6 @@ async function makeApi() {
   };
 }
 
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => [...document.querySelectorAll(s)];
-
-const state = {
-  items: [],          // 轻量模板列表
-  filtered: [],
-  cultureTab: 'all',
-  tpl: null,          // 完整模板（可能已被改过画幅）
-  tplBase: null,      // 原始模板（画幅重排的推导基准，永远不动）
-  pageSize: null,     // 本页自定义画幅 {w,h,mode}；null = 跟随模板
-  images: {},         // slotId -> {href,iw,ih,zoom,panX,panY,mode,name}
-  selectedId: null,
-  hoverId: null,
-  plan: null,         // 规则引擎给的分镜表
-  aiPlan: null,       // AI 导演给的分镜表（优先）
-  aiDecision: null,
-  llm: { protocol: 'openai', baseUrl: '', apiKey: '', model: '' },
-  charSheet: '',
-  bubbles: [],        // 气泡实例（画在页面上，导出时一起走）
-  selBubble: null,
-  lines: {},          // slotId -> 这一格的句子（台词/旁白）
-  editMod: 'text',     // 手机编辑页：text | image | bubble
-  promptEdits: {},    // slotId -> {prompt?, negative?} 用户手改的生图提示词（没改就不存）
-  bubTab: 'rec',      // rec | fav
-  bubUse: {},         // 气泡使用次数（常用排序）
-  engine: null,
-  hollow: false,
-  showLabels: true,
-  exportWidth: 1600,
-  outlineExport: true,
-  analysis: null,
-  plot: '',
-  pages: [],          // 多页：{tplId, images, bubbles, lines}
-  pageIdx: 0,
-  cands: {},          // slotId -> [href...] 候选图
-  slotCollapsed: false,
-  slotAiMode: 'img',  // img | prompt
-  paint: {},          // slotId -> {strokes:[...], workSide} 格子内绘制的笔画（唯一真相）
-  under: {},          // slotId -> 图片资产：画在照片上时，照片留在这里当底图
-  chars: [],          // 角色卡 [{id,name,note,images:[dataURL]}]
-  activeChars: [],    // 本页启用的角色 id
-  styleFollow: 'char',  // 生图参考谁：char 人设图 / sample 样图 / both 都参考 / none 都不跟
-  samples: [],          // 样图（风格参考），可多张
-  clipboard: null,    // 内部剪贴板（图片或气泡）
-  promptSrc: {},      // 每格提示词来源：rule（规则切分）/ ai（AI 生成）/ mine（自己写）
-  promptPrefix: {},   // 每格是否把「形状开头词」放在提示词最前面（默认 true）
-  libFilter: null,    // 模板库的标签筛选 {kind:'panels'|'intent'|'ratio'|'tag', value}
-  intentZh: {},       // 戏路 id → 中文（从 /api/meta 来）
-  history: { past: [], future: [] },
-};
-
 const CULTURE_LABEL = { jp: '日', cn: '中', kr: '韩', core: '通' };
 const CULTURE_ZH = { jp: '日式页漫', cn: '中式漫画', kr: '韩式条漫', core: '通用/跨界' };
 
@@ -138,7 +89,6 @@ const UI_KEY = 'pf.ui.v1';
 const LANG_KEY = 'pf.lang.v1';
 const MOTION_KEY = 'pf.motion';
 const sysDarkMQ = window.matchMedia('(prefers-color-scheme: dark)');
-const sysReduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -190,29 +140,7 @@ if (SHELL) {
  * 只在这个参数下存在；用来量「拖动 / 缩放」热路径到底花了多少时间，
  * 手机上也能直接看（不用连 Mac 抓 Safari 时间线）。
  * ---------------------------------------------------------------- */
-const PERF = new URLSearchParams(location.search).get('perf') === '1';
-const perf = {
-  frames: [], render: [], patch: [], save: [], paint: [], longtask: [],
-  lastSaveBytes: 0, renders: 0, patches: 0, saves: 0,
-};
-function perfPush(arr, v) { arr.push(v); if (arr.length > 90) arr.shift(); }
-function perfStats(arr) {
-  if (!arr.length) return { avg: 0, p95: 0, max: 0 };
-  const s = [...arr].sort((a, b) => a - b);
-  const at = (q) => s[Math.min(s.length - 1, Math.floor(s.length * q))];
-  return {
-    avg: s.reduce((n, v) => n + v, 0) / s.length,
-    p95: at(0.95), max: s[s.length - 1],
-  };
-}
-/** 量一段代码耗时（只在 ?perf=1 下记录，别的地方调它不会变慢） */
-const perfNow = () => (PERF ? performance.now() : 0);
-const perfDone = (kind, t0) => {
-  if (!PERF || !t0) return;
-  perfPush(perf[kind], performance.now() - t0);
-  if (kind === 'render') perf.renders++;
-  if (kind === 'patch') perf.patches++;
-};
+
 function initPerfHud() {
   if (!PERF) return;
   const el = document.createElement('div');
@@ -585,56 +513,6 @@ async function aiSelfTestBody(ok) {
  * 撤销 / 重做
  * 快照只克隆对象的外壳，图片的 dataURL 字符串是共享引用，所以很轻
  * ================================================================== */
-const HIST_MAX = 60;
-
-function snapshot() {
-  return {
-    images: Object.fromEntries(Object.entries(state.images).map(([k, v]) => [k, { ...v }])),
-    bubbles: state.bubbles.map((b) => ({ ...b })),
-    lines: { ...state.lines },
-    promptEdits: JSON.parse(JSON.stringify(state.promptEdits || {})),
-    selectedId: state.selectedId,
-    selBubble: state.selBubble,
-  };
-}
-
-function restore(snap) {
-  state.images = Object.fromEntries(Object.entries(snap.images).map(([k, v]) => [k, { ...v }]));
-  state.bubbles = snap.bubbles.map((b) => ({ ...b }));
-  state.lines = { ...snap.lines };
-  state.promptEdits = JSON.parse(JSON.stringify(snap.promptEdits || {}));
-  state.selectedId = snap.selectedId;
-  state.selBubble = snap.selBubble;
-  renderStage();
-  renderSlotPanel();
-  renderBubbles();
-}
-
-/** 在改动之前调用：把当前状态压进历史 */
-function commit() {
-  if (!state.tpl) return;
-  state.history.past.push(snapshot());
-  if (state.history.past.length > HIST_MAX) state.history.past.shift();
-  state.history.future.length = 0;
-}
-
-function undo() {
-  if (!state.history.past.length) { toast('没有可撤销的操作'); return; }
-  state.history.future.push(snapshot());
-  restore(state.history.past.pop());
-  toast('已撤销');
-}
-
-function redo() {
-  if (!state.history.future.length) { toast('没有可重做的操作'); return; }
-  state.history.past.push(snapshot());
-  restore(state.history.future.pop());
-  toast('已重做');
-}
-
-function resetHistory() {
-  state.history = { past: [], future: [] };
-}
 
 /* ================================================================== *
  * 可折叠面板：收起只留标题行，状态记在本机
@@ -1935,20 +1813,6 @@ function lpPulse() {
   document.body.classList.add('pf-lp');
   clearTimeout(lpPulse._t);
   lpPulse._t = setTimeout(() => document.body.classList.remove('pf-lp'), 320);
-}
-
-/**
- * 给一个 Promise 加超时。
- * 为什么要它：生图/写台词这类请求一旦挂住（服务商不返回、网络半死），
- * 按钮会永远停在"生成中"、格子永远显示"正在生成"，用户看到的就是"卡死了"。
- * 超时后抛错，流程照常走 catch/finally，状态才能真正复位。
- */
-function withTimeout(promise, ms, label = '请求') {
-  let timer = 0;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label}超时（${Math.round(ms / 1000)}s 没有响应），已放弃`)), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 // 生图超时：Seedream/Flux 排队 1–2 分钟是常态，默认给 120s；?imgtimeout=毫秒 可临时改（测试用）
@@ -4185,12 +4049,7 @@ const fileToDataURL = (file) => new Promise((res, rej) => {
   r.onerror = rej;
   r.readAsDataURL(file);
 });
-const blobToDataURL = (blob) => new Promise((res, rej) => {
-  const r = new FileReader();
-  r.onload = () => res(r.result);
-  r.onerror = rej;
-  r.readAsDataURL(blob);
-});
+
 const imageSize = (href) => new Promise((res) => {
   const img = new Image();
   img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight });
@@ -6421,13 +6280,6 @@ function downloadText(text, name, mime = 'text/plain;charset=utf-8') {
   downloadBlob(new Blob([text], { type: mime }), name);
 }
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-function debounce(fn, ms) {
-  let t;
-  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
-}
-
 /* ================================================================== *
  * 外观层：主题 / 平台快捷键 / 手机视图 / 滑块填充 / 静态版链接
  * ================================================================== */
@@ -6440,10 +6292,6 @@ function initChrome() {
   initMoreMenu();
   initViews();
   initStaticLinks();
-}
-
-function motionOK() {
-  return !sysReduceMQ.matches && document.documentElement.dataset.motion !== 'reduced';
 }
 
 /** 用 View Transitions 包一层；不支持或用户要求减弱动效时直接执行 */
@@ -6671,20 +6519,6 @@ function placeInd(g) {
   ind.style.opacity = '';
   ind.style.setProperty('--x', on.offsetLeft + 'px');
   ind.style.setProperty('--w', on.offsetWidth + 'px');
-}
-
-/** 列表依次浮现：给每个子元素一个序号 */
-function stagger(container, sel, cap = 14) {
-  if (!container) return;
-  container.querySelectorAll(sel).forEach((el, i) => el.style.setProperty('--i', Math.min(i, cap)));
-}
-
-/** 重新触发一个 CSS 动画类 */
-function replay(el, cls) {
-  if (!el || !motionOK()) return;
-  el.classList.remove(cls);
-  void el.offsetWidth;
-  el.classList.add(cls);
 }
 
 /** 滑块左侧填充：用 --p 画出 iOS 那种「已选部分是蓝色」的轨道 */
