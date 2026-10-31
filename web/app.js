@@ -3167,8 +3167,16 @@ function syncSlotZoom() {
   const slot = state.tpl?.slots?.find((x) => x.id === state.selectedId);
   const img = state.selectedId ? state.images[state.selectedId] : null;
   const view = document.body.dataset.view || '';
-  const showIt = !!(svg && slot && img && !state.hollow && view !== 'edit');
+  // 只在「画布」视图显示：以前写的是 view !== 'edit'，于是在剧情/模板库/导出视图里
+  // 也会显示——那几屏 #canvas 是 display:none，getBoundingClientRect 全 0，
+  // 缩放条就被定到了视口左上角（用户看到的那条小条）。
+  const showIt = !!(svg && slot && img && !state.hollow && view === 'canvas');
   if (!showIt) { box.classList.add('hidden'); return; }
+  // 再兜一层：svh 还没排版（宽高为 0）时也不显示
+  {
+    const pre = svg.getBoundingClientRect();
+    if (pre.width < 8 || pre.height < 8) { box.classList.add('hidden'); return; }
+  }
 
   // 用 position:fixed + 视口坐标：完全不依赖 offsetParent。
   // （踩过两次坑：offsetParent 会因祖先被加 transform 而变，算出来的位置在同步和 resize 时不一致）

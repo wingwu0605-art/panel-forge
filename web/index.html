@@ -356,11 +356,11 @@ window.addEventListener("unhandledrejection", function (e) {
 
   <!-- 选中那一格的缩放条：浮在格子正右侧，显示百分比 -->
   <div class="slot-zoom hidden" id="slotZoom" aria-hidden="true">
-    <button type="button" class="sz-btn" data-step="-1" title="缩小">−</button>
+    <button type="button" class="sz-btn" data-step="1" title="放大">+</button>
     <div class="sz-track">
       <input type="range" id="slotZoomRange" min="30" max="400" value="100" aria-label="这一格的图片缩放">
     </div>
-    <button type="button" class="sz-btn" data-step="1" title="放大">+</button>
+    <button type="button" class="sz-btn" data-step="-1" title="缩小">−</button>
     <button type="button" class="sz-val" id="slotZoomVal" title="点一下复位到 100%">100%</button>
   </div>
 

@@ -1996,6 +1996,63 @@ const scenarios = [
   },
 
   {
+    name: 'mobile-scroll',
+    title: '㉜ 手机：剧情视图能上下滚 + 缩放条不跑到左上角 + 加减按钮方向对',
+    async run(page, shot, { check }) {
+      await page.viewport(430, 900);
+      await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1&view=story');
+      await page.ready();
+
+      const out = await page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        await wait(400);
+        const left = document.querySelector('.rail.left');
+        const bar = document.querySelector('#slotZoom');
+        const res = {};
+
+        // 左栏是不是一个能滚的容器
+        res.box = {
+          overflowY: getComputedStyle(left).overflowY,
+          scrollHeight: left.scrollHeight,
+          clientHeight: left.clientHeight,
+          canScroll: left.scrollHeight > left.clientHeight + 8,
+        };
+        const before = left.scrollTop;
+        left.scrollTop = 260;
+        await wait(140);
+        res.scrolled = left.scrollTop - before;
+        left.scrollTop = before;
+
+        // 缩放条在剧情视图必须隐藏（以前 view !== 'edit' 导致它显示在 (0,0)）
+        res.storyHidden = bar.classList.contains('hidden');
+        res.storyDisplay = getComputedStyle(bar).display;
+
+        // 按钮顺序：+ 在上、− 在下
+        // 缩放条这时是隐藏的，几何全是 0 —— 用 DOM 顺序判断上下（flex 列布局里顺序即上下）
+        res.btns = [...bar.querySelectorAll('.sz-btn')].map((b) => b.dataset.step);
+        res.valAfterBtns = !!bar.querySelector('.sz-val');
+
+        // 切到画布视图（有图才显示；这里没图，只验证"不显示"不会因视图切换而炸）
+        document.querySelector('#tabbar button[data-view="canvas"]')?.click();
+        await wait(400);
+        res.canvasView = document.body.dataset.view;
+        res.canvasHidden = bar.classList.contains('hidden');
+        return res;
+      })()`);
+
+      check('手机剧情视图能上下滚动（以前 body 锁死、左栏被内容撑高）',
+        out.box.overflowY === 'auto' && out.box.canScroll && out.scrolled > 100,
+        `${out.box.clientHeight}/${out.box.scrollHeight} · 滚动 ${out.scrolled}px`);
+      check('缩放条在剧情视图不显示（不再跑到左上角）',
+        out.storyHidden === true && out.storyDisplay === 'none', out.storyDisplay);
+      check('缩放条「+」在滑块上方、「−」在下方（跟滑块上=放大一致）',
+        out.btns.length === 2 && out.btns[0] === '1' && out.btns[1] === '-1' && out.valAfterBtns,
+        out.btns.join(' / '));
+      await shot('mobile-scroll');
+    },
+  },
+
+  {
     name: 'auto-seg',
     title: '㉛ 全自动开关：深浅两套主题下都看得见（浅色曾白底白字）',
     async run(page, shot, { check }) {

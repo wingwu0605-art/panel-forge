@@ -2772,3 +2772,36 @@ body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outlin
 .rail,.stage-wrap{transition:opacity .16s var(--ease)}
 body.rail-fade .rail{opacity:0}
 body.rail-fade .stage-wrap{opacity:.9}
+
+/* 手机：左栏（模板库 / 剧情）必须自己滚
+   移动端布局把每个视图绝对定位在 body 里，而 body 是 overflow:hidden（桌面用），
+   于是内容超出一屏就"卡死不能上下拖"。这里给左栏自己一个滚动容器。 */
+@media (max-width:1024px){
+  /* 手机：每个视图自己滚
+     移动端把视图绝对定位在 body 里，而 body 是 overflow:hidden（桌面用），
+     内容超出一屏就"卡死不能上下拖"。
+
+     关键坑：.rail 基础规则里是 position:relative（(0,1,0)），媒体查询里
+     .layout > *{position:absolute}（也是 (0,1,0)）同权重、靠顺序——.rail 那条在后面赢，
+     所以子元素没被约束成视口高，被内容撑到 1338px，scrollHeight==clientHeight，
+     overflow:auto 也就无从滚动。这里显式把定位和高度写回来。 */
+  .layout > .rail,
+  .layout > .stage-wrap{
+    position:absolute;
+    top:0;
+    bottom:var(--tabbar-h);
+    left:0;
+    right:0;
+    height:auto;
+  }
+  .rail.left{
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-y:contain;
+    scroll-padding-bottom:calc(var(--tabbar-h) + 16px);
+  }
+  .rail.right{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
+  body[data-view="canvas"] .stage-wrap{overflow:hidden}
+  body[data-view="canvas"] .stage{overflow:auto;-webkit-overflow-scrolling:touch}
+}

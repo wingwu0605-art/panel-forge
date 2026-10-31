@@ -133,10 +133,10 @@ export function enterEdit(fromCanvas, { instant = false } = {}) {
   if (animate) body.classList.add('zooming', 'sheet-in');
   applyView('edit');
   if (!animate) { requestAnimationFrame(() => syncEditZoom(true)); return; }
-  // 不 replay：类在 applyView 之前就挂好了，动画会自然从动画起点开始
-  body.classList.remove('sheet-in');
-  void body.offsetWidth;
-  body.classList.add('sheet-in');
+  // 这里**不要** remove/add 重放动画：
+  //   类在 applyView 之前就挂好了，元素一旦可见动画就从起点开始；
+  //   而重放要读一次 offsetWidth —— 那是同步布局，前面 applyView 刚把整块右栏渲染完，
+  //   在手机上这一下就是肉眼可见的"先到位再滑上来"（弹一下）。
   requestAnimationFrame(() => {
     const g = untransformed();
     if (A && g) setHolderT(flipFrom(A, g));            // 先摆回原来整页的位置
