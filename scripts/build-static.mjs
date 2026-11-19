@@ -55,6 +55,35 @@ if (!html.includes('PF_STATIC')) {
   for (const f of await readdir(path.join(site, 'lib'))) h.update(await readFile(path.join(site, 'lib', f)));
   const v = h.digest('hex').slice(0, 8);
   html = html.replace(/(\.\/(?:styles\.css|app\.js))(\?v=[\w-]*)?(?=")/g, `$1?v=${v}`);
+
+  // 模块之间的 import 也要带同一个版本号。
+  // 只给入口加 ?v= 不够：GitHub Pages 让浏览器把每个文件缓存 10 分钟，发版后新的 app.js
+  // 会 import 到缓存里旧的 assets.mjs，导出名对不上 → 整张模块图链接失败，页面一行脚本都不跑。
+  // 所有相对路径的 import / import() 统一加 ?v=（同一个号，模块不会被加载成两份）。
+  const SPEC = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])(\.{1,2}\/[^'"?]+?\.m?js)\2/g;
+  const stamp = async (file) => {
+    const src = await readFile(file, 'utf8');
+    const out = src.replace(SPEC, (_, kw, q, spec) => `${kw}${q}${spec}?v=${v}${q}`);
+    if (out !== src) await writeFile(file, out, 'utf8');
+  };
+  for (const f of await readdir(site)) if (/\.m?js$/.test(f)) await stamp(path.join(site, f));
+  for (const f of await readdir(path.join(site, 'lib'))) if (f.endsWith('.mjs')) await stamp(path.join(site, 'lib', f));
+  for (const f of await readdir(path.join(site, 'vendor'))) if (/\.m?js$/.test(f)) await stamp(path.join(site, 'vendor', f));
+
+  // 自检：还有没带版本号的相对 import 就直接构建失败（CI 里会挡住发布）
+  const LEFT = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"](\.{1,2}\/[^'"?]+\.m?js)['"]/g;
+  const missed = [];
+  for (const dir of ['', 'lib', 'vendor']) {
+    for (const f of await readdir(path.join(site, dir))) {
+      if (!/\.m?js$/.test(f)) continue;
+      const src = await readFile(path.join(site, dir, f), 'utf8');
+      for (const m of src.matchAll(LEFT)) missed.push(`${dir ? dir + '/' : ''}${f} → ${m[1]}`);
+    }
+  }
+  if (missed.length) {
+    console.error('✗ 这些 import 没带版本号（发版后会和浏览器缓存里的旧文件混用）：\n  ' + missed.join('\n  '));
+    process.exit(1);
+  }
 }
 await writeFile(path.join(site, 'index.html'), html, 'utf8');
 
