@@ -16,12 +16,22 @@ export const IMG_MAX_SIDE = 2000;
 export const IMG_QUALITY = 0.9;
 export const dataHrefCache = new WeakMap(); // Blob → data URL，导出时用一次就够
 export const blobUrlCache = new WeakMap();  // Blob → blob URL，同一个 blob 永远拿同一个 URL（换页不会越攒越多）
+// 反查：blob URL → Blob（草稿落盘时把候选图这类「只记着 URL」的东西换回 Blob）。
+// 不会额外延长 Blob 的寿命：blob URL 没 revoke 之前，浏览器本来就持有这个 Blob。
+const blobByUrl = new Map();
 
 export const urlForBlob = (blob) => {
   let u = blobUrlCache.get(blob);
-  if (!u) { u = URL.createObjectURL(blob); blobUrlCache.set(blob, u); }
+  if (!u) { u = URL.createObjectURL(blob); blobUrlCache.set(blob, u); blobByUrl.set(u, blob); }
   return u;
 };
+export const blobForUrl = (url) => blobByUrl.get(url) || null;
+
+/** 任意来源（data URL / http / Blob）→ 稳定的 blob URL（候选图用：DOM 里不再塞几 MB 的 base64） */
+export async function blobUrlOf(src) {
+  if (typeof src === 'string' && blobByUrl.has(src)) return src;
+  return urlForBlob(await blobOf(src));
+}
 
 export const loadImgEl = (src) => new Promise((res, rej) => {
   const img = new Image();

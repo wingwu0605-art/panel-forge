@@ -1,174 +1,178 @@
+#!/usr/bin/env node
 /**
- * 配色质量闸：把 styles.css 里每套皮肤（含亮/暗两态）的令牌解析出来，
- * 换算成 sRGB 后校验 WCAG 2.2 对比度。不达标直接非零退出 —— 配色不靠肉眼。
+ * 配色对比度检查（WCAG 2.x，零依赖）。
  *
- *   node scripts/check-contrast.mjs
+ * 外观 = 风格（经典 / 液态玻璃 / 高级简约 / 灵动可爱）× 明暗 × 强调色（跟随风格 + 10 个）。
+ * 这里把 web/styles.css 里所有 `:root[...]` 令牌块按浏览器的层叠规则（属性选择器个数 → 源码顺序）
+ * 叠出每一种组合的最终令牌，解开 var()（含回退值），再逐对算对比度：
+ *   4 风格 × 2 明暗 × 11 强调色 = 88 种组合，每种 13 对。任何一对不达标 → 退出码 1（CI 会挂）。
  *
- * 校验的对（都是真实出现在界面上的组合）：
- *   正文 / 次级文字 / 三级文字  对 页面底色、卡片底
- *   按钮文字 对 主色底（on-tint / tint）
- *   主色、成功、警告、危险 ink 对 页面底色（链接、状态文字）
+ * 半透明的前景合成到背景上、半透明的背景合成到 --bg 上再算（液态玻璃的卡片是半透明的）。
+ * 用法：node scripts/check-contrast.mjs [--verbose]
  */
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
-/* ---------------- oklch → sRGB ---------------- */
-const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const css = readFileSync(path.join(ROOT, 'web/styles.css'), 'utf8');
+const VERBOSE = process.argv.includes('--verbose');
 
-function oklchToLinearRgb(L, C, H) {
-  const h = (H * Math.PI) / 180;
-  const a = C * Math.cos(h);
-  const b = C * Math.sin(h);
-  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
-  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
-  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
-  const l = l_ * l_ * l_;
-  const m = m_ * m_ * m_;
-  const s = s_ * s_ * s_;
-  return [
-    clamp01(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
-    clamp01(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
-    clamp01(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s),
-  ];
-}
+const STYLES = ['classic', 'glass', 'minimal', 'cute'];
+const SCHEMES = ['light', 'dark'];
+const ACCENTS = ['default', 'blue', 'indigo', 'purple', 'pink', 'red', 'orange', 'yellow', 'green', 'teal', 'graphite'];
 
-function parseColor(str) {
-  const t = String(str).trim();
-  let m = t.match(/^oklch\(\s*([\d.]+)%?\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\s*\)$/i);
-  if (m) {
-    let L = parseFloat(m[1]);
-    if (t.includes('%')) L = L / 100;
-    const C = parseFloat(m[2]);
-    const H = parseFloat(m[3]);
-    const A = m[4] === undefined ? 1 : parseFloat(m[4]);
-    return { lin: oklchToLinearRgb(L, C, H), a: A };
-  }
-  m = t.match(/^#([0-9a-f]{6})$/i);
-  if (m) {
-    const n = parseInt(m[1], 16);
-    const srgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255);
-    return { lin: srgb.map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)), a: 1 };
-  }
-  m = t.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
-  if (m) {
-    const srgb = [m[1], m[2], m[3]].map((v) => parseFloat(v) / 255);
-    return { lin: srgb.map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)), a: m[4] === undefined ? 1 : parseFloat(m[4]) };
-  }
-  return null;
-}
-
-const lin2srgb = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
-const srgb2lin = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-
-/** 半透明颜色合成到底色上。注意：alpha 混合必须发生在 **sRGB（gamma）空间**，
- *  直接在线性空间插值算出来的对比度是错的（会低报 2~3 倍）。 */
-function composite(fg, bg) {
-  if (!fg) return bg;
-  const a = fg.a === undefined ? 1 : fg.a;
-  if (a >= 1) return fg;
-  const out = fg.lin.map((v, i) => srgb2lin(lin2srgb(v) * a + lin2srgb(bg.lin[i]) * (1 - a)));
-  return { lin: out, a: 1 };
-}
-
-const lum = (c) => 0.2126 * c.lin[0] + 0.7152 * c.lin[1] + 0.0722 * c.lin[2];
-const ratio = (fg, bg) => {
-  const f = composite(fg, bg);
-  const a = lum(f);
-  const b = lum(bg);
-  const hi = Math.max(a, b);
-  const lo = Math.min(a, b);
-  return (hi + 0.05) / (lo + 0.05);
-};
-
-/* ---------------- 解析 CSS ---------------- */
-const css = readFileSync('web/styles.css', 'utf8');
-
-function parseDecls(body) {
-  const out = {};
-  // 先去掉注释：否则 「/* 说明 */ --bg:...」 会让 key 变成注释文本，令牌被静默吞掉
-  const clean = body.replace(/\/\*[\s\S]*?\*\//g, '');
-  for (const part of clean.split(';')) {
-    const i = part.indexOf(':');
-    if (i < 0) continue;
-    const k = part.slice(0, i).trim();
-    const v = part.slice(i + 1).trim();
-    if (k.startsWith('--')) out[k] = v;
-  }
-  return out;
-}
-
-/** 把 var(--x) 解引用到同一声明块里的具体值 */
-function resolve(decls, name, depth = 0) {
-  if (depth > 5) return null;
-  let v = decls[name];
-  if (!v) return null;
-  const m = v.match(/^var\(\s*(--[\w-]+)\s*\)$/);
-  if (m) return resolve(decls, m[1], depth + 1);
-  v = v.replace(/color-mix\([^)]*\)/gi, '').trim();
-  return v || null;
-}
-
-const blocks = {};
-// 基础主题（亮）
-const baseLight = css.match(/^:root\{([\s\S]*?)\n\}/m);
-if (baseLight) blocks['经典·亮'] = parseDecls(baseLight[1]);
-// 基础主题（暗）
-const baseDark = css.match(/:root:not\(\[data-theme="light"\]\)\{([^}]*)\}/);
-if (baseDark) blocks['经典·暗'] = { ...blocks['经典·亮'], ...parseDecls(baseDark[1]) };
-
-for (const skin of ['cute', 'minimal']) {
-  const light = css.match(new RegExp(`html\\[data-skin="${skin}"\\]\\{([\\s\\S]*?)\\n\\}`, 'm'));
-  if (light) blocks[`${skin}·亮`] = parseDecls(light[1]);
-  const darkMedia = css.match(new RegExp(`@media \\(prefers-color-scheme:dark\\)\\{\\s*html\\[data-skin="${skin}"\\]:not\\(\\[data-theme="light"\\]\\)\\{([^}]*)\\}`, 'm'));
-  const darkManual = css.match(new RegExp(`html\\[data-skin="${skin}"\\]\\[data-theme="dark"\\]\\{([^}]*)\\}`, 'm'));
-  const darkDecls = { ...(darkMedia ? parseDecls(darkMedia[1]) : {}) };
-  if (darkManual) Object.assign(darkDecls, parseDecls(darkManual[1]));
-  if (Object.keys(darkDecls).length) {
-    blocks[`${skin}·暗`] = { ...blocks[`${skin}·亮`], ...darkDecls };
-  }
-}
-
-/* ---------------- 校验 ---------------- */
-// [前景, 背景, 最小对比度, 说明]
 const PAIRS = [
   ['--label', '--bg', 4.5, '正文 / 页面底'],
   ['--label', '--bg-elev', 4.5, '正文 / 卡片'],
+  ['--label', '--surface-2', 4.5, '正文 / 次级面'],
   ['--label-2', '--bg', 4.5, '次级文字 / 页面底'],
   ['--label-2', '--bg-elev', 4.5, '次级文字 / 卡片'],
-  ['--label-3', '--bg', 3.0, '三级文字 / 页面底（大字面/图标）'],
-  ['--on-tint', '--tint', 4.5, '按钮文字 / 主色底'],
-  ['--tint', '--bg', 3.0, '主色 / 页面底（链接与控件）'],
+  ['--label-3', '--bg', 3.0, '三级文字 / 页面底（大字 / 图标）'],
+  ['--on-tint', '--tint', 4.5, '主按钮文字 / 主色'],
+  ['--tint', '--bg', 3.0, '主色控件 / 页面底'],
+  ['--tint', '--bg-elev', 3.0, '主色控件 / 卡片'],
   ['--green-ink', '--bg', 4.5, '成功文字 / 页面底'],
   ['--red-ink', '--bg', 4.5, '危险文字 / 页面底'],
+  ['--red-ink', '--bg-elev', 4.5, '危险文字 / 卡片'],
   ['--orange-ink', '--bg', 4.5, '提醒文字 / 页面底'],
 ];
 
-let fails = 0;
-let checks = 0;
-for (const [themeName, decls] of Object.entries(blocks)) {
-  const rows = [];
-  for (const [fgName, bgName, min, note] of PAIRS) {
-    const fgStr = resolve(decls, fgName);
-    const bgStr = resolve(decls, bgName);
-    if (!fgStr || !bgStr) { rows.push({ ok: false, note: `${note}（令牌缺失 ${!fgStr ? fgName : bgName}）` }); fails++; continue; }
-    const fg = parseColor(fgStr);
-    const bg = parseColor(bgStr);
-    if (!fg || !bg) { rows.push({ ok: false, note: `${note}（无法解析 ${fgStr} / ${bgStr}）` }); fails++; continue; }
-    const r = ratio(fg, bg);
-    checks++;
-    const ok = r >= min;
-    if (!ok) fails++;
-    rows.push({ ok, note, r: r.toFixed(2), min });
+/* ------------------------------------------------------------------ 读令牌块 */
+/** 只取顶层的 `:root…{}` 块（@supports / @media 里的是曲线和布局尺寸，不含颜色） */
+function tokenBlocks(src) {
+  const text = src.replace(/\/\*[\s\S]*?\*\//g, (m) => ' '.repeat(m.length));
+  const blocks = [];
+  let depth = 0, i = 0, start = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (c === '{') {
+      if (depth === 0) {
+        const sel = text.slice(start, i).trim();
+        let j = i + 1, d = 1;
+        while (d && j < text.length) { if (text[j] === '{') d++; else if (text[j] === '}') d--; j++; }
+        if (/^:root(\[[^\]]+\])*$/.test(sel.replace(/\s+/g, ''))) {
+          blocks.push({ sel, body: text.slice(i + 1, j - 1), order: blocks.length });
+        }
+        i = j; start = j; continue;
+      }
+    } else if (c === ';' && depth === 0) start = i + 1;
+    i++;
   }
-  console.log(`\n── ${themeName} ${'─'.repeat(Math.max(0, 46 - themeName.length))}`);
-  for (const row of rows) {
-    const mark = row.ok ? '✓' : '✗';
-    console.log(`  ${mark} ${row.note.padEnd(30, ' ')} ${String(row.r ?? '—').padStart(6)}  ≥${row.min ?? '—'}`);
+  for (const b of blocks) {
+    b.conds = [...b.sel.matchAll(/\[data-([a-z-]+)="([^"]+)"\]/g)].map((m) => [m[1], m[2]]);
+    b.decls = {};
+    for (const m of b.body.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);?/gi)) b.decls[m[1]] = m[2].trim();
   }
+  return blocks;
 }
 
-console.log(`\n解析到 ${Object.keys(blocks).length} 套配色：${Object.keys(blocks).join(' · ')}`);
-if (fails) {
-  console.log(`\n❌ ${fails} / ${checks} 对不达 AA，先改配色再提交。`);
-  process.exit(1);
+function tokensFor(blocks, attrs) {
+  const hit = blocks.filter((b) => b.conds.every(([k, v]) => attrs[k] === v))
+    .sort((a, b) => a.conds.length - b.conds.length || a.order - b.order);
+  const out = {};
+  for (const b of hit) Object.assign(out, b.decls);
+  return out;
 }
-console.log(`\n✅ ${checks} 对全部达标（WCAG 2.2 AA）`);
+
+/** 解开 var(--x, 回退)（可嵌套） */
+function resolve(tokens, value, seen = new Set()) {
+  let v = value;
+  for (let guard = 0; guard < 20 && v.includes('var('); guard++) {
+    v = v.replace(/var\(\s*(--[a-z0-9-]+)\s*(?:,\s*((?:[^()]|\((?:[^()]|\([^()]*\))*\))*))?\)/gi, (_, name, fb) => {
+      if (name in tokens && !seen.has(name)) return resolve(tokens, tokens[name], new Set([...seen, name]));
+      return fb !== undefined ? fb.trim() : 'UNDEFINED';
+    });
+  }
+  return v.trim();
+}
+
+/* ------------------------------------------------------------------ 颜色 */
+function parseColor(str) {
+  const s = str.trim().toLowerCase();
+  let m;
+  if ((m = s.match(/^#([0-9a-f]{3,8})$/))) {
+    let h = m[1];
+    if (h.length <= 4) h = [...h].map((c) => c + c).join('');
+    const n = (k) => parseInt(h.slice(k, k + 2), 16) / 255;
+    return { r: n(0), g: n(2), b: n(4), a: h.length === 8 ? n(6) : 1 };
+  }
+  if ((m = s.match(/^rgba?\(([^)]+)\)$/))) {
+    const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    return { r: p[0] / 255, g: p[1] / 255, b: p[2] / 255, a: p[3] ?? 1 };
+  }
+  if ((m = s.match(/^oklch\(([^)]+)\)$/))) {
+    const [main, alpha] = m[1].split('/');
+    const [L, C, H] = main.trim().split(/\s+/).map(parseFloat);
+    return { ...oklchToSrgb(L, C, H), a: alpha ? parseFloat(alpha) : 1 };
+  }
+  if (s === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
+  return null;
+}
+function oklchToSrgb(L, C, H) {
+  const h = (H * Math.PI) / 180;
+  const a = C * Math.cos(h), b = C * Math.sin(h);
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
+  const l = l_ ** 3, m = m_ ** 3, s = s_ ** 3;
+  const lin = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+  const enc = (x) => { const v = Math.min(1, Math.max(0, x)); return v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055; };
+  return { r: enc(lin[0]), g: enc(lin[1]), b: enc(lin[2]) };
+}
+const over = (fg, bg) => ({
+  r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1,
+});
+const lum = (c) => {
+  const f = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+};
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+
+/* ------------------------------------------------------------------ 检查 */
+const blocks = tokenBlocks(css);
+if (!blocks.length) { console.error('✗ 没找到 :root 令牌块'); process.exit(1); }
+
+let fails = 0, checks = 0, worst = null;
+for (const style of STYLES) {
+  for (const scheme of SCHEMES) {
+    for (const accent of ACCENTS) {
+      const attrs = { scheme };
+      if (style !== 'classic') attrs.style = style;
+      if (accent !== 'default') attrs.accent = accent;
+      const tk = tokensFor(blocks, attrs);
+      const get = (name) => {
+        const raw = resolve(tk, `var(${name})`);
+        const c = parseColor(raw);
+        if (!c) throw new Error(`${style}/${scheme}/${accent}: ${name} = "${raw}" 解析不了`);
+        return c;
+      };
+      const page = get('--bg');
+      if (page.a < 1) throw new Error(`${style}/${scheme}: --bg 必须是不透明色（状态栏颜色也取它）`);
+      for (const [fgName, bgName, min, note] of PAIRS) {
+        let bg = get(bgName);
+        if (bg.a < 1) bg = over(bg, page);
+        let fg = get(fgName);
+        if (fg.a < 1) fg = over(fg, bg);
+        const r = ratio(fg, bg);
+        checks++;
+        const tag = `${style}·${scheme}·${accent}`;
+        if (!worst || r - min < worst.margin) worst = { margin: r - min, tag, pair: `${fgName} / ${bgName}`, r };
+        if (r < min) {
+          fails++;
+          console.log(`  ✗ ${tag.padEnd(26)} ${`${fgName} / ${bgName}`.padEnd(26)} ${r.toFixed(2)} < ${min}  ${note}`);
+        } else if (VERBOSE) {
+          console.log(`  ✓ ${tag.padEnd(26)} ${`${fgName} / ${bgName}`.padEnd(26)} ${r.toFixed(2)}`);
+        }
+      }
+    }
+  }
+}
+const combos = STYLES.length * SCHEMES.length * ACCENTS.length;
+console.log(`对比度：${combos} 种外观组合 × ${PAIRS.length} 对 = ${checks} 项，${fails ? `${fails} 项不达标` : '全部达标'}` +
+  `（余量最小：${worst.tag} ${worst.pair} = ${worst.r.toFixed(2)}）`);
+process.exit(fails ? 1 : 0);

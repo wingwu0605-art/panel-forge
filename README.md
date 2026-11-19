@@ -9,14 +9,14 @@
 给 AI 漫画一副「像人画的」版面骨架：格子有大小差、有斜切、有留白、有越界、有叠压插入格——
 而不是九宫格平铺。每一格还带景别、构图意图和可直接喂给文生图模型的提示词。
 
-![编辑器：日式三段落とし + 图片填充 + 逐格分镜表](out/hero-jp.png)
+![编辑器：日式三段落とし + 图片填充 + 逐格分镜表](docs/images/hero-jp.png)
 
 上图为 `jp-shonen-3tier`（少年漫·三段落とし）：右→左阅读、大格冲击、图片自动裁进格子。
 下面两张分别是韩式长条漫（11 格一镜到底）与「剧情 → 匹配」实况：
 
-![韩式长条漫 11 格](out/hero-kr.png)
+![韩式长条漫 11 格](docs/images/hero-kr.png)
 
-![剧情匹配：雨夜拔刀](out/hero-match.png)
+![剧情匹配：雨夜拔刀](docs/images/hero-match.png)
 
 ---
 
@@ -136,7 +136,7 @@ node scripts/dump-templates.mjs  # 导出 out/templates.json 给别的工具用
 | 近方格 | 宽高比 0.85–1.18 | 主体居中、背景干净 |
 | 常规格 | 其它 | 均衡构图 |
 
-![形状开头词：三角格](out/v3-shape.png)
+![形状开头词：三角格](docs/images/v3-shape.png)
 
 三种拿法：
 
@@ -187,7 +187,7 @@ GET  /api/templates/{id}/shapes                      # 这套模板里每格是�
 每个气泡可以调：**不透明度（10–100%）**、大小、旋转 ±30°、文字（自动换行、中文按字断）。
 气泡画在页面 SVG 里，所以**导出 PNG / SVG 时跟着一起走**，不需要后期再加。
 
-![本格句子 + 气泡素材库](out/v4-bubbles.png)
+![本格句子 + 气泡素材库](docs/images/v4-bubbles.png)
 
 ---
 
@@ -218,7 +218,7 @@ GET  /api/templates/{id}/shapes                      # 这套模板里每格是�
 
 ## 网页编辑器
 
-![编辑器 + 分镜表](out/hero-jp.png)
+![编辑器 + 分镜表](docs/images/hero-jp.png)
 
 1. **选版式**：左栏模板库（按体系/关键词筛），或写一段剧情点「匹配分镜」让引擎挑。
 2. **填图**（三种）：点格子选图 / 把一批图直接拖进画布（按阅读顺序自动填）/ `Ctrl+V` 粘贴到选中格。
@@ -468,7 +468,7 @@ panel-forge/
 │  ├─ library-{jp,cn,kr,core}.mjs   # 138 套模板定义
 │  ├─ svg.mjs                 # 渲染器（服务端与浏览器共用）
 │  └─ aidocs.mjs              # system prompt / 6 个工具定义 / OpenAPI
-├─ web/                       # 编辑器（原生 ESM，无构建步骤）
+├─ web/                       # 编辑器（原生 ESM，无构建步骤）：app.js 主干 + theme / drafts / motion / dialogs 等功能模块
 ├─ scripts/                   # validate / test-api / test-llm-mock / dump / contact-sheet / test-match
 ├─ docs/                      # API、AI 接入、模板 DSL 规范
 └─ out/                       # 截图与导出物

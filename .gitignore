@@ -11,22 +11,11 @@ secret*
 # 构建产物（GitHub Actions 会重新生成）
 site/
 
-# 生成物：接触表/截图（hero 图要保留，README 在用）
-out/contact-*.html
-out/sheet-*.png
-out/crop-*.png
-out/dbg*.png
-out/dbg*.js
-out/*.svg
-# 目视检查（scripts/visual-check.mjs）的截图，每次重跑都会变
-out/shots/
+# 本地输出目录：截图、接触表、dump、临时探针脚本（README 用的图在 docs/images/）
+out/
 
 # 系统
 .DS_Store
 Thumbs.db
 desktop.ini
 *.log
-
-out/dom*.html
-out/*.js
-out/*.log

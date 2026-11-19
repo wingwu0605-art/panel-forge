@@ -13,7 +13,11 @@
  *   关闭时按记住的父节点/兄弟节点原位放回。
  */
 
-const RAIL_PREFIX = 'pf.rail.';
+import { $, $$ } from './util.mjs';
+import { FRESH } from './env.mjs';
+import { fx, play, settled, staggerIn, motionOK } from './motion.mjs';
+import { store, KEYS } from './storage.mjs';
+
 // 紧凑布局（手机 / 窄窗）走的是单列 + 底部 tabbar，侧栏收起会与「按视图隐藏区块」打架：
 // 结果是左栏只剩一列图标、画布和右栏全被隐藏（真出现过这个 bug）。所以窄屏一律不收起。
 const COMPACT_MQ = (() => { try { return window.matchMedia('(max-width:1024px)'); } catch { return { matches: false, addEventListener() {} }; } })();
@@ -42,21 +46,10 @@ function iconSvg(key) {
     stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key] || ICONS.more}</svg>`;
 }
 
-const $ = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-const FRESH = (() => {
-  try { return new URLSearchParams(location.search).get('fresh') === '1'; } catch { return false; }
-})();
-
-const store = {
-  get(k) {
-    if (FRESH) return null;                 // 自动化测试要干净的初始状态
-    try { return localStorage.getItem(RAIL_PREFIX + k); } catch { return null; }
-  },
-  set(k, v) {
-    if (FRESH) return;
-    try { localStorage.setItem(RAIL_PREFIX + k, v); } catch { /* ignore */ }
-  },
+// 侧栏收起状态（?fresh=1 时不读也不写：自动化测试要干净的初始状态）
+const railStore = {
+  get: (side) => (FRESH ? null : store.get(KEYS.rail(side))),
+  set: (side, v) => { if (!FRESH) store.set(KEYS.rail(side), v); },
 };
 
 /** 一条侧栏的实例 */
@@ -65,7 +58,7 @@ function makeRail(railEl, side, itemsFn) {
   const st = {
     el: railEl,
     side,
-    mini: store.get(side) === 'mini',
+    mini: railStore.get(side) === 'mini',
     openKey: null,
     moved: null,      // { node, parent, next }
     itemsFn,
@@ -118,15 +111,19 @@ function makeRail(railEl, side, itemsFn) {
     st.moved = null;
   };
 
-  const closePop = () => {
-    restore();
-    pop.classList.add('hidden');
+  /** 关掉气泡。animate：用户主动关（点外面 / Esc / ×）时淡出一下；切换功能时立刻关 */
+  const closePop = ({ animate = false } = {}) => {
     $$('.rail-ico', strip).forEach((b) => b.classList.remove('on'));
     st.openKey = null;
+    const done = () => { restore(); pop.classList.add('hidden'); };
+    const out = animate && !pop.classList.contains('hidden') ? fx.fadeOut(pop, 'railPopOut') : null;
+    if (!out) { pop.getAnimations().forEach((a) => a.cancel()); done(); return; }
+    // 淡出期间又打开了别的功能：openPop 会先 closePop()（立刻关），这里的收尾就不再执行
+    settled(out).then((finished) => { if (finished && st.openKey === null) { out.cancel(); done(); } });
   };
 
   const openPop = (key) => {
-    if (st.openKey === key) { closePop(); return; }
+    if (st.openKey === key) { closePop({ animate: true }); return; }
     // 同时只留一个功能气泡：先把其它侧栏的关掉（键盘/脚本触发 click 时也要成立）
     for (const other of RAILS) if (other !== st) other.closePop();
 
@@ -138,15 +135,12 @@ function makeRail(railEl, side, itemsFn) {
     $('.rail-pop-body', pop).appendChild(item.node);
     $('.rail-pop-head b', pop).textContent = item.label;
 
-    // 切换功能：内容换掉后重新播一次"弹入"，并给内容一个从上滑入的小非线性动画
+    // 打开 = 带一点过冲的弹入；切换功能 = 轻一些的淡入，内容再从下面滑上来一点
+    // （Web Animations：以前是摘类 → 读 offsetWidth 强制同步布局 → 再加类，来重放 CSS 动画）
     pop.classList.remove('hidden');
-    pop.classList.remove('swap-in', 'pop-in');
-    void pop.offsetWidth;
-    pop.classList.add(swap ? 'swap-in' : 'pop-in');
-    const bodyEl = $('.rail-pop-body', pop);
-    bodyEl.classList.remove('content-in');
-    void bodyEl.offsetWidth;
-    bodyEl.classList.add('content-in');
+    if (swap) fx.swapIn(pop, 'railPopSwap'); else fx.popIn(pop, 'railPopIn');
+    play($('.rail-pop-body', pop), [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
+      { duration: 300, easing: 'spring-soft', id: 'railContentIn' });
     // 位置：贴着侧栏那一侧
     const r = railEl.getBoundingClientRect();
     const pw = Math.min(360, window.innerWidth * 0.86);
@@ -162,35 +156,74 @@ function makeRail(railEl, side, itemsFn) {
 
   /* ---- 迷你 / 展开 ---- */
   /**
-   * 收起 / 展开。
-   * 性能要点：列宽切换是**布局变更**，一帧内完成即可；绝不能给 grid-template-columns 加过渡，
-   * 否则每帧都要重排卡片里的文字（真实窗口里就是严重卡顿）。
-   * 为了不让那一次布局抖动被看见，先给内容盖一层"挡板"（opacity:0，无过渡），
-   * 下一帧再落布局，再下一帧淡回来 —— 抖动发生在不可见的帧里。
+   * 收起 / 展开：整条侧栏当抽屉滑进 / 滑出（弹簧曲线），舞台跟着列宽一起伸缩。
+   *
+   * 列宽用 Web Animations 从「屏幕上现在的样子」插到目标值（中途再点一次也是从当前位置接着走）；
+   * 动画期间栏里每一块的宽度钉死在展开态、整块平移，所以逐帧排版的只有舞台，
+   * 卡片里的文字不会逐帧重排 —— 以前就是怕这个，才改成「一帧落定 + 挡板淡出 / 整页交叉淡变」，
+   * 结果点一下整个界面都闪一下。
    */
+  const SLIDE_MS = 560;
+  const contentKids = () => [...railEl.children].filter((el) => !el.classList.contains('rail-strip'));
+  let slideToken = null;
+
+  /** 收尾：放开钉死的宽度，收起的那一侧换成图标条（reveal：图标依次冒出来） */
+  const finishSlide = ({ reveal = true } = {}) => {
+    slideToken = null;
+    for (const el of contentKids()) {
+      el.getAnimations().forEach((a) => { if (a.id === 'railSlide') a.cancel(); });
+      el.style.width = '';
+      el.style.flexShrink = '';
+    }
+    const closing = railEl.classList.contains('rail-closing');
+    railEl.classList.remove('rail-anim', 'rail-closing');
+    if (closing && reveal) staggerIn(strip, '.rail-ico', { cap: 8, step: 22 });
+  };
+
+  const slide = (from, kids, widths) => {
+    const layout = railEl.parentElement;
+    const to = getComputedStyle(layout).gridTemplateColumns;   // 类已经换好：这里排一次版拿到目标列宽
+    const col = (cols) => parseFloat(String(cols).split(' ')[side === 'left' ? 0 : 2]) || 0;
+    const c0 = col(from);
+    const c1 = col(to);
+    if (Math.abs(c0 - c1) < 1 || from.split(' ').length !== to.split(' ').length) { finishSlide(); return; }
+    const wide = Math.max(c0, c1);              // 展开态的列宽
+    const dir = side === 'left' ? -1 : 1;       // 左栏往左收，右栏往右收
+    const off = (c) => `translateX(${dir * (wide - c)}px)`;   // 内容外缘始终贴着列的边
+    const ws = widths || kids.map((el) => el.getBoundingClientRect().width);
+    kids.forEach((el, i) => {
+      if (!ws[i]) return;
+      el.style.width = ws[i] + 'px';
+      el.style.flexShrink = '0';
+    });
+    railEl.classList.add('rail-anim');
+    const timing = { duration: SLIDE_MS, easing: 'spring-soft' };
+    // 两条侧栏共用一个列宽动画：后点的那条从当前画面接管，两边都走到目标
+    play(layout, [{ gridTemplateColumns: from }, { gridTemplateColumns: to }], { ...timing, id: 'railCols' });
+    const anims = kids.filter((el, i) => ws[i]).map((el) =>
+      play(el, [{ transform: off(c0) }, { transform: off(c1) }], { ...timing, id: 'railSlide' }));
+    const token = {};
+    slideToken = token;
+    Promise.all(anims.map((a) => settled(a))).then(() => { if (slideToken === token) finishSlide(); });
+  };
+
   const applyMini = (mini, opts = {}) => {
     if (COMPACT_MQ.matches) mini = false;   // 窄屏强制展开
     st.mini = mini;
+    const animate = !opts.silent && motionOK() && !COMPACT_MQ.matches && railEl.parentElement;
+    // 先读「屏幕上现在的样子」（动画进行中读到的就是动画当前帧），再收掉上一次没放完的
+    const from = animate ? getComputedStyle(railEl.parentElement).gridTemplateColumns : '';
+    const kids = animate && mini ? contentKids() : [];
+    const widths = kids.map((el) => el.getBoundingClientRect().width);
+    finishSlide({ reveal: false });
 
-    const commit = () => {
-      railEl.classList.toggle('mini', mini);
-      document.body.classList.toggle(side === 'left' ? 'rail-left-mini' : 'rail-right-mini', mini);
-      if (mini) rebuild();
-      else closePop();
-      if (!opts.silent) store.set(side, mini ? 'mini' : 'open');
-    };
-
-    // 首次装配（silent）不需要挡板，直接落位
-    if (opts.silent) { commit(); return; }
-
-    // 点击后立刻开始淡出（纯合成层，无重排），在最暗的那一刻落布局，
-    // 再淡回来 —— 反馈是即时的，布局抖动被藏在中段，全程没有逐帧重排。
-    document.body.classList.add('rail-fade');
-    clearTimeout(applyMini._t);
-    applyMini._t = setTimeout(() => {
-      commit();                                  // 布局只在这里发生一次
-      document.body.classList.remove('rail-fade');
-    }, 132);
+    railEl.classList.toggle('mini', mini);
+    railEl.classList.toggle('rail-closing', !!(animate && mini));   // 收起动画期间保持展开态的样子
+    document.body.classList.toggle(side === 'left' ? 'rail-left-mini' : 'rail-right-mini', mini);
+    if (mini) rebuild();
+    else closePop();
+    if (!opts.silent) railStore.set(side, mini ? 'mini' : 'open');
+    if (animate) slide(from, mini ? kids : contentKids(), mini ? widths : null);
   };
 
   toggle.addEventListener('click', (ev) => {
@@ -206,19 +239,20 @@ function makeRail(railEl, side, itemsFn) {
   });
 
   pop.addEventListener('click', (ev) => {
-    if (ev.target.closest('.rail-pop-close')) closePop();
+    if (ev.target.closest('.rail-pop-close')) closePop({ animate: true });
   });
   document.addEventListener('pointerdown', (ev) => {
     if (!st.openKey) return;
     if (pop.contains(ev.target) || strip.contains(ev.target) || toggle.contains(ev.target)) return;
-    closePop();
+    closePop({ animate: true });
   }, true);
-  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closePop(); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && st.openKey) closePop({ animate: true }); });
   window.addEventListener('resize', () => { if (st.openKey) closePop(); });
 
   applyMini(st.mini, { silent: true });
   // 从宽窗缩到窄窗：立刻退出收起态，避免"只剩一列图标"
-  const onMQ = () => applyMini(st.mini, { silent: true });
+  // 跨过手机断点：窄屏强制展开，回到宽屏按记住的偏好恢复（以前回来就丢了「收起」）
+  const onMQ = () => applyMini(railStore.get(side) === 'mini', { silent: true });
   if (COMPACT_MQ.addEventListener) COMPACT_MQ.addEventListener('change', onMQ);
   else if (COMPACT_MQ.addListener) COMPACT_MQ.addListener(onMQ);
   st.rebuild = rebuild;

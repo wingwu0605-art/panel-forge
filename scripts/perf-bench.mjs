@@ -9,7 +9,7 @@
  * 需要 `node server.mjs` 已经在跑。数据只落在临时浏览器 profile 里，不碰你的草稿。
  * 判读：拖动期间 render 次数应该接近 0（整页重建），patch 次数接近帧数（只改属性）。
  */
-import { launch, BASE } from './visual-check.mjs';
+import { launch } from './visual-check.mjs';
 
 const args = process.argv.slice(2);
 const opt = Object.fromEntries(args.filter((a) => a.startsWith('--'))
@@ -121,7 +121,7 @@ try {
     const ta = document.querySelector('#slotLine');
     ta.value = (ta.value || '') + '（补一句）';
     ta.dispatchEvent(new Event('input', { bubbles: true }));
-    // 再点一下让整页重绘把它带进草稿（renderStage 会排一次存盘）
+    // 改句子会自己排一次存盘；再点一下格子，确认切换选中不会把图片重新写一遍
     const c2 = canvas.querySelector('svg image[data-slot]')?.getBoundingClientRect();
     if (c2) {
       canvas.dispatchEvent(ev('pointerdown', c2.left + 4, c2.top + 4));
@@ -134,7 +134,7 @@ try {
   const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(2) + 'MB' : Math.round(n / 1024) + 'KB');
   console.log(`\n  PanelForge 拖动赛跑 · ${TPL} · 视口 ${W}×${H}`);
   console.log(`  灌入 ${N} 张 ${opt.src || '1600×2000'}（原图 ${fill.inputMB}MB）→ 画布上 ${fill.slots} 格有图`);
-  console.log(`  页面里：base64 ${kb(hud.imageBytes)} · SVG 标记 ${kb(hud.markupBytes)}\n`);
+  console.log(`  页面里：图片 ${kb(hud.imageBytes)} · SVG 标记 ${kb(hud.markupBytes)}\n`);
   console.log(`  拖动 ${drag.frames} 帧：平均 ${drag.avg}ms · p50 ${drag.p50}ms · p95 ${drag.p95}ms · 最差 ${drag.worst}ms → 约 ${drag.fps}fps`);
   console.log(`  整页重绘 render：${hud.renders} 次 · 最近一批 p95 ${hud.render.p95.toFixed(1)}ms`);
   console.log(`  属性补丁 patch：${hud.patches} 次 · 最近一批 p95 ${hud.patch.p95.toFixed(2)}ms`);
