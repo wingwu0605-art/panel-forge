@@ -151,6 +151,12 @@ export function initCollapsibles() {
       [...el.children].filter((c) => c !== head).forEach((c) => inner.appendChild(c));
       body.appendChild(inner);
       el.appendChild(body);
+    } else if (!body.querySelector(':scope > .card-body-inner')) {
+      // 标记里已经写了 .card-body：内容同样要包成唯一一层，grid 0fr 才收得到 0
+      const inner = document.createElement('div');
+      inner.className = 'card-body-inner';
+      inner.append(...body.childNodes);
+      body.append(inner);
     }
     const caret = document.createElement('button');
     caret.type = 'button';

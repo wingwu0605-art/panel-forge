@@ -15,7 +15,7 @@
 
 import { $, $$ } from './util.mjs';
 import { FRESH } from './env.mjs';
-import { fx, play, settled, withTransition } from './motion.mjs';
+import { fx, play, settled, staggerIn, motionOK } from './motion.mjs';
 import { store, KEYS } from './storage.mjs';
 
 // 紧凑布局（手机 / 窄窗）走的是单列 + 底部 tabbar，侧栏收起会与「按视图隐藏区块」打架：
@@ -156,24 +156,74 @@ function makeRail(railEl, side, itemsFn) {
 
   /* ---- 迷你 / 展开 ---- */
   /**
-   * 收起 / 展开。列宽切换是布局变更，必须一帧落定（给 grid-template-columns 加过渡会逐帧重排卡片文字）。
-   * 用 View Transition：浏览器先截一张旧画面，布局一次到位后在合成层上交叉淡变 ——
-   * 以前是「整栏淡出 132ms（setTimeout）→ 落布局 → 淡回」，点了要等一下才有反应。
+   * 收起 / 展开：整条侧栏当抽屉滑进 / 滑出（弹簧曲线），舞台跟着列宽一起伸缩。
+   *
+   * 列宽用 Web Animations 从「屏幕上现在的样子」插到目标值（中途再点一次也是从当前位置接着走）；
+   * 动画期间栏里每一块的宽度钉死在展开态、整块平移，所以逐帧排版的只有舞台，
+   * 卡片里的文字不会逐帧重排 —— 以前就是怕这个，才改成「一帧落定 + 挡板淡出 / 整页交叉淡变」，
+   * 结果点一下整个界面都闪一下。
    */
+  const SLIDE_MS = 560;
+  const contentKids = () => [...railEl.children].filter((el) => !el.classList.contains('rail-strip'));
+  let slideToken = null;
+
+  /** 收尾：放开钉死的宽度，收起的那一侧换成图标条（reveal：图标依次冒出来） */
+  const finishSlide = ({ reveal = true } = {}) => {
+    slideToken = null;
+    for (const el of contentKids()) {
+      el.getAnimations().forEach((a) => { if (a.id === 'railSlide') a.cancel(); });
+      el.style.width = '';
+      el.style.flexShrink = '';
+    }
+    const closing = railEl.classList.contains('rail-closing');
+    railEl.classList.remove('rail-anim', 'rail-closing');
+    if (closing && reveal) staggerIn(strip, '.rail-ico', { cap: 8, step: 22 });
+  };
+
+  const slide = (from, kids, widths) => {
+    const layout = railEl.parentElement;
+    const to = getComputedStyle(layout).gridTemplateColumns;   // 类已经换好：这里排一次版拿到目标列宽
+    const col = (cols) => parseFloat(String(cols).split(' ')[side === 'left' ? 0 : 2]) || 0;
+    const c0 = col(from);
+    const c1 = col(to);
+    if (Math.abs(c0 - c1) < 1 || from.split(' ').length !== to.split(' ').length) { finishSlide(); return; }
+    const wide = Math.max(c0, c1);              // 展开态的列宽
+    const dir = side === 'left' ? -1 : 1;       // 左栏往左收，右栏往右收
+    const off = (c) => `translateX(${dir * (wide - c)}px)`;   // 内容外缘始终贴着列的边
+    const ws = widths || kids.map((el) => el.getBoundingClientRect().width);
+    kids.forEach((el, i) => {
+      if (!ws[i]) return;
+      el.style.width = ws[i] + 'px';
+      el.style.flexShrink = '0';
+    });
+    railEl.classList.add('rail-anim');
+    const timing = { duration: SLIDE_MS, easing: 'spring-soft' };
+    // 两条侧栏共用一个列宽动画：后点的那条从当前画面接管，两边都走到目标
+    play(layout, [{ gridTemplateColumns: from }, { gridTemplateColumns: to }], { ...timing, id: 'railCols' });
+    const anims = kids.filter((el, i) => ws[i]).map((el) =>
+      play(el, [{ transform: off(c0) }, { transform: off(c1) }], { ...timing, id: 'railSlide' }));
+    const token = {};
+    slideToken = token;
+    Promise.all(anims.map((a) => settled(a))).then(() => { if (slideToken === token) finishSlide(); });
+  };
+
   const applyMini = (mini, opts = {}) => {
     if (COMPACT_MQ.matches) mini = false;   // 窄屏强制展开
     st.mini = mini;
+    const animate = !opts.silent && motionOK() && !COMPACT_MQ.matches && railEl.parentElement;
+    // 先读「屏幕上现在的样子」（动画进行中读到的就是动画当前帧），再收掉上一次没放完的
+    const from = animate ? getComputedStyle(railEl.parentElement).gridTemplateColumns : '';
+    const kids = animate && mini ? contentKids() : [];
+    const widths = kids.map((el) => el.getBoundingClientRect().width);
+    finishSlide({ reveal: false });
 
-    const commit = () => {
-      railEl.classList.toggle('mini', mini);
-      document.body.classList.toggle(side === 'left' ? 'rail-left-mini' : 'rail-right-mini', mini);
-      if (mini) rebuild();
-      else closePop();
-      if (!opts.silent) railStore.set(side, mini ? 'mini' : 'open');
-    };
-
-    if (opts.silent) { commit(); return; }   // 首次装配：直接落位
-    withTransition('rail', commit);
+    railEl.classList.toggle('mini', mini);
+    railEl.classList.toggle('rail-closing', !!(animate && mini));   // 收起动画期间保持展开态的样子
+    document.body.classList.toggle(side === 'left' ? 'rail-left-mini' : 'rail-right-mini', mini);
+    if (mini) rebuild();
+    else closePop();
+    if (!opts.silent) railStore.set(side, mini ? 'mini' : 'open');
+    if (animate) slide(from, mini ? kids : contentKids(), mini ? widths : null);
   };
 
   toggle.addEventListener('click', (ev) => {
@@ -201,7 +251,8 @@ function makeRail(railEl, side, itemsFn) {
 
   applyMini(st.mini, { silent: true });
   // 从宽窗缩到窄窗：立刻退出收起态，避免"只剩一列图标"
-  const onMQ = () => applyMini(st.mini, { silent: true });
+  // 跨过手机断点：窄屏强制展开，回到宽屏按记住的偏好恢复（以前回来就丢了「收起」）
+  const onMQ = () => applyMini(railStore.get(side) === 'mini', { silent: true });
   if (COMPACT_MQ.addEventListener) COMPACT_MQ.addEventListener('change', onMQ);
   else if (COMPACT_MQ.addListener) COMPACT_MQ.addListener(onMQ);
   st.rebuild = rebuild;

@@ -333,10 +333,15 @@ function renderList({ rebuild = false } = {}) {
   }
   const show = new Set(list.map((t) => t.id));
   const cur = state.tpl?.id;
+  const revealed = [];
   for (const [id, el] of tplCards) {
-    el.hidden = !show.has(id);
+    const hide = !show.has(id);
+    if (el.hidden && !hide) revealed.push(el);
+    el.hidden = hide;
     el.classList.toggle('on', id === cur);
   }
+  // 筛选 / 搜索后新出现的卡片依次浮上来（只动前十几张，屏幕外的不浪费）
+  revealed.slice(0, 14).forEach((el, i) => fx.rise(el, i * 22));
 }
 
 /* ---------------- 模板库的标签筛选（格数 / 题材 / 画幅 / 标签） ---------------- */
@@ -958,6 +963,7 @@ function bindUI() {
   const canvas = $('#canvas');
 
   canvas.addEventListener('pointerdown', (ev) => {
+    lastPointerType = ev.pointerType || 'mouse';
     if (!state.tpl) return;
     const pt = pagePoint(ev);
     const bub = bubbleAt(pt);
@@ -1591,7 +1597,15 @@ function bindUI() {
   });
 }
 
+/** 最近一次按下画布用的是什么（mouse / touch / pen）：触屏双击是「进编辑页」，不能再顺手打开图库 */
+let lastPointerType = 'mouse';
+/**
+ * 鼠标双击某一格 = 选图填进去（画师版 = 直接进画布）。
+ * 触屏 / 手写笔的双击由 noteTap → fireDoubleTap 处理（进这一格的编辑页）；
+ * 手机浏览器在双击后还会补发一次 dblclick，以前它会接着弹出系统图库。
+ */
 function onCanvasDblClick(ev) {
+  if (lastPointerType !== 'mouse') return;
   const slot = slotAt(pagePoint(ev));
   if (!slot) return;
   state.selectedId = slot.id;

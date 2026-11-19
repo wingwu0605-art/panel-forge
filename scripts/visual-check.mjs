@@ -2218,6 +2218,43 @@ const scenarios = [
 
         // 收起时舞台宽度的中间帧数量（>3 说明是动画而不是瞬移）
         const stageW = () => Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().width);
+
+        // 弹簧滑动：逐帧采样舞台宽度 —— 中间要有很多帧、先快后慢（非线性）；
+        // 动画期间卡片宽度不变（不逐帧重排文字）；不走整页交叉淡变（以前点一下整个界面闪一下）
+        {
+          const card = document.querySelector('.rail.left > .card');
+          const cw0 = Math.round(card.getBoundingClientRect().width);
+          const samples = [];
+          let on = true;
+          let vt = false;
+          const t0 = performance.now();
+          const tick = () => {
+            if (!on) return;
+            if (document.documentElement.dataset.vt) vt = true;
+            samples.push({ t: performance.now() - t0, w: stageW(), cw: Math.round(card.getBoundingClientRect().width) });
+            requestAnimationFrame(tick);
+          };
+          document.querySelector('.rail.left .rail-toggle').click();
+          requestAnimationFrame(tick);
+          await wait(900);
+          on = false;
+          const w0 = samples[0]?.w || 0;
+          const w1 = samples[samples.length - 1]?.w || 0;
+          const mid = samples.filter((x) => x.w !== w0 && x.w !== w1);
+          // 时间从「真正开始动」那一帧算（机器忙时动画会晚几帧才起步）
+          const tMove = (samples.find((p) => p.w !== w0) || samples[0] || { t: 0 }).t;
+          const at = (ms) => { const x = samples.find((p) => p.t >= tMove + ms); return x ? (x.w - w0) / ((w1 - w0) || 1) : 0; };
+          res.slide = {
+            frames: new Set(mid.map((x) => x.w)).size,
+            p25: Number(at(140).toFixed(2)),
+            dist: w1 - w0,
+            cardSame: samples.filter((x) => x.cw > 0).every((x) => Math.abs(x.cw - cw0) <= 1),
+            vt,
+            miniAfter: left.classList.contains('mini') && !left.classList.contains('rail-closing'),
+          };
+          document.querySelector('.rail.left .rail-toggle').click();   // 展开回来
+          await wait(800);
+        }
         const fromW = stageW();
         const transitionProps = getComputedStyle(document.querySelector('.layout')).transitionProperty;
         document.querySelector('#railRight .rail-toggle').click();
@@ -2291,6 +2328,11 @@ const scenarios = [
       check('侧栏切换靠一次布局完成，不靠动画布局属性（否则每帧重排文字会卡顿）',
         out.grow.noLayoutTransition === true && out.grow.to > out.grow.from + 100,
         `${out.grow.from} → ${out.grow.to} · 布局过渡=${out.grow.transitionProps || '(无)'}`);
+      check('侧栏收起是连续的弹簧动画（多帧、先快后慢，不是瞬移也不整页闪）',
+        out.slide.frames >= 5 && out.slide.p25 > 0.35 && !out.slide.vt && out.slide.dist > 150,
+        `${out.slide.frames} 个中间帧 · 25% 时间走完 ${Math.round(out.slide.p25 * 100)}% 路程 · 舞台 +${out.slide.dist}px · 交叉淡变=${out.slide.vt}`);
+      check('滑动期间卡片宽度不变（不逐帧重排文字），放完才换成图标条',
+        out.slide.cardSame && out.slide.miniAfter, `卡片宽度不变=${out.slide.cardSame} · 收尾=${out.slide.miniAfter}`);
       check('收起成图标条后，「展开」按钮仍然看得见（能再展开）',
         out.collapsedToggle.mini && out.collapsedToggle.leftBtn && out.collapsedToggle.rightBtn,
         JSON.stringify(out.collapsedToggle));
@@ -2473,12 +2515,18 @@ const scenarios = [
         await wait(420);
         res.single = { vib, view: document.body.dataset.view, toast: document.querySelector('#toast')?.textContent || '' };
 
-        // ② 双击：震动 + 进编辑
+        // ② 双击：震动 + 进编辑（手机浏览器在双击后还会补发一个 dblclick —— 它不能再打开图库）
+        let picks = 0;
+        const fp = document.querySelector('#filePick');
+        const origClick = fp.click;
+        fp.click = () => { picks++; };
         await tap(0.5, 0.28);
         await wait(120);
         await tap(0.5, 0.28);
+        svg().dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, ...at(0.5, 0.28) }));
         await wait(450);
-        res.double = { vib, view: document.body.dataset.view, toast: document.querySelector('#toast')?.textContent || '' };
+        fp.click = origClick;
+        res.double = { vib, view: document.body.dataset.view, toast: document.querySelector('#toast')?.textContent || '', picks };
 
         // ②b 抽屉应从下方滑上来（单调向上），不是"先到位再回弹"
         document.body.dataset.view = 'canvas';
@@ -2538,6 +2586,7 @@ const scenarios = [
       check('双击某一格会震动', out.double.vib === 1, String(out.double.vib));
       check('双击后直接进入编辑视图', out.double.view === 'edit', out.double.view || '(空)');
       check('双击有提示', /双击进入/.test(out.double.toast), out.double.toast);
+      check('触屏双击不会顺手打开图库', out.double.picks === 0, `打开了 ${out.double.picks} 次`);
       check('编辑抽屉是从下方滑上来的（不闪）',
         out.slide.rebounds === 0 && out.slide.last < out.slide.first - 60,
         `top ${out.slide.first} → ${out.slide.last} · 回弹 ${out.slide.rebounds} 次`);

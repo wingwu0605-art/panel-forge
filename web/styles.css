@@ -540,11 +540,13 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.tpl:focus-visible{
 /* ---------------------------------------------------------------- 布局 */
 .layout{
   flex:1 1 auto;min-height:0;
-  display:grid;grid-template-columns:var(--rail-w-left,320px) minmax(0,1fr) var(--rail-w-right,360px);
-  /* 注意：这里**不能**给 grid-template-columns 加 transition。
-     布局属性的过渡会让每帧都对整棵子树重新排版（卡片里的文字逐行重排），
-     在真实窗口里就是肉眼可见的卡顿。列宽一次到位，观感交给下面的 opacity/transform。 */
+  display:grid;grid-template-columns:var(--rail-w-left) minmax(0,1fr) var(--rail-w-right);
+  /* 不给 grid-template-columns 加 CSS 过渡：收起 / 展开的列宽动画在 rails.mjs 里用 Web Animations 做，
+     动画期间侧栏内容宽度钉死在展开态，只有舞台逐帧排版，卡片文字不会逐帧重排。 */
 }
+/* 列宽只在这里定：中等宽度改的是变量，不是整条 grid-template-columns（以前那样会让「收起」在 ≤1320px 失效） */
+body{--rail-w-left:320px;--rail-w-right:360px}
+@media (max-width:1320px){body{--rail-w-left:296px;--rail-w-right:336px}}
 body.rail-left-mini{--rail-w-left:56px}
 body.rail-right-mini{--rail-w-right:56px}
 .rail{overflow-y:auto;overscroll-behavior:contain;padding:14px;display:flex;flex-direction:column;gap:12px}
@@ -1314,7 +1316,6 @@ body.pf-dragging .canvas svg{box-shadow:none}
 
 /* ---------------------------------------------------------------- 自适应：中等宽度 */
 @media (max-width:1320px){
-  .layout{grid-template-columns:296px minmax(0,1fr) 336px}
   .top-mid .pill.dim{display:none}
 }
 @media (max-width:1180px){
@@ -2197,33 +2198,30 @@ body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outlin
 /* 左右侧栏：收回成图标条 + 单功能气泡 */
 .rail{position:relative}
 
-/* 展开/收起按钮（贴在侧栏右上角） */
+/* 展开 / 收起按钮：在标题条里排版（不再绝对定位，以前会压住右栏标签） */
 .rail-toggle{
-  position:absolute; top:8px; z-index:6;
+  position:relative; z-index:6;
   width:26px; height:26px; padding:0; border:0; border-radius:8px; cursor:pointer;
   display:grid; place-items:center; color:var(--label-3);
   background:var(--fill-2); box-shadow:inset 0 0 0 .5px var(--sep);
-  transition:color .18s var(--ease), background .18s var(--ease), transform .18s var(--ease);
+  transition:color .18s var(--ease), background .18s var(--ease), transform .4s var(--spring);
 }
-.rail.left .rail-toggle{right:8px}
-.rail.right .rail-toggle{left:8px}
 .rail-toggle:hover{color:var(--tint); background:var(--fill-hover); transform:rotate(90deg)}
 .rail-toggle:active{transform:scale(.92)}
 
-/* 图标条：只在 mini 状态出现 */
-.rail-strip{display:none; flex-direction:column; align-items:center; gap:6px; padding:44px 0 12px}
-.rail.mini .rail-strip{display:flex}
-.rail.mini{padding-left:0;padding-right:0;overflow:hidden}
-.rail.mini > .card{display:none}
-/* mini 状态只保留图标条和右上角按钮，其它直接子节点一律收起 */
-.rail.mini > *:not(.rail-strip):not(.rail-toggle):not(.rail-head){display:none !important}
-.rail.mini > .rail-strip{display:flex}
+/* 图标条：只在收起状态出现。
+   收起动画期间（.rail-closing）侧栏保持展开态的样子，整栏当抽屉滑出去，放完才换成图标条 */
+.rail-strip{display:none; flex-direction:column; align-items:center; gap:4px; padding:6px 0 12px}
+.rail.mini:not(.rail-closing){padding-left:0;padding-right:0;overflow:hidden}
+.rail.mini:not(.rail-closing) > *:not(.rail-strip):not(.rail-head){display:none !important}
+.rail.mini:not(.rail-closing) > .rail-strip{display:flex}
+.rail.rail-anim{overflow:hidden !important}
 
 .rail-ico{
   position:relative; width:38px; height:38px; padding:0; border:0; border-radius:12px; cursor:pointer;
   display:grid; place-items:center; color:var(--label-2);
   background:transparent;
-  transition:color .18s var(--ease), background .18s var(--ease), transform .18s var(--ease);
+  transition:color .2s var(--spring-soft), background .2s var(--spring-soft), transform .26s var(--spring-soft);
 }
 .rail-ico svg{transition:transform .22s var(--spring), stroke-dashoffset .35s var(--ease)}
 .rail-ico:hover{color:var(--tint); background:var(--fill-hover); transform:translateY(-1px)}
@@ -2293,8 +2291,6 @@ body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outlin
   .rail-tip{display:none}
 }
 
-/* 侧栏标题条 + 气泡弹性动画（第二批修正） */
-
 /* 标题条：开关按钮独占一行，不再压住右栏标签 */
 .rail-head{
   display:flex; align-items:center; justify-content:flex-end;
@@ -2302,32 +2298,18 @@ body[data-drop-zone="sample"] #styleFollow{outline:2px dashed var(--tint);outlin
   border-bottom:.5px solid var(--sep);
   background:var(--bg);
 }
-.rail.left .rail-head{justify-content:flex-end}
-.rail.mini .rail-head{
+.rail.mini:not(.rail-closing) .rail-head{
   justify-content:center; padding:0; height:40px;
   border-bottom:0; background:transparent;
 }
-/* 旧定位样式作废（改成在标题条里排版） */
-.rail-toggle{position:static !important; top:auto !important; left:auto !important; right:auto !important}
-.rail.right .rail-toggle{left:auto}
-
-/* 图标条：紧贴标题条下面，居中 */
-.rail-strip{padding:6px 0 12px}
-.rail.mini .rail-strip > .rail-ico{flex:0 0 auto}
-
-/* 图标悬停的线条动画再加一点回弹，别像开关一样硬 */
-.rail-ico{transition:color .2s var(--spring-soft), background .2s var(--spring-soft), transform .26s var(--spring-soft)}
-.rail-strip{gap:4px}
-
-/* 收起/展开时，画布区域跟着列宽平滑变化（页面本身不做缩放动画） */
-.stage-wrap{transition:margin .52s var(--spring-soft)}
+.rail-strip > .rail-ico{flex:0 0 auto}
 
 /* 窄屏：收起功能整体失效（单列布局 + 按视图隐藏区块，收起会导致"只剩一列图标"） */
 @media (max-width:1024px){
   .rail-toggle{display:none !important}
   .rail-strip{display:none !important}
   .rail-head{display:none !important}
-  .rail.mini > *:not(.rail-strip):not(.rail-toggle):not(.rail-head){display:revert !important}
+  .rail.mini:not(.rail-closing) > *:not(.rail-strip):not(.rail-head){display:revert !important}
   .rail.mini > .card{display:flex !important}
   body.rail-left-mini{--rail-w-left:320px}
   body.rail-right-mini{--rail-w-right:360px}
@@ -2417,6 +2399,16 @@ dialog.sheet:not([open])::backdrop{opacity:0}
 .sheet-note{margin:6px 0 0}
 #keySheet .sheet-body{display:grid;grid-template-columns:1fr 1.05fr;gap:20px}
 .lightbox .sheet-panel{display:flex;flex-direction:column}
+/* 手机：弹窗是从底部滑上来的抽屉（贴底、全宽、上圆角） */
+@media (max-width:1024px){
+  dialog.sheet{margin:auto 0 0;width:100%;max-width:none;max-height:92dvh}
+  dialog.sheet:not([open]){transform:translateY(100%)}
+  @starting-style{dialog.sheet[open]{transform:translateY(100%)}}
+  .sheet-panel{width:100%;max-height:92dvh;border-radius:var(--r-xl) var(--r-xl) 0 0;padding-bottom:env(safe-area-inset-bottom)}
+  .sheet-head{flex-wrap:wrap;row-gap:2px}
+  .sheet-sub{order:3;flex:1 1 100%}
+  #keySheet .sheet-body{grid-template-columns:1fr;gap:16px}
+}
 
 /* 弹窗里的通用块：列表项 / 提示框 */
 .list{display:flex;flex-direction:column;gap:6px;margin:10px 0;max-height:52vh;overflow:auto}

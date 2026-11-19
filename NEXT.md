@@ -284,6 +284,11 @@ iPhone 上还叠了三个放大器：单标签内存天花板（解码结果被�
   CSS 不看它；测试里要切暗色请设 `data-scheme`
 - **颜色只写在令牌块里**（`styles.css` 开头的 `:root[...]`），组件里写 `var(--…)`；风格之间形态上的差异只写在「6 风格处理」一节。
   新加强调色或风格后跑 `npm run check:contrast`
+- **侧栏收起 / 展开别用 View Transition**：整页截图交叉淡变，布局一变就是「整个界面闪一下」。
+  现在的做法（`rails.mjs`）：WAAPI 插 `.layout` 的 `gridTemplateColumns`，栏里每块宽度钉在展开态、整块平移，
+  收起期间挂 `.rail-closing` 保持展开态外观，放完才换图标条。列宽只改 `--rail-w-left/right` 变量，
+  别在媒体查询里直接写整条 `grid-template-columns`（会把「收起」顶掉）
+- **触屏双击 = 进编辑页，鼠标双击 = 选图**：手机浏览器双击后会补发 `dblclick`，`onCanvasDblClick` 只认鼠标
 - **选中 / 悬停不走整页重绘**：`patchHighlight()` 只改高亮层；所以「改了内容」必须自己调 `queueSave()`，别指望下一次重绘顺手存
 - GitHub Pages 对 `.css/.js` 有 10 分钟缓存：`build-static.mjs` 已按内容哈希自动换 `?v=`，别再手改
 - Render/公网部署**不要**配 `LLM_API_KEY`（无鉴权会被白嫖）；`/api/proxy` 要求 `x-pf-client` 头 + 内网黑名单
