@@ -2122,15 +2122,17 @@ body[data-drop-zone="text"] #plot{outline:2px dashed var(--tint);outline-offset:
   #canvas{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 }
 
-/* 该格缩放条：浮在选中格子正右侧 */
+/* 该格缩放条：放在页面外侧和这一格同高的空白里（位置在 slot-zoom.mjs 里算，不压别的格子） */
 .slot-zoom{
   position:fixed; z-index:300; display:flex; flex-direction:column; align-items:center; gap:6px;
   padding:8px 6px; border-radius:14px;
   background:var(--material-thick); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
   box-shadow:var(--shadow-3), inset 0 0 0 .5px var(--sep);
-  transform:translateX(8px);
-  transition:opacity .16s var(--ease), transform .16s var(--ease);
 }
+/* 横条：这一格太矮放不下竖条时（− 滑杆 + 在一行，百分比在最左） */
+.slot-zoom.h{flex-direction:row-reverse; padding:6px 8px}
+.slot-zoom.h .sz-track{height:24px; width:96px}
+.slot-zoom.h .sz-track input[type="range"]{transform:none}
 .slot-zoom.hidden{display:none}
 .slot-zoom .sz-btn{
   width:24px; height:24px; border:0; border-radius:8px; cursor:pointer;
@@ -2172,9 +2174,10 @@ body[data-drop-zone="text"] #plot{outline:2px dashed var(--tint);outline-offset:
 .dh-formats{margin-top:4px; font-size:11.5px; color:var(--label-3); font-family:var(--font-mono); letter-spacing:.3px}
 
 @media (max-width:720px){
-  .slot-zoom{padding:6px 5px; gap:5px; transform:translateX(2px) scale(.94); transform-origin:left center}
+  .slot-zoom{padding:6px 5px; gap:5px}
   .slot-zoom .sz-track{height:76px}
   .slot-zoom .sz-track input[type="range"]{width:76px}
+  .slot-zoom.h .sz-track{height:24px; width:76px}
 }
 
 /* 风格跟随卡片 + 样图 */

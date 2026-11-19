@@ -1923,7 +1923,7 @@ const scenarios = [
 
   {
     name: 'slot-zoom',
-    title: '㉘ 该格缩放条贴在格子右侧 + 拖放毛玻璃提示写清格式',
+    title: '㉘ 该格缩放条在这一格旁边、不压别的格子 + 拖放毛玻璃提示写清格式',
     async run(page, shot, { check }) {
       await page.viewport(1280, 900);
       await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
@@ -1954,10 +1954,17 @@ const scenarios = [
         const br = box.getBoundingClientRect();
         // 用「格子真实屏幕矩形」当参照（图片是 cover 的，会溢出格子，拿 <image> 的 rect 会算错）
         const slotRect = window.__pfSlotRect ? window.__pfSlotRect() : null;
+        // 和别的格子有没有重叠（只允许碰到「这一格」自己）
+        const hit = (a, b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
+        const ids = (window.__pfSize?.().slots || []).map((x) => x.id);
+        const same = (q) => q && slotRect && Math.abs(q.left - slotRect.left) < 0.5 && Math.abs(q.top - slotRect.top) < 0.5;
+        const covered = ids.filter((id) => { const q = window.__pfSlotRect(id); return q && !same(q) && hit(br, q); });
         res.show = {
           visible: !box.classList.contains('hidden'),
           pct: document.querySelector('#slotZoomVal')?.textContent || '',
-          gapRight: slotRect ? Math.round(br.left - slotRect.right) : null,
+          place: box.dataset.place || '',
+          covered,
+          outsidePage: br.left >= r.right || br.right <= r.left,
           vCenterDiff: slotRect ? Math.round(Math.abs((br.top + br.height / 2) - (slotRect.top + slotRect.height / 2))) : null,
           hasSlotRect: !!slotRect,
         };
@@ -2008,9 +2015,10 @@ const scenarios = [
       })()`);
 
       check('没有图时缩放条不出现', out.hiddenBeforeImage === true);
-      check('有图后缩放条贴在「这一格」正右侧（距格子右边界约 10px）',
-        out.show.visible && out.show.hasSlotRect && out.show.gapRight >= 6 && out.show.gapRight <= 14,
-        `gap=${out.show.gapRight}px`);
+      check('缩放条不压住任何别的格子',
+        out.show.visible && out.show.hasSlotRect && out.show.covered.length === 0,
+        out.show.covered.length ? `压住了 ${out.show.covered.join(',')}` : `位置=${out.show.place}`);
+      check('桌面上缩放条放在页面外侧的空白里', out.show.outsidePage && /^gutter/.test(out.show.place), out.show.place);
       check('缩放条与这一格垂直居中', Math.abs(out.show.vCenterDiff) <= 2, `Δ=${out.show.vCenterDiff}px`);
       check('缩放条显示百分比', /^\d+%$/.test(out.show.pct), out.show.pct);
       check('点「+」放大并同步百分比', out.plus !== out.show.pct, `${out.show.pct} → ${out.plus}`);
