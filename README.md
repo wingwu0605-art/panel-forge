@@ -468,7 +468,7 @@ panel-forge/
 │  ├─ library-{jp,cn,kr,core}.mjs   # 138 套模板定义
 │  ├─ svg.mjs                 # 渲染器（服务端与浏览器共用）
 │  └─ aidocs.mjs              # system prompt / 6 个工具定义 / OpenAPI
-├─ web/                       # 编辑器（原生 ESM，无构建步骤）
+├─ web/                       # 编辑器（原生 ESM，无构建步骤）：app.js 主干 + theme / drafts / motion / dialogs 等功能模块
 ├─ scripts/                   # validate / test-api / test-llm-mock / dump / contact-sheet / test-match
 ├─ docs/                      # API、AI 接入、模板 DSL 规范
 └─ out/                       # 截图与导出物

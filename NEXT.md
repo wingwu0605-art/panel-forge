@@ -73,7 +73,13 @@ node scripts/perf-bench.mjs     # 拖动性能赛跑：灌 N 张图 → 合成�
 | `lib/svg.mjs` | 整页 SVG 渲染器（服务端/浏览器共用）+ `imageAttrs()`（热路径补丁与渲染共用同一份计算）|
 | `lib/llm-core.mjs` | 浏览器/Node 共用：prompt 常量、`chat()`、`aiDecide`、`optimizePrompts`、`generateImage`、`fitImageSize` |
 | `lib/llm.mjs` | Node 入口：读 `LLM_*` 环境变量后转交 core |
-| `web/app.js` | 前端全部逻辑（~4200 行，**原生 ES module，`state` 不挂在 window 上**）|
+| `web/app.js` | 编辑器主干：画布渲染 / 选格拖图 / 气泡 / 分镜表 / 生图（~3300 行，**原生 ES module，`state` 不挂在 window 上**）|
+| `web/ctx.mjs` | 模块间共享能力的 `app` 对象（`app.renderStage()` 等，app.js 启动前填好）—— 功能模块别 `import` app.js |
+| `web/theme.mjs` | 外观：明暗 × 风格 × 强调色 + 语言 + 减弱动效（`<html>` 上的 `data-scheme/style/accent`）|
+| `web/motion.mjs` | 动效：Web Animations 预设 `fx`、`staggerIn`、`withTransition`（View Transition）、`setFold` |
+| `web/dialogs.mjs` | 原生 `<dialog>`：`openModal` / `closeModal` / `sheet()`（动态弹窗都用它）|
+| `web/drafts.mjs` · `storage.mjs` | 草稿（IndexedDB，图片按页分开存 Blob）· localStorage 键名总表 `KEYS` |
+| `web/keys.mjs` · `refs.mjs` · `inbox.mjs` · `auto-mode.mjs` · `paint-ui.mjs` | Key 管理 · 角色参考 · 拖放粘贴收件箱 · 全自动 · 绘画入口 |
 | `web/paint.mjs` | 兜底轻量笔（笔刷/撤销/多边形裁剪）；外部引擎起不来时用它 |
 | `web/paint-host.mjs` | 外部绘画引擎的适配层（iframe + 同源直调），换引擎只改这里 |
 | `web/klecks/` | Klecks 的预构建产物 + 我们写的 `embed.html`；**升级步骤见该目录 README** |
@@ -272,7 +278,13 @@ iPhone 上还叠了三个放大器：单标签内存天花板（解码结果被�
 - **改 .bat 必须纯 ASCII**：cmd 按 OEM 码页解析，中文字节会把结构搞崩
 - **改 HTML 不要用文本锚点 replace 猜层级**：上次把 caret 插进了标题的 `<div>` 里，导致换行错位
 - 用 `Get-Content` 看 UTF-8 中文会乱码，用 node 读
-- 折叠动画用 `display:none` 会变成硬切（不可过渡），要用 `max-height`/`height` + `var(--ease)`
+- 折叠用 grid `0fr ↔ 1fr`：内容必须包在**唯一一层**子元素里（`.card-body-inner` / `.sec-inner`，JS 会自动包），
+  否则多个子元素各占一行，收不到 0
+- **外观只认 `<html>` 上的属性**：`data-scheme`（实际明暗）/ `data-style` / `data-accent`。`data-theme` 只记录「手动选了什么」，
+  CSS 不看它；测试里要切暗色请设 `data-scheme`
+- **颜色只写在令牌块里**（`styles.css` 开头的 `:root[...]`），组件里写 `var(--…)`；风格之间形态上的差异只写在「6 风格处理」一节。
+  新加强调色或风格后跑 `npm run check:contrast`
+- **选中 / 悬停不走整页重绘**：`patchHighlight()` 只改高亮层；所以「改了内容」必须自己调 `queueSave()`，别指望下一次重绘顺手存
 - GitHub Pages 对 `.css/.js` 有 10 分钟缓存：`build-static.mjs` 已按内容哈希自动换 `?v=`，别再手改
 - Render/公网部署**不要**配 `LLM_API_KEY`（无鉴权会被白嫖）；`/api/proxy` 要求 `x-pf-client` 头 + 内网黑名单
 

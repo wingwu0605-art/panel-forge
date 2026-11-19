@@ -1,26 +1,13 @@
 /**
  * 生图提示词：三源（规则切分 / AI 优化 / 自己写）+ 形状开头词 + 避免项。
  *
- * 从 app.js 抽出。这里的函数只做"拼字符串 + 读 state"，但需要三样外部能力，
- * 所以用依赖注入而不是直接 import app.js（避免循环依赖）：
- *   · pagePlan()          当前页的分镜计划（规则/AI 提示词来自它）
+ * 这里的函数只做「拼字符串 + 读 state」，用到的三样外部能力从 ctx.mjs 的 app 对象取：
+ *   · pagePlan()          当前页的分镜计划（规则 / AI 提示词来自它）
  *   · activeCharPayload()  人设 / 风格参考（角色一致性那段话与参考图）
  *   · queueSave()         改动后落草稿
- *
- * app.js 启动时调 installPromptDeps(...) 接上即可。
  */
 import { state } from './state.mjs';
-
-let deps = {
-  pagePlan: () => null,
-  activeCharPayload: () => ({ block: '', refs: [] }),
-  queueSave: () => {},
-};
-
-/** 由 app.js 注入外部依赖（只需调一次） */
-export function installPromptDeps(next) {
-  deps = { ...deps, ...next };
-}
+import { app } from './ctx.mjs';
 
 export function autoPromptOf(slot, panel) {
   if (panel?.promptEn) return panel.promptEn;
@@ -30,7 +17,7 @@ export function autoPromptOf(slot, panel) {
 /** 这一格的三份提示词：规则切分 / AI 生成 / 用户自己写（前两份由 plan 带下来） */
 export function promptParts(slotId) {
   const slot = state.tpl?.slots?.find((s) => s.id === slotId);
-  const panel = (deps.pagePlan()?.panels || []).find((p) => p.id === slotId) || null;
+  const panel = (app.pagePlan()?.panels || []).find((p) => p.id === slotId) || null;
   const edit = state.promptEdits?.[slotId] || {};
   // 规则版：AI 覆盖前的那份；AI 版：AI 改写过的那份
   const rule = panel?.promptEnRule || panel?.promptEn || autoPromptOf(slot, panel);
@@ -69,7 +56,7 @@ export function effectivePrompt(slotId) {
 /** 真正发给生图模型的那一段（角色一致性 + 提示词 + 避免项），预览和生图共用 */
 export function buildImagePrompt(slotId) {
   const e = effectivePrompt(slotId);
-  const chars = deps.activeCharPayload();
+  const chars = app.activeCharPayload();
   const body = [chars.block, e.prompt].filter(Boolean).join(' ');
   return { ...e, chars, full: e.negative ? `${body} | avoid: ${e.negative}` : body };
 }
@@ -79,5 +66,5 @@ export function setPromptEdit(slotId, field, value) {
   const auto = field === 'prompt' ? e.autoPrompt : e.autoNeg;
   if (value.trim() === auto.trim()) delete cur[field]; else cur[field] = value;
   if (Object.keys(cur).length) state.promptEdits[slotId] = cur; else delete state.promptEdits[slotId];
-  deps.queueSave?.();
+  app.queueSave();
 }

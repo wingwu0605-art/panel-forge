@@ -15,7 +15,7 @@
  */
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, mkdtempSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -268,14 +268,13 @@ const scenarios = [
       // 换一格：内容必须跟着换
       await page.evaluate("document.querySelector('#btnEditNext')?.click()");
       await sleep(400);
-      const second = await page.evaluate((probeSrc) => {
-        const probe = eval(probeSrc);
+      const second = await page.evaluate(() => {
         return {
           idx: (document.querySelector('#slotIndex')?.textContent || '').trim(),
           boardText: (document.querySelector('#slotBoard')?.textContent || '').replace(/\s+/g, ' ').trim(),
           pres: document.querySelectorAll('#slotBoardPrompts .bp-pre').length,
         };
-      }, PROBE);
+      });
       check('换格子后分镜信息跟着换', second.idx !== first.idx && second.boardText !== first.boardText,
         `${first.idx} → ${second.idx}`);
       check('换格子后提示词段仍在', second.pres >= 2, `${second.pres} 段`);
@@ -1082,7 +1081,7 @@ const scenarios = [
           ai: document.body.dataset.ai || '',
           aiCard: (() => { const el = document.querySelector('[data-panel="ai"]'); return el ? !el.hidden : null; })(),
           perSlotAi: (() => { const el = document.querySelector('.ai-gen'); return el ? getComputedStyle(el).display !== 'none' : null; })(),
-          sheetOpen: !document.querySelector('#panelSheet')?.classList.contains('hidden'),
+          sheetOpen: !!document.querySelector('#panelSheet')?.open,
         };
       })()`;
       const openSheet = `(() => { document.querySelector('#btnPanels').click(); })()`;
@@ -1201,8 +1200,9 @@ const scenarios = [
       await sleep(500);
       const four = await page.evaluate(`({
         count: (document.querySelector('#listCount')?.textContent || '').trim(),
-        allFour: [...document.querySelectorAll('.tpl .mt span:first-child')].every((s) => s.textContent === '4格'),
-        n: document.querySelectorAll('.tpl').length,
+        // 筛选只切 hidden（卡片缓存着不重建），所以数「看得见的」
+        allFour: [...document.querySelectorAll('.tpl:not([hidden]) .mt span:first-child')].every((s) => s.textContent === '4格'),
+        n: document.querySelectorAll('.tpl:not([hidden])').length,
         clear: !!document.querySelector('#facetClear'),
       })`);
       check('点「4格」只剩四格模板', four.allFour && four.n === 24 && /24/.test(four.count), `${four.count} / ${four.n} 张`);
@@ -1210,7 +1210,7 @@ const scenarios = [
 
       // 点卡片上的标签（题材）也能筛选
       await page.evaluate(`(() => {
-        const tag = [...document.querySelectorAll('.tpl .ttag')].find((x) => x.dataset.facet === 'intent');
+        const tag = [...document.querySelectorAll('.tpl:not([hidden]) .ttag')].find((x) => x.dataset.facet === 'intent');
         tag.click();
       })()`);
       await sleep(500);
@@ -1237,75 +1237,76 @@ const scenarios = [
 
   {
     name: 'ui-skin',
-    title: '⑬ 可选皮肤：iOS 26 液态玻璃（默认外观不受影响）',
+    title: '⑬ 风格：液态玻璃（经典默认不受影响 · 旧偏好自动迁移 · 预览链接不改偏好）',
     async run(page, shot, { check }) {
       await page.viewport(1200, 900);
-      const tok = `(n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim()`;
-
-      // 默认：经典皮肤，没有 data-ui
+      const clearLook = "['pf.style','pf.ui.v1','pf.skin','pf.accent','pf.theme'].forEach((k) => localStorage.removeItem(k))";
       await page.goto('/?fresh=1&tpl=ref-4band-2col');
-      await page.evaluate("localStorage.removeItem('pf.ui.v1')");
+      await page.evaluate(clearLook);
       await page.goto('/?fresh=1&tpl=ref-4band-2col');
       await page.ready();
-      const classic = await page.evaluate(`({
-        ui: document.documentElement.dataset.ui || '',
-        rxl: getComputedStyle(document.documentElement).getPropertyValue('--r-xl').trim(),
-        btnR: getComputedStyle(document.querySelector('.btn')).borderRadius,
-      })`);
-      check('默认是经典外观（没有 data-ui）', classic.ui === '' && classic.rxl === '20px',
-        `--r-xl=${classic.rxl} / 按钮圆角=${classic.btnR}`);
-
-      // 通过外观面板切到液态玻璃
-      await page.evaluate(`(() => {
-        const b = [...document.querySelectorAll('#uiSeg button')].find((x) => x.dataset.ui === 'ios26');
-        b.click();
-      })()`);
-      await sleep(700);
-      const glass = await page.evaluate(`({
-        ui: document.documentElement.dataset.ui || '',
-        label: document.querySelector('#uiName').textContent,
+      const look = `({
+        style: document.documentElement.dataset.style || '',
+        label: document.querySelector('#styleName')?.textContent || '',
         rxl: getComputedStyle(document.documentElement).getPropertyValue('--r-xl').trim(),
         blur: getComputedStyle(document.documentElement).getPropertyValue('--blur').trim(),
         btnR: getComputedStyle(document.querySelector('.btn')).borderRadius,
         segR: getComputedStyle(document.querySelector('.seg')).borderRadius,
         bodyGrad: getComputedStyle(document.body).backgroundImage.slice(0, 24),
-        saved: localStorage.getItem('pf.ui.v1'),
-      })`);
-      check('切到液态玻璃：data-ui + 令牌换了', glass.ui === 'ios26' && glass.rxl === '28px' && /blur\(32px\)/.test(glass.blur),
+        saved: localStorage.getItem('pf.style'),
+      })`;
+      const classic = await page.evaluate(look);
+      check('默认是经典（没有 data-style）', classic.style === '' && classic.rxl === '20px',
+        `--r-xl=${classic.rxl} / 按钮圆角=${classic.btnR}`);
+
+      // 外观面板里点「液态玻璃」
+      await page.evaluate("document.querySelector('#uiStyleSeg [data-style=\"glass\"]').click()");
+      await sleep(700);
+      const glass = await page.evaluate(look);
+      check('切到液态玻璃：data-style + 令牌换了', glass.style === 'glass' && glass.rxl === '28px' && /blur\(32px\)/.test(glass.blur),
         `--r-xl ${classic.rxl} → ${glass.rxl}`);
+      check('外观面板显示当前风格名', glass.label === '液态玻璃', glass.label);
       check('控件胶囊化', glass.btnR === '999px' && glass.segR === '999px', `按钮 ${glass.btnR} / 分段 ${glass.segR}`);
       check('背景有环境色渐变（玻璃才透得出来）', glass.bodyGrad.includes('radial-gradient'), glass.bodyGrad);
-      check('记住了', glass.saved === 'ios26');
-      await page.evaluate(`(() => {
-        const b = [...document.querySelectorAll('#modeSeg button')].find((x) => x.dataset.mode === 'light');
-        b.click();
-      })()`);
+      check('记住了', glass.saved === 'glass', glass.saved || '(无)');
+      await page.evaluate("document.querySelector('#modeSeg [data-mode=\"light\"]').click()");
       await sleep(900);
-      await shot('skin-ios26-light');
+      await shot('style-glass-light');
 
-      // 刷新后仍是液态玻璃；再切回经典要能干净恢复
+      // 刷新后仍是液态玻璃（启动脚本在样式表加载前就写好 data-style，不闪经典）
       await page.goto('/?fresh=1&tpl=ref-4band-2col');
       await page.ready();
-      const persisted = await page.evaluate("document.documentElement.dataset.ui || ''");
-      check('刷新后皮肤记忆生效', persisted === 'ios26', persisted || '(无)');
+      const persisted = await page.evaluate("document.documentElement.dataset.style || ''");
+      check('刷新后风格记忆生效', persisted === 'glass', persisted || '(无)');
 
-      await page.evaluate(`(() => {
-        const b = [...document.querySelectorAll('#uiSeg button')].find((x) => x.dataset.ui === 'classic');
-        b.click();
-      })()`);
+      await page.evaluate("document.querySelector('#uiStyleSeg [data-style=\"classic\"]').click()");
       await sleep(600);
-      const back = await page.evaluate(`({
-        ui: document.documentElement.dataset.ui || '',
-        rxl: getComputedStyle(document.documentElement).getPropertyValue('--r-xl').trim(),
-        bodyBg: getComputedStyle(document.body).backgroundColor,
-      })`);
-      check('切回经典能干净恢复', back.ui === '' && back.rxl === '20px', `--r-xl=${back.rxl}`);
+      const back = await page.evaluate(look);
+      check('切回经典能干净恢复', back.style === '' && back.rxl === '20px' && back.saved === null, `--r-xl=${back.rxl}`);
 
-      // ?ui=ios26 可直接分享预览链接
+      // 分享预览链接：?style=glass 直接预览，但不改你记住的风格
+      await page.goto('/?fresh=1&tpl=ref-4band-2col&style=glass');
+      await page.ready();
+      const viaUrl = await page.evaluate(look);
+      check('?style=glass 链接可直接预览', viaUrl.style === 'glass', viaUrl.style || '(无)');
+      check('预览链接不会改掉记住的风格', viaUrl.saved === null, viaUrl.saved || '(未写入)');
       await page.goto('/?fresh=1&tpl=ref-4band-2col&ui=ios26');
       await page.ready();
-      const viaUrl = await page.evaluate("document.documentElement.dataset.ui || ''");
-      check('?ui=ios26 链接可直接预览', viaUrl === 'ios26');
+      const legacyUrl = await page.evaluate("document.documentElement.dataset.style || ''");
+      check('旧的 ?ui=ios26 链接仍然能预览', legacyUrl === 'glass', legacyUrl || '(无)');
+
+      // 旧版偏好迁移：pf.ui.v1=ios26 → 液态玻璃；pf.skin=cute → 灵动可爱（皮肤优先）
+      await page.evaluate("localStorage.setItem('pf.ui.v1','ios26')");
+      await page.goto('/?fresh=1&tpl=ref-4band-2col');
+      await page.ready();
+      const mig1 = await page.evaluate("({ style: document.documentElement.dataset.style || '', saved: localStorage.getItem('pf.style'), old: localStorage.getItem('pf.ui.v1') })");
+      check('旧「液态玻璃」偏好迁移过来', mig1.style === 'glass' && mig1.saved === 'glass' && mig1.old === null, JSON.stringify(mig1));
+      await page.evaluate("localStorage.removeItem('pf.style'); localStorage.setItem('pf.skin','cute'); localStorage.setItem('pf.ui.v1','ios26')");
+      await page.goto('/?fresh=1&tpl=ref-4band-2col');
+      await page.ready();
+      const mig2 = await page.evaluate("({ style: document.documentElement.dataset.style || '', saved: localStorage.getItem('pf.style'), skin: localStorage.getItem('pf.skin') })");
+      check('旧「皮肤」偏好迁移过来（两个都有时皮肤优先）', mig2.style === 'cute' && mig2.saved === 'cute' && mig2.skin === null, JSON.stringify(mig2));
+      await page.evaluate(clearLook);
     },
   },
 
@@ -1386,7 +1387,6 @@ const scenarios = [
         await wait(60);
         return { fits, flashZh: zhCount() };
       })()`);
-      const viaUrl2 = await page.evaluate("document.documentElement.lang");
       const viaUrl = await page.evaluate("document.documentElement.lang");
       check('?lang=en 链接可直接分享', viaUrl === 'en', viaUrl);
       check('英文标签的底框包住文字（不再被边框穿过）',
@@ -1684,12 +1684,12 @@ const scenarios = [
 
   {
     name: 'skins',
-    title: '㉑ 两套皮肤（灵动可爱 / 高级简约）+ 版本号 + 偏好记忆',
+    title: '㉑ 风格：灵动可爱 / 高级简约 + 强调色在每种风格下都生效 + 版本号',
     async run(page, shot, { check }) {
       await page.viewport(1280, 900);
       await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
       await page.ready();
-      await page.evaluate("localStorage.removeItem('pf.skin')");
+      await page.evaluate("['pf.style','pf.skin','pf.ui.v1','pf.accent'].forEach((k) => localStorage.removeItem(k))");
       await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
       await page.ready();
 
@@ -1697,52 +1697,74 @@ const scenarios = [
         const root = document.documentElement;
         const g = (n) => getComputedStyle(root).getPropertyValue(n).trim();
         const card = document.querySelector('.card');
+        const btn = document.querySelector('#btnTheme');
+        const primary = document.querySelector('.btn.primary');
         return {
-          skin: root.dataset.skin || 'classic',
-          tint: g('--tint'),
+          style: root.dataset.style || 'classic',
+          accent: root.dataset.accent || 'default',
+          tint: primary ? getComputedStyle(primary).backgroundColor : '',
           rxl: g('--r-xl'),
           cardRadius: card ? getComputedStyle(card).borderRadius : '',
           btnRadius: (() => { const b = document.querySelector('.btn'); return b ? getComputedStyle(b).borderRadius : ''; })(),
           version: window.__pfVersion ? window.__pfVersion() : '',
           versionText: (document.querySelector('#appVersion') || {}).textContent || '',
+          accentName: (document.querySelector('#accentName') || {}).textContent || '',
+          btnTheme: !!btn,
         };
       })()`;
+      const pick = (style) => page.evaluate(`document.querySelector('#uiStyleSeg [data-style="${style}"]').click()`);
+      const accent = (a) => page.evaluate(`document.querySelector('#swatches [data-a="${a}"]').click()`);
 
       const base = await page.evaluate(probe);
       check('版本号来自 VERSION 文件', /^\d+\.\d+\.\d+$/.test(base.version), base.version);
       check('外观面板底部显示版本', /v\d+\.\d+\.\d+/.test(base.versionText), base.versionText);
+      check('强调色默认「跟随风格」', base.accent === 'default' && base.accentName === '跟随风格', base.accentName);
 
       // 灵动可爱
-      await page.evaluate("document.querySelector('#skinSeg [data-skin=\"cute\"]').click()");
+      await pick('cute');
       await sleep(700);
       const cute = await page.evaluate(probe);
-      check('切到灵动可爱（html[data-skin=cute]）', cute.skin === 'cute', cute.skin);
-      check('灵动可爱换了自己的主色（莓红，不是经典蓝）',
-        cute.tint !== base.tint && /oklch|rgb/.test(cute.tint), cute.tint);
+      check('切到灵动可爱（data-style=cute）', cute.style === 'cute', cute.style);
+      check('灵动可爱用自己的主色（莓红，不是经典蓝）', cute.tint !== base.tint, `${base.tint} → ${cute.tint}`);
       check('灵动可爱圆角更胖（26px）', cute.rxl === '26px' && cute.cardRadius === '26px', `${cute.rxl}/${cute.cardRadius}`);
       check('灵动可爱按钮是药丸形', /999|1e\+0|1000/.test(cute.btnRadius) || parseFloat(cute.btnRadius) > 100, cute.btnRadius);
-      await shot('skin-cute');
+      await shot('style-cute');
+
+      // 以前的 bug：皮肤把主色写死了，在可爱 / 简约下点强调色没反应
+      await accent('teal');
+      await sleep(600);
+      const cuteTeal = await page.evaluate(probe);
+      check('灵动可爱下点强调色真的生效', cuteTeal.accent === 'teal' && cuteTeal.tint !== cute.tint, `${cute.tint} → ${cuteTeal.tint}`);
+      await accent('default');
+      await sleep(600);
+      const cuteBack = await page.evaluate(probe);
+      check('「跟随风格」回到这套风格自己的主色', cuteBack.accent === 'default' && cuteBack.tint === cute.tint, cuteBack.tint);
 
       // 高级简约
-      await page.evaluate("document.querySelector('#skinSeg [data-skin=\"minimal\"]').click()");
+      await pick('minimal');
       await sleep(700);
       const min = await page.evaluate(probe);
-      check('切到高级简约（html[data-skin=minimal]）', min.skin === 'minimal', min.skin);
-      check('高级简约用的是低饱和靛蓝', min.tint !== cute.tint && /oklch|rgb/.test(min.tint), min.tint);
+      check('切到高级简约（data-style=minimal）', min.style === 'minimal', min.style);
+      check('高级简约用的是低饱和靛蓝', min.tint !== cute.tint && min.tint !== base.tint, min.tint);
       check('高级简约圆角收敛（16px）', min.rxl === '16px' && min.cardRadius === '16px', `${min.rxl}/${min.cardRadius}`);
-      await shot('skin-minimal');
+      await accent('orange');
+      await sleep(600);
+      const minOrange = await page.evaluate(probe);
+      check('高级简约下强调色也生效', minOrange.tint !== min.tint, `${min.tint} → ${minOrange.tint}`);
+      await shot('style-minimal-orange');
 
       // 偏好记忆
       await page.goto('/?perf=1&fresh=1&tpl=jp-shonen-3tier&slot=p1');
       await page.ready();
       const remembered = await page.evaluate(probe);
-      check('刷新后记住上次的皮肤', remembered.skin === 'minimal', remembered.skin);
+      check('刷新后记住风格 + 强调色', remembered.style === 'minimal' && remembered.accent === 'orange', `${remembered.style} · ${remembered.accent}`);
 
       // 回到经典
-      await page.evaluate("document.querySelector('#skinSeg [data-skin=\"classic\"]').click()");
+      await accent('default');
+      await pick('classic');
       await sleep(600);
       const back = await page.evaluate(probe);
-      check('能切回经典', back.skin === 'classic' && back.tint !== min.tint, `${back.skin} · ${back.tint}`);
+      check('能切回经典', back.style === 'classic' && back.tint === base.tint, `${back.style} · ${back.tint}`);
     },
   },
 
@@ -1829,7 +1851,7 @@ const scenarios = [
         document.querySelector('#fabGenPage').click();
         await wait(300);
         res.fabBody = document.querySelector('#dangerBody').textContent.replace(/\s+/g, ' ');
-        document.querySelector('#dangerSheet [data-cancel]').click();
+        document.querySelector('#dangerSheet [data-close]').click();
         await wait(150);
 
         // 全自动：警示 → 角色确认 → 开始
@@ -2081,10 +2103,14 @@ const scenarios = [
         const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b); return Number(((Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05)).toFixed(2)); };
         const res = {};
         for (const theme of ['light', 'dark']) {
+          // 明暗现在看 data-scheme（data-theme 只记录「手动选了什么」）
           document.documentElement.dataset.theme = theme;
+          document.documentElement.dataset.scheme = theme;
           for (const mode of ['full', 'story', 'off']) {
             seg.querySelector('[data-auto="' + mode + '"]').click();
-            await wait(240);
+            // 等颜色 / 滑块过渡真正放完再量（固定等 240ms 在并行跑、机器忙时会量到过渡中间的颜色）
+            await wait(60);
+            await Promise.race([Promise.allSettled(seg.getAnimations({ subtree: true }).map((a) => a.finished)), wait(1500)]);
             const onBtn = seg.querySelector('button.on');
             const ind = seg.querySelector('.seg-ind');
             const color = getComputedStyle(onBtn).color;
@@ -2207,11 +2233,13 @@ const scenarios = [
         document.querySelectorAll('#railRight .rail-ico')[0]?.click();
         await wait(150);
         const popOpen = [...document.querySelectorAll('.rail-pop')].find((p) => !p.classList.contains('hidden'));
-        const popAnim = popOpen ? getComputedStyle(popOpen).animationName : '';
+        // 动画走 Web Animations：按 id 认（打开 = railPopIn，切换 = railPopSwap）
+        const animId = (el) => (el?.getAnimations() || []).map((a) => a.id).find((id) => /^railPop/.test(id)) || '';
+        const popAnim = animId(popOpen);
         document.querySelectorAll('#railRight .rail-ico')[1]?.click();
         await wait(150);
         const popSwap = [...document.querySelectorAll('.rail-pop')].find((p) => !p.classList.contains('hidden'));
-        res.popAnim = { open: popAnim, swap: popSwap ? getComputedStyle(popSwap).animationName : '' };
+        res.popAnim = { open: popAnim, swap: animId(popSwap) };
 
         // 收起状态下按钮是否还看得见（之前被 mini 的隐藏规则连标题条一起藏了）
         const ensureMini = async (rail) => {
@@ -2272,9 +2300,11 @@ const scenarios = [
       // 静态产物自检：app.js 里 import 的每个相对模块，site/ 下必须真的存在
       // （site/ 不入库：没构建过就先构建一次，否则这一条永远是假红）
       {
-        if (!existsSync(join(ROOT, 'site', 'index.html'))) {
-          execFileSync(process.execPath, [join(ROOT, 'scripts', 'build-static.mjs')], { cwd: ROOT, stdio: 'ignore' });
-        }
+        // 没构建过、或者 web/ 里有比 site/ 新的文件，就重新构建（否则拆出新模块后这一条是假红）
+        const siteIndex = join(ROOT, 'site', 'index.html');
+        const stale = !existsSync(siteIndex) || readdirSync(join(ROOT, 'web'))
+          .some((f) => statSync(join(ROOT, 'web', f)).mtimeMs > statSync(siteIndex).mtimeMs);
+        if (stale) execFileSync(process.execPath, [join(ROOT, 'scripts', 'build-static.mjs')], { cwd: ROOT, stdio: 'ignore' });
         const appSrc = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
         const mods = [...appSrc.matchAll(/from '\.\/([^']+\.mjs)'/g)].map((m) => m[1]);
         const missing = [];
@@ -2693,7 +2723,7 @@ const scenarios = [
         document.querySelector('#fabGenPage').click();
         await wait(200);
         res.danger = {
-          shown: !document.querySelector('#dangerSheet').classList.contains('hidden'),
+          shown: !!document.querySelector('#dangerSheet').open,
           goDisabled: document.querySelector('#dangerGo').disabled,
           hasAck: !!document.querySelector('#dangerAck'),
         };
@@ -2904,7 +2934,8 @@ const scenarios = [
 /* ------------------------------------------------------------------ 起浏览器 */
 /** 起一个 headless Chrome 并连上它的当前页；用完记得 close() */
 export async function launch({ width = 1440, height = 900 } = {}) {
-  const profile = join(tmpdir(), 'pf-visual-' + Date.now());
+  // 每个进程一份独立的临时配置目录（分片并行时同一毫秒启动的几个 Chrome 以前会撞到同一个目录、互相串状态）
+  const profile = mkdtempSync(join(tmpdir(), 'pf-visual-'));
   const port = await freePort();
   const exe = findChrome();
   const chrome = spawn(exe, [

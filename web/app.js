@@ -2,19 +2,32 @@
  * app.js — PanelForge 分镜坊 前端
  * 零框架；渲染内核与后端共用同一份 /lib/svg.mjs，保证「所见即导出」。
  */
-import { estimateLayout, splitTextIntoPages, buildAutoSteps, imageQueueForPage, imageQueueAll, estimateCostHint } from './lib/auto.mjs';
-import { $, $$, PERF, perf, perfPush, perfStats, perfNow, perfDone, withTimeout, blobToDataURL, clamp, escapeHtml, debounce, sysReduceMQ, motionOK, stagger, replay , withTransition } from './util.mjs';
-import { state, installHistoryDeps, HIST_MAX, snapshot, restore, commit, undo, redo, resetHistory } from './state.mjs';
-import { imageAsset, rehydrateImages, exportImageMap, urlForBlob, loadImgEl } from './assets.mjs';
-import { autoPromptOf, promptParts, effectivePrompt, buildImagePrompt, setPromptEdit, installPromptDeps } from './prompt.mjs';
-import { setView, initViews, setEditMod, syncEditHead, syncEditZoom, goCanvasOnCompact, installViewDeps } from './mobile.mjs';
-import { installRails } from './rails.mjs';
-import { renderTemplateSVG, imageAttrs } from './lib/svg.mjs';
-import { createCellPainter, localPoly } from './paint.mjs';
-import { createKlecksHost } from './paint-host.mjs';
-import { installI18n, setLang as setI18nLang, getLang, stats as i18nStats } from './i18n.mjs';
+import { renderTemplateSVG, highlightMarkup, imageAttrs } from './lib/svg.mjs';
 import { pointInPoly } from './lib/geometry.mjs';
-import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble, bubbleThumb, pickBubbleForText } from './lib/bubbles.mjs';
+import { BUBBLES, recommendBubbles, makeBubble, bubbleThumb, pickBubbleForText } from './lib/bubbles.mjs';
+import { $, $$, PERF, perfNow, perfDone, withTimeout, clamp, escapeHtml, debounce } from './util.mjs';
+import { params, DBG, FRESH, STATIC, ARTIST, SHELL, REPO_URL } from './env.mjs';
+import { store, KEYS } from './storage.mjs';
+import { app } from './ctx.mjs';
+import { fx, settled, staggerIn, setFold } from './motion.mjs';
+import { openModal, closeModal, sheet } from './dialogs.mjs';
+import { toast, copyText, setRange, setBusy, initSegIndicators, initRanges, initCollapsibles, initPlatformKeys, initMoreMenu } from './ui.mjs';
+import { state, commit, undo, redo, resetHistory } from './state.mjs';
+import { imageAsset, rehydrateImages, exportImageMap, loadImgEl, blobUrlOf } from './assets.mjs';
+import { effectivePrompt, buildImagePrompt, setPromptEdit } from './prompt.mjs';
+import { setView, initViews, setEditMod, syncEditHead, syncEditZoom, goCanvasOnCompact } from './mobile.mjs';
+import { installRails } from './rails.mjs';
+import { installI18n } from './i18n.mjs';
+import { initAppearance, currentTint } from './theme.mjs';
+import { downloadText, exportBlob } from './share.mjs';
+import { openPaint, exportSlotImage, initPaint } from './paint-ui.mjs';
+import { loadChars, renderChars, activeCharPayload, bindRefs } from './refs.mjs';
+import { loadLlm, saveLlm, syncLlmStatus, loadKeyStore, openKeySheet, bindKeys } from './keys.mjs';
+import { queueSave, clearDrafts, loadDraft, installAutosave, newPageId } from './drafts.mjs';
+import { applyLayout, bindPanelSheet } from './panels.mjs';
+import { bindSlotZoom, syncSlotZoom, syncSlotZoomSoon } from './slot-zoom.mjs';
+import { bindAutoUI } from './auto-mode.mjs';
+import { bindInboxUI } from './inbox.mjs';
 
 /**
  * 双模式 API：
@@ -23,7 +36,7 @@ import { BUBBLES, BUBBLE_IDS, recommendBubbles, makeBubble, bubbleThumb, pickBub
  */
 let api = null;
 async function makeApi() {
-  if (window.PF_STATIC) {
+  if (STATIC) {
     const mod = await import('./api-static.js');
     return mod.createStaticApi();
   }
@@ -67,66 +80,11 @@ async function makeApi() {
 const CULTURE_LABEL = { jp: '日', cn: '中', kr: '韩', core: '通' };
 const CULTURE_ZH = { jp: '日式页漫', cn: '中式漫画', kr: '韩式条漫', core: '通用/跨界' };
 
-/* 外观层常量（init() 在顶层就跑，所以必须放在这里，不能放文件末尾） */
-const ACCENTS = [
-  { id: 'blue', zh: '蓝色', l: '#007aff', d: '#0a84ff' },
-  { id: 'indigo', zh: '靛蓝', l: '#5856d6', d: '#5e5ce6' },
-  { id: 'purple', zh: '紫色', l: '#af52de', d: '#bf5af2' },
-  { id: 'pink', zh: '粉色', l: '#ff2d55', d: '#ff375f' },
-  { id: 'red', zh: '红色', l: '#ff3b30', d: '#ff453a' },
-  { id: 'orange', zh: '橙色', l: '#f56300', d: '#ff9f0a' },
-  { id: 'yellow', zh: '黄色', l: '#e0a800', d: '#ffd60a' },
-  { id: 'green', zh: '绿色', l: '#28a745', d: '#30d158' },
-  { id: 'teal', zh: '青色', l: '#0a9fb5', d: '#40c8e0' },
-  { id: 'graphite', zh: '石墨', l: '#636366', d: '#98989d' },
-];
-const ACCENT_KEY = 'pf.accent';
-/** 界面风格：classic（默认）/ ios26（液态玻璃皮肤）；改皮肤只动 data-ui，不动组件 */
-const UI_KEY = 'pf.ui.v1';
-/** 界面语言：zh（源语言）/ en / id */
-const LANG_KEY = 'pf.lang.v1';
-const MOTION_KEY = 'pf.motion';
-const sysDarkMQ = window.matchMedia('(prefers-color-scheme: dark)');
-
-const store = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* ignore */ } },
-};
-
-const REPO_URL = 'https://github.com/wingwu0605-art/panel-forge';
-const THEME_KEY = 'pf.theme';
-const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
-/** ?dbg=1：底栏换成一行动调试信息（排查多页 / 面板问题时用） */
-const DBG = new URLSearchParams(location.search).get('dbg') === '1';
-
-/**
- * 画师版入口：`?mode=artist`，或构建时注入 `window.PF_PAINTER`（见 site/painter.html）。
- * 同一份源码产出两个独立网页：AI 版（index.html）和画师版（painter.html）。
- * 画师版里 AI 相关界面全部收起（规则匹配、分镜、绘制都在）。
- */
-const ARTIST = window.PF_PAINTER === true
-  || new URLSearchParams(location.search).get('mode') === 'artist';
 if (ARTIST) {
   document.body.dataset.mode = 'artist';
   document.title = 'PanelForge 画师版 · 分镜与绘制';
 }
 
-/**
- * 原生壳（Capacitor / WebView）检测。
- * 壳里和浏览器里的性能预算不一样：WebView 的 backdrop-filter 很贵、弹簧动效更容易掉帧，
- * 所以壳里走一套更省的性能档（见 styles.css 的 body[data-shell]），并开启分享出口。
- * 优先级：?shell= 参数 → Capacitor 平台 → UA 标记。
- */
-const SHELL = (() => {
-  const q = new URLSearchParams(location.search).get('shell');
-  if (q) return q;
-  try {
-    const cap = window.Capacitor;
-    if (cap?.isNativePlatform?.()) return cap.getPlatform?.() || 'native';
-  } catch { /* ignore */ }
-  if (/PanelForgeShell/i.test(navigator.userAgent || '')) return 'android';
-  return '';
-})();
 if (SHELL) {
   document.body.dataset.shell = SHELL;
   document.documentElement.lang = document.documentElement.lang || 'zh-CN';
@@ -137,65 +95,6 @@ if (SHELL) {
  * 只在这个参数下存在；用来量「拖动 / 缩放」热路径到底花了多少时间，
  * 手机上也能直接看（不用连 Mac 抓 Safari 时间线）。
  * ---------------------------------------------------------------- */
-
-function initPerfHud() {
-  if (!PERF) return;
-  const el = document.createElement('div');
-  el.className = 'perf-hud';
-  el.id = 'perfHud';
-  el.textContent = 'perf…';
-  document.body.appendChild(el);
-  let last = performance.now();
-  const tick = (t) => { perfPush(perf.frames, t - last); last = t; requestAnimationFrame(tick); };
-  requestAnimationFrame(tick);
-  if (window.PerformanceObserver) {
-    try {
-      new PerformanceObserver((l) => l.getEntries().forEach((e) => perfPush(perf.longtask, Math.round(e.duration))))
-        .observe({ type: 'longtask', buffered: true });
-    } catch { /* 老浏览器没有 longtask */ }
-  }
-  const cls = (v, warn, bad) => (v >= bad ? 'bad' : v >= warn ? 'warn' : '');
-  const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(2) + 'MB' : Math.round(n / 1024) + 'KB');
-  window.__pfPerf = {
-    reset() {
-      for (const k of ['frames', 'render', 'patch', 'save', 'longtask']) perf[k].length = 0;
-      perf.renders = 0; perf.patches = 0; perf.saves = 0; perf.lastSaveBytes = 0;
-    },
-    snapshot() {
-      return {
-        frames: perfStats(perf.frames), render: perfStats(perf.render), patch: perfStats(perf.patch),
-        save: perfStats(perf.save), renders: perf.renders, patches: perf.patches, saves: perf.saves,
-        longtasks: perf.longtask.slice(-8), saveBytes: perf.lastSaveBytes,
-        images: Object.keys(state.images || {}).length,
-        imageBytes: Object.values(state.images || {}).reduce((n, im) => n + String(im?.href || '').length, 0),
-        markupBytes: ($('#canvas svg')?.outerHTML || '').length,
-      };
-    },
-  };
-  setInterval(() => {
-    const f = perfStats(perf.frames);
-    const r = perfStats(perf.render);
-    const p = perfStats(perf.patch);
-    const imgs = Object.values(state.images || {});
-    const bytes = imgs.reduce((n, im) => n + String(im?.href || '').length, 0);
-    const markup = ($('#canvas svg')?.outerHTML || '').length;
-    const fps = f.avg > 0 ? Math.round(1000 / f.avg) : 0;
-    el.innerHTML = [
-      `<b>${fps}</b> fps · 帧 p95 <span class="${cls(f.p95, 20, 34)}">${f.p95.toFixed(1)}ms</span> · 长任务 ${perf.longtask.length}`,
-      `render ${perf.renders} 次 · 最近 ${r.p95.toFixed(1)}ms · 峰 ${r.max.toFixed(1)}ms`,
-      `patch ${perf.patches} 次 · 最近 ${p.p95.toFixed(2)}ms`,
-      `存盘 ${perf.saves} 次 · ${kb(perf.lastSaveBytes)} · 峰 ${perfStats(perf.save).max.toFixed(0)}ms`,
-      `图 ${imgs.length} 张 · base64 ${kb(bytes)} · 标记 ${kb(markup)}`,
-    ].join('\n');
-  }, 250);
-}
-
-const THEME_ICONS = {
-  auto: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2Z" fill="currentColor"/></svg>',
-  light: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8v2.1M10 16.1v2.1M1.8 10h2.1M16.1 10h2.1M4.2 4.2l1.5 1.5M14.3 14.3l1.5 1.5M4.2 15.8l1.5-1.5M14.3 5.7l1.5-1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
-  dark: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.4 12.6A7 7 0 0 1 7.4 3.6a7 7 0 1 0 9 9Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
-};
-const THEME_NAME = { auto: '跟随系统', light: '浅色', dark: '深色' };
 
 /* ================================================================== *
  * 启动
@@ -223,16 +122,21 @@ async function directFirst(name, body) {
 async function init() {
   // 语言必须最先装：initChrome 里的外观面板会读 getLang()，
   // 那时若 i18n 还没装，读到的默认值 'zh' 会把已存的语言偏好写回成 null（刷新后记不住）。
-  installI18n(new URLSearchParams(location.search).get('lang') || store.get(LANG_KEY) || 'zh');
+  installI18n(params.get('lang') || store.get(KEYS.lang) || 'zh');
   initChrome();
-  initPerfHud();
+  if (PERF) import('./perf-hud.mjs').then((m) => m.initPerfHud());
   bindUI();
-  installPromptDeps({ pagePlan, activeCharPayload, queueSave });
-  installViewDeps({ renderStage, renderSlotPanel, activateTab, currentPlanPanel });
-  installHistoryDeps({ renderStage, renderSlotPanel, renderBubbles, toast });
-  bindStyleFollow();
+  // 各功能模块自己绑自己的界面（以前全塞在 bindUI 里，一千多行）
+  bindRefs();
+  bindKeys();
+  bindAutoUI();
+  bindInboxUI();
+  bindSlotZoom();
+  initPaint();
+  installRails();
+  installAutosave();
   initCollapsibles();
-  api = await makeApi();
+  app.api = api = await makeApi();
   adaptTopLinksForStatic();
   const meta = await api.meta();
   const list = await api.templates();
@@ -243,7 +147,7 @@ async function init() {
   state.intentZh = Object.fromEntries((Array.isArray(meta.intents) ? meta.intents : [])
     .map((i) => [i.id, i.zh || i.id]));
   $('#statTpl').textContent = `${meta.templates} 套模板 · ${meta.roles.length} 种格型`;
-  $('#statPort').textContent = window.PF_STATIC ? '离线可用' : location.host;
+  $('#statPort').textContent = STATIC ? '离线可用' : location.host;
   $('#analyzeHint').textContent = '本地规则引擎';
   if (meta.engine) {
     const e = meta.engine;
@@ -254,8 +158,7 @@ async function init() {
   loadLlm();
   syncLlmStatus();
 
-  const want = new URLSearchParams(location.hash.slice(1)).get('tpl')
-    || new URLSearchParams(location.search).get('tpl');
+  const want = new URLSearchParams(location.hash.slice(1)).get('tpl') || params.get('tpl');
   const first = want || 'ref-4band-2col';
   await selectTemplate(first);
   // 旧链接 / 打错的 ?tpl=：别停在"没有版式"的空状态，回落默认版式并说明
@@ -271,7 +174,6 @@ async function init() {
     }
   }
 
-  const params = new URLSearchParams(location.search);
   const wantSlot = params.get('slot');
   if (wantSlot && state.tpl?.slots?.some((s) => s.id === wantSlot)) {
     state.selectedId = wantSlot;
@@ -285,20 +187,17 @@ async function init() {
   }
   // 先把第一页立起来（页签必须马上有，不能因为读草稿卡住而空白）
   if (!state.pages.length) {
-    state.pages = [{ tplId: state.tpl?.id || 'ref-4band-2col', name: '第 1 页', images: {}, bubbles: [], lines: {} }];
+    state.pages = [{ id: newPageId(), tplId: state.tpl?.id || 'ref-4band-2col', name: '第 1 页', images: {}, bubbles: [], lines: {} }];
     state.pageIdx = 0;
   }
   renderPageTabs();
   loadKeyStore();
   await loadChars();
 
-  // 再尝试恢复草稿：IndexedDB 不可用/被策略拦住时也不能拖死启动
+  // 再尝试恢复草稿：IndexedDB 不可用 / 被策略卡住时 loadDraft 1.5s 内返回 null，不会拖死启动
   // ?fresh=1 跳过恢复（自动化测试要干净的初始状态，否则上一个用例的草稿会换掉模板）
   try {
-    const draft = params.get('fresh') === '1' ? null : await Promise.race([
-      loadDraft(),
-      new Promise((r) => setTimeout(() => r(null), 1500)),
-    ]);
+    const draft = FRESH ? null : await loadDraft();
     if (draft && draft.pages?.length) {
       state.pages = draft.pages;
       state.pageIdx = Math.min(draft.pageIdx || 0, draft.pages.length - 1);
@@ -323,8 +222,8 @@ async function init() {
   } catch (e) {
     console.warn('[PanelForge] 草稿恢复失败（不影响使用）', e);
   }
-  if (params.get('keyselftest') === '1') await runKeySelfTest();
-  if (params.get('aiselftest') === '1') await runAiSelfTest();
+  if (params.get('keyselftest') === '1') await (await import('./selftest.mjs')).runKeySelfTest();
+  if (params.get('aiselftest') === '1') await (await import('./selftest.mjs')).runAiSelfTest();
   if (params.get('shortcuts') === '1') toggleShortcuts(true);
   if (params.get('keys') === '1') openKeySheet();
   if (params.get('tab')) activateTab(params.get('tab'));
@@ -356,239 +255,9 @@ function showDbgLine() {
 }
 
 /* ================================================================== *
- * 快捷键自检（?keyselftest=1）：派发真实 keydown 事件，检查状态变化
- * ================================================================== */
-async function runKeySelfTest() {
-  const rows = [];
-  const ok = (name, cond, extra = '') => rows.push({ name, cond: !!cond, extra });
-  const press = (key, opts = {}) => {
-    if (document.activeElement?.blur) document.activeElement.blur();
-    window.dispatchEvent(new KeyboardEvent('keydown', {
-      key, ctrlKey: !!opts.ctrl, shiftKey: !!opts.shift, bubbles: true, cancelable: true,
-    }));
-  };
-  const slots = state.tpl.slots;
-  const s0 = slots[0].id;
-  const s1 = slots[1]?.id || slots[0].id;
-
-  state.images = {}; state.bubbles = []; state.lines = {};
-  state.selBubble = null; state.selectedId = s0;
-  resetHistory();
-
-  // 撤销 / 重做
-  commit();
-  state.images[s0] = { href: 'data:image/png;base64,iVBORw0KGgo=', iw: 8, ih: 8, zoom: 1, panX: 0, panY: 0, mode: 'cover', name: 't' };
-  ok('准备：第 1 格有图', !!state.images[s0]);
-  press('z', { ctrl: true });
-  ok('Ctrl+Z 撤销 → 图没了', !state.images[s0], `${Object.keys(state.images).length} 张`);
-  press('z', { ctrl: true, shift: true });
-  ok('Ctrl+Shift+Z 重做 → 图回来', !!state.images[s0]);
-
-  // 复制 / 粘贴 / 删除
-  state.selectedId = s0;
-  press('c', { ctrl: true });
-  ok('Ctrl+C 复制图片', state.clipboard?.kind === 'image');
-  state.selectedId = s1;
-  press('v', { ctrl: true });
-  ok('Ctrl+V 粘贴到第 2 格', !!state.images[s1]);
-  press('Delete');
-  ok('Delete 移除第 2 格图片', !state.images[s1]);
-
-  // 气泡：尺寸 / 微调 / 复制 / 删除
-  state.selectedId = s0;
-  addBubble('talk-ellipse', { noCommit: true });
-  const b0 = selectedBubble();
-  ok('气泡已添加', !!b0);
-  if (b0) {
-    const w0 = b0.w;
-    press(']');
-    ok('] 放大气泡', selectedBubble().w > w0, `${w0}→${selectedBubble().w}`);
-    const w1 = selectedBubble().w;
-    press('[');
-    ok('[ 缩小气泡', selectedBubble().w < w1);
-    const y0 = selectedBubble().y;
-    press('ArrowDown', { shift: true });
-    ok('Shift+↓ 下移 10', selectedBubble().y === y0 + 10, `${y0}→${selectedBubble().y}`);
-    const n0 = state.bubbles.length;
-    press('d', { ctrl: true });
-    ok('Ctrl+D 复制气泡', state.bubbles.length === n0 + 1, `${n0}→${state.bubbles.length}`);
-    press('Delete');
-    ok('Delete 删除气泡', state.bubbles.length === n0);
-  }
-
-  // 视图开关 / 数字跳格 / 帮助
-  const hollow0 = $('#chkHollow').checked;
-  press('h');
-  ok('H 切换镂空', $('#chkHollow').checked !== hollow0);
-  press('h');
-  const labels0 = $('#chkLabels').checked;
-  press('g');
-  ok('G 切换格号', $('#chkLabels').checked !== labels0);
-  press('2');
-  ok('数字键 2 跳到第 2 格', state.selectedId === s1);
-  press('?');
-  ok('? 打开快捷键表', !$('#shortcuts').classList.contains('hidden'));
-  press('Escape');
-  ok('Esc 关闭快捷键表', $('#shortcuts').classList.contains('hidden'));
-
-  const pass = rows.filter((r) => r.cond).length;
-  const box = document.createElement('div');
-  box.className = 'selftest';
-  box.innerHTML = `<b>快捷键自检：${pass}/${rows.length} 通过</b>` +
-    rows.map((r) => `<div class="${r.cond ? '' : 'no'}">${r.cond ? '✅' : '❌'} ${r.name}${r.extra ? ' — ' + r.extra : ''}</div>`).join('');
-  document.body.appendChild(box);
-  console.log(box.textContent);
-  return pass === rows.length;
-}
-
-/* ================================================================== *
- * 静态版 AI 自检（?aiselftest=1）
- * 直接 new 一个 static api，验证「浏览器直连模型」这条链路
- * ================================================================== */
-async function runAiSelfTest() {
-  const rows = [];
-  const ok = (name, cond, extra = '') => rows.push({ name, cond: !!cond, extra });
-  try {
-    await aiSelfTestBody(ok);
-  } catch (e) {
-    rows.push({ name: '自检过程异常：' + e.message, cond: false, extra: String(e.stack || '').slice(0, 160) });
-  }
-  const pass = rows.filter((r) => r.cond).length;
-  const box = document.createElement('div');
-  box.className = 'selftest';
-  box.innerHTML = `<b>静态版 AI 自检：${pass}/${rows.length} 通过</b>` +
-    rows.map((r) => `<div class="${r.cond ? '' : 'no'}">${r.cond ? '✅' : '❌'} ${r.name}${r.extra ? ' — ' + r.extra : ''}</div>`).join('');
-  document.body.appendChild(box);
-  return pass === rows.length;
-}
-
-async function aiSelfTestBody(ok) {
-  const { createStaticApi } = await import('./api-static.js');
-  const sapi = createStaticApi();
-
-  // 指向本地假模型（CORS 开放）
-  state.llm = { protocol: 'openai', baseUrl: 'http://127.0.0.1:7399', apiKey: 'mock-key', model: 'mock-model' };
-  localStorage.setItem(LLM_STORE, JSON.stringify(state.llm));
-
-  const status = await sapi.llmStatus();
-  ok('静态版 llmStatus 认得 Key', status.configured === true && status.staticMode === true);
-
-  try {
-    const t = await sapi.llmTest({ llm: state.llm });
-    ok('llmTest 浏览器直连成功', t.ok === true, t.reply || t.error || '');
-  } catch (e) {
-    ok('llmTest 浏览器直连成功', false, e.message);
-  }
-
-  const plot = '雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋。';
-  let decide = null;
-  try {
-    decide = await sapi.aiDecide({ plot, culture: 'all', ratio: 'auto', candidates: 8, pageWidth: 1600, llm: state.llm });
-    ok('aiDecide 返回 ok', decide.ok === true, decide.error || '');
-    ok('选中模板是合法 id', !decide.decision?.quality?.corrected, decide.decision?.pick || '');
-    ok('生成的计划格数 > 0', (decide.plan?.panels?.length || 0) > 0, `${decide.plan?.panels?.length || 0} 格`);
-    ok('每格都有画面内容', (decide.plan?.panels || []).every((p) => p.content), '');
-  } catch (e) {
-    ok('aiDecide 返回 ok', false, e.message);
-  }
-
-  if (decide?.ok) {
-    try {
-      const p = await sapi.prompts({ plot, templateId: decide.decision.pick, pageWidth: 1600, llm: state.llm });
-      ok('prompts 返回 ok', p.ok === true, p.error || '');
-      ok('优化生效的格数 > 0', (p.applied || 0) > 0, `${p.applied}/${p.total}`);
-      const first = p.plan?.panels?.[0];
-      ok('提示词已被替换为 AI 版', first?.aiOptimized === true, (first?.promptEn || '').slice(0, 46));
-    } catch (e) {
-      ok('prompts 返回 ok', false, e.message);
-    }
-  }
-
-  localStorage.removeItem(LLM_STORE);
-  const noKey = await sapi.aiDecide({ plot, llm: { apiKey: '' } });
-  ok('无 Key 时给出友好提示', noKey.ok === false && (noKey.code === 'NO_LLM_KEY' || !!noKey.hint), noKey.code || '');
-}
-
-/* ================================================================== *
  * 撤销 / 重做
  * 快照只克隆对象的外壳，图片的 dataURL 字符串是共享引用，所以很轻
  * ================================================================== */
-
-/* ================================================================== *
- * 可折叠面板：收起只留标题行，状态记在本机
- * ================================================================== */
-/**
- * 折叠状态单独一个 key。以前它和「界面风格」共用 `pf.ui.v1`：选了液态玻璃会把折叠记录冲掉，
- * 收起任意一块又会把界面风格冲回经典（刷新后才看出来）。
- */
-const FOLD_STORE = 'pf.fold.v1';
-
-function initCollapsibles() {
-  let saved = {};
-  try {
-    saved = JSON.parse(localStorage.getItem(FOLD_STORE) || 'null');
-    if (!saved || typeof saved !== 'object') {
-      // 迁移：老版本把折叠状态写在 pf.ui.v1（是 JSON 对象才是折叠记录）
-      const old = JSON.parse(localStorage.getItem('pf.ui.v1') || 'null');
-      saved = old && typeof old === 'object' ? old : {};
-    }
-  } catch { saved = {}; }
-  const persist = () => { try { localStorage.setItem(FOLD_STORE, JSON.stringify(saved)); } catch { /* ignore */ } };
-  // ?collapse=ai,browse 可指定初始收起（分享"专注模式"链接用，不影响记住的状态）
-  const force = (new URLSearchParams(location.search).get('collapse') || '').split(',').filter(Boolean);
-
-  // 默认收起的卡片（用户改过就以记录为准）：模板库内容多、日常最占地方
-  const DEFAULT_CLOSED = ['browse'];
-  for (const el of $$('[data-collapse]')) {
-    const key = el.dataset.collapse;
-    const savedVal = saved[key];
-    const initialOpen = typeof savedVal === 'boolean' ? savedVal : (!DEFAULT_CLOSED.includes(key) && !force.includes(key));
-
-    // 原生 <details>（「怎么用」）
-    if (el.tagName === 'DETAILS') {
-      el.open = initialOpen;
-      el.addEventListener('toggle', () => { saved[key] = el.open; persist(); });
-      continue;
-    }
-
-    const head = el.querySelector(':scope > .card-head, :scope > .bub-head');
-    if (!head) continue;
-
-    // 头部之后的兄弟节点统一包进 .card-body
-    let body = el.querySelector(':scope > .card-body');
-    if (!body) {
-      body = document.createElement('div');
-      body.className = 'card-body';
-      const inner = document.createElement('div');
-      inner.className = 'card-body-inner';
-      [...el.children].filter((c) => c !== head).forEach((c) => inner.appendChild(c));
-      body.appendChild(inner);
-      el.appendChild(body);
-    }
-
-    const caret = document.createElement('button');
-    caret.type = 'button';
-    caret.className = 'caret';
-    caret.title = '展开 / 收起';
-    caret.setAttribute('aria-label', '展开或收起');
-    caret.innerHTML = '<svg viewBox="0 0 12 12" width="10" height="10"><path d="M2 4.2 6 8l4-3.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-    head.appendChild(caret);
-
-    const apply = (open, save = true) => {
-      animateFold(el, body, open, { instant: !save });
-      caret.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (save) { saved[key] = open; persist(); }
-    };
-    apply(initialOpen, false);
-
-    // 点标题行任意处都能折叠；但标题里的按钮/输入框不触发
-    head.addEventListener('click', (ev) => {
-      const hit = ev.target.closest('button, input, select, textarea, a');
-      if (hit && !hit.classList.contains('caret')) return;
-      apply(el.classList.contains('collapsed'));
-    });
-  }
-}
 
 /* ================================================================== *
  * 模板列表
@@ -598,57 +267,76 @@ function intentZh(id) {
   return state.intentZh?.[id] || id;
 }
 
-function renderList() {
+/* ---------------- 模板库 ----------------
+ * 138 张卡的缩略图只在第一次生成；之后搜索 / 筛选 / 换选中只切 hidden 和 .on。
+ * 以前每敲一个字就把 138 个缩略图 SVG 重新拼一遍再 innerHTML（40–90ms），整排入场动画也跟着重放。 */
+const tplCards = new Map();   // 模板 id → 卡片元素
+const tplHay = (t) => (t._hay ??= (t.id + t.name + t.desc + t.tags.join('') + t.intents.map(intentZh).join('')
+  + intentZh(t.ratio) + ratioName(t.ratio) + t.panels + '格 ' + CULTURE_ZH[t.culture]).toLowerCase());
+
+function tplCard(t) {
+  let el = tplCards.get(t.id);
+  if (el) return el;
+  el = document.createElement('div');
+  el.className = 'tpl';
+  el.dataset.id = t.id;
+  const chips = [
+    `<button class="ttag" data-facet="panels" data-val="${t.panels}">${t.panels}格</button>`,
+    ...t.tags.slice(0, 2).map((x) => `<button class="ttag" data-facet="tag" data-val="${escapeHtml(x)}">${escapeHtml(x)}</button>`),
+    ...(t.intents[0] ? [`<button class="ttag" data-facet="intent" data-val="${escapeHtml(t.intents[0])}">${escapeHtml(intentZh(t.intents[0]))}</button>`] : []),
+  ].join('');
+  el.innerHTML = `
+    <div class="th">${renderTemplateSVG({ ...t, slots: t.thumbSlots }, { width: 220, showEmptyTint: false, slotOutline: true })}</div>
+    <div class="nm">${escapeHtml(t.name)}</div>
+    <div class="mt">
+      <span>${t.panels}格</span><span>·</span><span>${ratioName(t.ratio)}</span><span>·</span><span>${CULTURE_LABEL[t.culture]}</span>
+    </div>
+    <div class="tpl-tags">${chips}</div>
+    <span class="bd">${t.panels}</span>
+    <span class="cul">${CULTURE_LABEL[t.culture]}</span>`;
+  tplCards.set(t.id, el);
+  return el;
+}
+
+/** rebuild：换语言时把卡片按当前语言重建一遍 */
+function renderList({ rebuild = false } = {}) {
   const q = ($('#search').value || '').trim().toLowerCase();
   let list = state.items;
   if (state.cultureTab !== 'all') list = list.filter((t) => t.culture === state.cultureTab);
-  if (q) {
-    // 搜索框也吃标签的**中文名**（「四格」「战斗」「9:16」都能命中）
-    list = list.filter((t) => {
-      const hay = (t.id + t.name + t.desc + t.tags.join('') + t.intents.map(intentZh).join('')
-        + intentZh(t.ratio) + ratioName(t.ratio) + t.panels + '格 ' + CULTURE_ZH[t.culture]).toLowerCase();
-      return hay.includes(q);
-    });
-  }
+  // 搜索框也吃标签的**中文名**（「四格」「战斗」「9:16」都能命中）
+  if (q) list = list.filter((t) => tplHay(t).includes(q));
   if (state.libFilter) list = list.filter((t) => matchFacet(t, state.libFilter));
   state.filtered = list;
   $('#listCount').textContent = `${list.length} 套`;
   renderFacetBar();
 
-  const frag = document.createDocumentFragment();
-  for (const t of list) {
-    const el = document.createElement('div');
-    el.className = 'tpl' + (state.tpl && state.tpl.id === t.id ? ' on' : '');
-    el.dataset.id = t.id;
-    const chips = [
-      `<button class="ttag" data-facet="panels" data-val="${t.panels}">${t.panels}格</button>`,
-      ...t.tags.slice(0, 2).map((x) => `<button class="ttag" data-facet="tag" data-val="${escapeHtml(x)}">${escapeHtml(x)}</button>`),
-      ...(t.intents[0] ? [`<button class="ttag" data-facet="intent" data-val="${escapeHtml(t.intents[0])}">${escapeHtml(intentZh(t.intents[0]))}</button>`] : []),
-    ].join('');
-    el.innerHTML = `
-      <div class="th">${renderTemplateSVG({ ...t, slots: t.thumbSlots }, { width: 220, showEmptyTint: false, slotOutline: true })}</div>
-      <div class="nm">${escapeHtml(t.name)}</div>
-      <div class="mt">
-        <span>${t.panels}格</span><span>·</span><span>${ratioName(t.ratio)}</span><span>·</span><span>${CULTURE_LABEL[t.culture]}</span>
-      </div>
-      <div class="tpl-tags">${chips}</div>
-      <span class="bd">${t.panels}</span>
-      <span class="cul">${CULTURE_LABEL[t.culture]}</span>`;
-    el.addEventListener('click', (ev) => {
+  const grid = $('#tplGrid');
+  if (rebuild || grid._items !== state.items) {
+    tplCards.clear();
+    grid._items = state.items;
+    grid.replaceChildren(...state.items.map(tplCard));
+    staggerIn(grid, '.tpl:nth-child(-n+18)', { cap: 14, step: 24 });
+  }
+  if (!grid.dataset.bound) {
+    grid.dataset.bound = '1';
+    grid.addEventListener('click', (ev) => {
+      const card = ev.target.closest('.tpl');
+      if (!card) return;
       const tag = ev.target.closest('[data-facet]');
       if (tag) {   // 点卡片上的标签 = 按它筛选，而不是换模板
         ev.stopPropagation();
         setFacet(tag.dataset.facet, tag.dataset.val);
         return;
       }
-      selectTemplate(t.id); goCanvasOnCompact();
+      selectTemplate(card.dataset.id); goCanvasOnCompact();
     });
-    frag.appendChild(el);
   }
-  const grid = $('#tplGrid');
-  [...frag.children].forEach((el, i) => el.style.setProperty('--i', Math.min(i, 14)));
-  grid.innerHTML = '';
-  grid.appendChild(frag);
+  const show = new Set(list.map((t) => t.id));
+  const cur = state.tpl?.id;
+  for (const [id, el] of tplCards) {
+    el.hidden = !show.has(id);
+    el.classList.toggle('on', id === cur);
+  }
 }
 
 /* ---------------- 模板库的标签筛选（格数 / 题材 / 画幅 / 标签） ---------------- */
@@ -787,7 +475,7 @@ async function selectTemplate(id, opts = {}) {
   renderExportKv();
   syncSizeUI();
   renderBubbles();
-  $$('.tpl').forEach((el) => el.classList.toggle('on', el.dataset.id === tpl.id));
+  for (const [id, el] of tplCards) el.classList.toggle('on', id === tpl.id);
   refreshScript();
 }
 
@@ -799,7 +487,6 @@ function readOrderText(r) {
  * 画布渲染
  * ================================================================== */
 let rafPending = false;
-let pageEnterTimer = 0;
 /**
  * 拖动 / 缩放图片的热路径：只改被拖那一格 <image> 的几何属性，不重建整页。
  *
@@ -833,6 +520,40 @@ function refreshSlotImage(slotId) {
 }
 
 /**
+ * 选中 / 悬停换了：只重画高亮那一层（几个 path），不重拼整页 SVG、也不触发存草稿。
+ * 以前鼠标每划过一格就整页重绘 + 排一次存盘（扫一遍画布 25 次重绘、175 个定时器）。
+ * 还没画出高亮层（比如整页重绘还在排队）就返回 false，调用方退回 renderStage()。
+ */
+function patchHighlight() {
+  const layer = $('#canvas svg g[data-hl-layer]');
+  if (!layer || !state.tpl || rafPending) return false;
+  const t0 = perfNow();
+  const h = highlightMarkup(state.tpl, {
+    selectedId: state.hollow ? null : state.selectedId,
+    hoverId: state.hoverId,
+    uiAccent: currentTint(),
+  });
+  const [hov, sel] = layer.children;
+  if (hov._hl !== h.hover) { hov.innerHTML = h.hover; hov._hl = h.hover; }
+  if (sel._hl !== h.sel) { sel.innerHTML = h.sel; sel._hl = h.sel; }
+  perfDone('patch', t0);
+  return true;
+}
+function setHover(id) {
+  if (id === state.hoverId) return;
+  state.hoverId = id;
+  if (!patchHighlight()) renderStage();
+}
+/** 只换选中格（不动内容）：选中的气泡要取消时，气泡的虚线框也得重画，那就走整页 */
+function selectSlotQuick(id) {
+  const hadBubble = state.selBubble != null;
+  state.selectedId = id;
+  state.selBubble = null;
+  if (hadBubble || !patchHighlight()) renderStage();
+  syncSlotZoomSoon();
+}
+
+/**
  * 拖动气泡的热路径：只给这个气泡的 <g> 加一个 translate。
  * 标记里的位置是「烤死」的（data-x/data-y），所以每次按 state 和目标位置算一次偏移，
  * 不用累加，也就不会漂。
@@ -854,309 +575,7 @@ function refreshBubble(id) {
   if (!patchBubble(id)) renderStage();
 }
 
-/* ================================================================== *
- * 格子内绘制（P0）：铺满动画 → 按格子形状裁剪的画布 → 存回这一格
- * ================================================================== */
-let painter = null;        // 轻量笔会话（web/paint.mjs），引擎起不来时的兜底
-let paintHost = null;      // 外部引擎会话（web/paint-host.mjs → Klecks iframe）
-let paintEngine = 'none';  // 'klecks' | 'brush'
-let paintSlotId = null;
-let paintBound = false;
-
-/** 把一张矩形 PNG 按格子多边形裁掉多余部分（斜切格靠这个贴合） */
-async function clipToSlot(blob, slot) {
-  const bmp = await createImageBitmap(blob);
-  const k = bmp.width / slot.w;   // 输出分辨率 / 包围盒单位
-  const c = document.createElement('canvas');
-  c.width = bmp.width; c.height = bmp.height;
-  const g = c.getContext('2d');
-  const path = new Path2D();
-  localPoly(slot).forEach(([x, y], i) => {
-    const px = x * k, py = y * k;
-    if (i) path.lineTo(px, py); else path.moveTo(px, py);
-  });
-  path.closePath();
-  g.clip(path);
-  g.drawImage(bmp, 0, 0);
-  return await new Promise((res) => c.toBlob(res, 'image/png'));
-}
-
-/** 把画布等比放进舞台（画布的像素尺寸固定，只有 CSS 尺寸随屏幕变） */
-function fitPaintCanvas() {
-  if (!painter) return;
-  const stage = $('#paintStage');
-  if (!stage) return;
-  const box = stage.getBoundingClientRect();
-  const ar = painter.w / painter.h;
-  let w = Math.max(40, box.width - 20);
-  let h = w / ar;
-  if (h > box.height - 20) { h = Math.max(40, box.height - 20); w = h * ar; }
-  painter.canvas.style.width = Math.round(w) + 'px';
-  painter.canvas.style.height = Math.round(h) + 'px';
-}
-
-/** 铺满：从这一格在页面上的位置，长大到整屏 */
-function animatePaintIn(slot, el) {
-  const svg = $('#canvas svg');
-  const node = el || painter?.canvas;
-  if (!svg || !node || !motionOK()) return;
-  const r = svg.getBoundingClientRect();
-  const k = r.width / state.tpl.page.w;
-  const to = node.getBoundingClientRect();
-  if (!to.width) return;
-  const from = { x: r.left + slot.x * k, y: r.top + slot.y * k, w: slot.w * k, h: slot.h * k };
-  node.animate([
-    { transform: `translate(${from.x - to.left}px,${from.y - to.top}px) scale(${from.w / to.width})`, opacity: 0.35 },
-    { transform: 'none', opacity: 1 },
-  ], { duration: 460, easing: 'cubic-bezier(.32,.72,0,1)' });
-}
-
-/**
- * 打开某一格的绘制。
- * 优先用外部引擎（Klecks iframe）；它没产物 / 起不来时退回自带的轻量笔。
- */
-async function openPaint(slotId = state.selectedId) {
-  if (!state.tpl || !slotId) { toast('先选一个格子'); return; }
-  const slot = state.tpl.slots.find((s) => s.id === slotId);
-  if (!slot) return;
-  if (painter || paintHost) closePaint();
-
-  // 底图 = 这一格现在的图（第一次是照片/参考图，之后再进是自己的上一版成图）
-  const baseUrl = state.images[slotId]?.href || '';
-  const rec = state.paint[slotId] || null;
-
-  paintSlotId = slotId;
-  const t0 = perfNow();
-  const sheet = $('#paintSheet');
-  const stage = $('#paintStage');
-  stage.innerHTML = '';
-  sheet.hidden = false;
-  document.body.classList.add('painting');
-  $('#paintTitle').textContent = `绘制第 ${slot.order} 格`;
-  $('#paintSub').textContent = `${slot.shape?.zh || '常规格'} · ${Math.round(slot.w)}×${Math.round(slot.h)}`;
-  if (!paintBound) bindPaintUI();
-  syncPaintPaperBtn();
-
-  // ---- 1) 先试外部引擎 ----
-  const host = createKlecksHost({ slot, baseUrl });
-  try {
-    host.onSubmit = () => { finishPaint(); };
-    await host.mount(stage);
-    paintHost = host;
-    paintEngine = 'klecks';
-    document.body.classList.add('paint-engine');
-    // 应用用户上次选的白底/透明
-    await host.setPaper(paintPaperOn());
-    // 窄屏（手机竖屏）：标题副行给一句最短的提示，别把顶栏撑满
-    if (window.innerWidth < 560) {
-      $('#paintSub').textContent = `${slot.shape?.zh || '常规格'} · 竖屏窄，建议横屏`;
-    }
-    animatePaintIn(slot, host.el);
-    perfDone('paint', t0);
-    return;
-  } catch (e) {
-    console.warn('[paint] 外部引擎没起来，退回轻量笔：', e.message);
-    host.destroy();
-    stage.innerHTML = '';
-  }
-
-  // ---- 2) 退回轻量笔 ----
-  paintEngine = 'brush';
-  document.body.classList.remove('paint-engine');
-  if (!state.paint[slotId] && state.images[slotId] && !state.under[slotId]) {
-    state.under[slotId] = state.images[slotId];
-  }
-  const under = state.under[slotId] || null;
-  painter = createCellPainter({ slot, strokes: rec?.strokes || [] });
-  stage.appendChild(painter.canvas);
-  painter.setPaper(paintPaperOn());
-  fitPaintCanvas();
-  $('#paintUndo').disabled = !painter.strokes.length;
-  wirePaintCanvas();
-  if (under?.href) {
-    try { painter.setUnderlay(await loadImgEl(under.href)); } catch { /* 底图读不出来就白底画 */ }
-  }
-  painter.render();
-  animatePaintIn(slot, painter.canvas);
-  perfDone('paint', t0);
-}
-
-/** 把某一格的图单独导成文件（画好的作品 / AI 生成图 / 拖进来的照片都走这里） */
-async function exportSlotImage(slotId = state.selectedId) {
-  const im = slotId ? state.images[slotId] : null;
-  if (!im) { toast('这一格还没有图'); return; }
-  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
-  try {
-    const blob = im.blob instanceof Blob ? im.blob : await (await fetch(im.href)).blob();
-    const ext = /png/.test(blob.type) ? 'png' : 'jpg';
-    await exportBlob(blob, `${state.tpl?.id || 'page'}-第${slot?.order ?? '?'}格.${ext}`);
-    toast('已导出这一格的图');
-  } catch (e) {
-    toast('导出失败：' + e.message);
-  }
-}
-
-/** 白底 / 透明：用户可选，记在本机。true = 白底，false = 透明 */
-function paintPaperOn() { return store.get('pf.paint.paper') !== '0'; }
-
-function syncPaintPaperBtn() {
-  const on = paintPaperOn();
-  const b = $('#paintPaper');
-  if (b) {
-    b.textContent = on ? '白底' : '透明';
-    b.classList.toggle('primary', !on);
-  }
-}
-
-async function setPaintPaper(on) {
-  store.set('pf.paint.paper', on ? null : '0');
-  syncPaintPaperBtn();
-  if (paintEngine === 'klecks' && paintHost) await paintHost.setPaper(on);
-  else if (painter) painter.setPaper(on);
-  toast(on ? '画布改成白底（导出不透明 PNG）' : '画布改成透明（导出带透明通道）');
-}
-
-/**
- * 把一张图「送出去」：原生壳里走系统分享面板，浏览器里走 Web Share，都没有就下载。
- * 这是手机上把这一格交给别的绘画 App（绘世界 / Procreate / 概念…）的唯一可靠通道。
- */
-/* ------------------------------------------------------------------ *
- * 「用某个绘画 App 打开这一格」
- * 先把图写到缓存 → 让用户从「真的接收图片的 App」里选一个 → 原生 setPackage 直跳。
- * 如果目标 App 没声明接收图片，那谁也跳不过去（这是对方的选择，不是我们能绕的）。
- * ------------------------------------------------------------------ */
-let sharedTargetsCache = null;
-
-/** 列出手机上会出现在分享面板里的 App（壳里才有；浏览器返回 null） */
-async function nativeShareTargets(force = false) {
-  const plugin = window.Capacitor?.Plugins?.ShareTo;
-  if (!plugin?.listTargets) return null;
-  if (sharedTargetsCache && !force) return sharedTargetsCache;
-  try {
-    const r = await plugin.listTargets();
-    sharedTargetsCache = Array.isArray(r?.targets) ? r.targets : [];
-    return sharedTargetsCache;
-  } catch (e) {
-    console.warn('[share] 列目标失败', e);
-    return [];
-  }
-}
-
-/** 把图片交给指定包名的 App（跳过系统面板） */
-async function shareToPackage(pkg, blob, name) {
-  const cap = window.Capacitor;
-  const plugin = cap?.Plugins?.ShareTo;
-  if (!plugin?.sendTo) { toast('这个环境不支持直跳，用「分享」面板'); return false; }
-  try {
-    const b64 = await blobToBase64(blob);
-    const safe = `pf-${Date.now()}.png`;
-    await cap.Plugins.Filesystem.writeFile({ path: safe, data: b64, directory: 'CACHE', recursive: true });
-    const { uri } = await cap.Plugins.Filesystem.getUri({ path: safe, directory: 'CACHE' });
-    await plugin.sendTo({ package: pkg, uri, mime: blob.type || 'image/png' });
-    return true;
-  } catch (e) {
-    console.warn('[share] 直跳失败', e);
-    toast(`直跳失败：${String(e?.message || e).slice(0, 60)}`);
-    return false;
-  }
-}
-
-/** 壳里：「分享」先弹我们自己的 App 选择器，选完直接跳过去；没有插件就退回系统面板 */
-async function sharePickOrSheet(blob, name, title) {
-  const targets = await nativeShareTargets();
-  if (!targets?.length) { await shareOrDownload(blob, name, title); return; }
-  openSharePicker(targets, blob, name);
-}
-
-function openSharePicker(targets, blob, name) {
-  const old = document.querySelector('#sharePick');
-  if (old) old.remove();
-  const sheet = document.createElement('div');
-  sheet.className = 'keysheet';
-  sheet.id = 'sharePick';
-  sheet.innerHTML = `
-    <div class="ks-panel" style="max-width:460px">
-      <div class="ks-head">
-        <b>用哪一个 App 打开</b>
-        <span class="muted small">只有能接收图片的 App 才会出现在这里</span>
-        <button class="btn tiny" data-close>关闭</button>
-      </div>
-      <div class="ks-body" style="display:block;padding:12px 14px 16px">
-        <div class="share-pick-list">
-          ${targets.map((t) => `<button class="share-pick" data-pkg="${escapeHtml(t.package)}">
-            <b>${escapeHtml(t.label || t.package)}</b>
-            <span>${escapeHtml(t.package)}</span>
-          </button>`).join('')}
-        </div>
-        <button class="btn tiny wide" data-sheet style="margin-top:10px">用系统分享面板（更多 App）</button>
-      </div>
-    </div>`;
-  document.body.appendChild(sheet);
-  const close = () => sheet.remove();
-  sheet.addEventListener('click', async (ev) => {
-    if (ev.target === sheet || ev.target.closest('[data-close]')) { close(); return; }
-    if (ev.target.closest('[data-sheet]')) { close(); await shareOrDownload(blob, name); return; }
-    const btn = ev.target.closest('[data-pkg]');
-    if (!btn) return;
-    close();
-    await shareToPackage(btn.dataset.pkg, blob, name);
-  });
-}
-
-async function shareOrDownload(blob, name, title = 'PanelForge 分镜') {
-  const file = new File([blob], name, { type: blob.type || 'image/png' });
-  const cap = window.Capacitor;
-  const native = !!cap?.isNativePlatform?.();
-  // ① 原生壳：Capacitor Filesystem 写到缓存，再用 Share 打开系统面板
-  if (native && cap.Plugins?.Filesystem && cap.Plugins?.Share) {
-    try {
-      const b64 = await blobToBase64(blob);
-      // 文件名带中文时 Filesystem 在部分机型上会失败，统一转成 ASCII 安全名
-      const safe = `pf-${Date.now()}.png`;
-      await cap.Plugins.Filesystem.writeFile({ path: safe, data: b64, directory: 'CACHE', recursive: true });
-      const { uri } = await cap.Plugins.Filesystem.getUri({ path: safe, directory: 'CACHE' });
-      await cap.Plugins.Share.share({ title, files: [uri] });
-      toast('已打开系统分享面板');
-      return true;
-    } catch (e) {
-      const msg = String(e?.message || e);
-      console.warn('[share] 原生分享失败', e);
-      // 用户主动取消不算错误，不弹提示
-      if (!/cancel/i.test(msg)) toast(`分享没成功（${msg.slice(0, 40)}），已改存相册`);
-    }
-  }
-  // ② 浏览器：Web Share Level 2（iOS Safari 15+ / Chrome Android）
-  if (!native) {
-    try {
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title });
-        return true;
-      }
-    } catch { /* 用户取消或平台不支持 */ }
-  }
-  // ③ 兜底：壳里存相册（WebView 不支持下载），浏览器里下载
-  if (await saveToGallery(blob, name)) return false;
-  downloadBlob(blob, name);
-  toast(native ? '当前环境既不支持分享也不支持下载：请用「导出」' : '已下载');
-  return false;
-}
-
-/** 壳里排查分享/导出问题用：把这些能力的存在情况打出来 */
-window.__pfShareDebug = () => {
-  const cap = window.Capacitor;
-  return {
-    shell: SHELL || null,
-    isNative: !!cap?.isNativePlatform?.(),
-    plugins: cap?.Plugins ? Object.keys(cap.Plugins) : [],
-    hasSaveImage: !!cap?.Plugins?.SaveImage?.save,
-    hasShare: !!cap?.Plugins?.Share?.share,
-    hasFilesystem: !!cap?.Plugins?.Filesystem?.writeFile,
-    hasShareTarget: !!cap?.Plugins?.ShareTarget?.getPending,
-    webShare: typeof navigator.canShare === 'function',
-  };
-};
-
-/**
+                /**
  * 壳里：取走别的 App 分享进来的图片，填进当前选中的格子（没选中就第一空格）。
  * 这是「画完在别的 App 里 → 分享回 PanelForge → 自动回到对应格子」的那一半。
  */
@@ -1205,40 +624,26 @@ function initShareIn() {
  * toast 是胶囊形，长文本会被截断（用户反馈「报错信息不全」就是这么来的），
  * 所以长错误一律进这个面板：可滚动、可选中、可一键复制。
  */
+/** 错误详情：toast 装不下的完整报错（可选中复制）。用通用弹窗 sheet()，和其它弹窗同一套样子与进出场 */
 function showErrorDetail(title, err, extra = '') {
-  const old = document.querySelector('#errSheet');
-  if (old) old.remove();
   const msg = String(err?.message || err || '未知错误');
   const hint = err?.hint || '';
   const code = err?.code || '';
   const rid = err?.requestId ? `\nrequest_id=${err.requestId}` : '';
-  const body = `${msg}${rid}${hint ? '\n\n建议：' + hint : ''}${extra ? '\n' + extra : ''}`;
-  const sheet = document.createElement('div');
-  sheet.className = 'keysheet';
-  sheet.id = 'errSheet';
-  sheet.innerHTML = `
-    <div class="ks-panel" style="max-width:560px">
-      <div class="ks-head">
-        <b>${escapeHtml(title)}${code ? ` · ${escapeHtml(code)}` : ''}</b>
-        <span class="muted small">完整信息（可选中复制）</span>
-        <button class="btn tiny" data-close>关闭</button>
-      </div>
-      <div class="ks-body">
-        <pre class="err-pre"></pre>
-        <div class="row2">
-          <button class="btn tiny primary" data-copy>复制错误信息</button>
-          <button class="btn tiny" data-close2>知道了</button>
-        </div>
-      </div>
-    </div>`;
-  sheet.querySelector('.err-pre').textContent = body;
-  document.body.appendChild(sheet);
-  const close = () => sheet.remove();
-  sheet.addEventListener('click', (ev) => {
-    if (ev.target === sheet || ev.target.closest('[data-close]') || ev.target.closest('[data-close2]')) { close(); return; }
-    if (ev.target.closest('[data-copy]')) copyText(body, '错误信息已复制');
+  const text = `${msg}${rid}${hint ? '\n\n建议：' + hint : ''}${extra ? '\n' + extra : ''}`;
+  const s = sheet({
+    id: 'errSheet',
+    title: title + (code ? ` · ${code}` : ''),
+    sub: '完整信息（可选中复制）',
+    body: `<pre class="err-pre"></pre>
+      <div class="row2">
+        <button type="button" class="btn tiny primary" data-copy>复制错误信息</button>
+        <button type="button" class="btn tiny" data-close>知道了</button>
+      </div>`,
   });
-  return sheet;
+  s.body.querySelector('.err-pre').textContent = text;
+  s.body.addEventListener('click', (ev) => { if (ev.target.closest('[data-copy]')) copyText(text, '错误信息已复制'); });
+  return s.el;
 }
 
 // 调试/自动化钩子：不产生真实请求就能看错误面板长什么样
@@ -1248,363 +653,7 @@ window.__pfLlm = () => ({ ...state.llm });
 window.__pfApi = () => api;
 window.__pfJobs = () => ({ ...(state.imgJobs || {}) });
 window.__pfImages = () => ({ ...state.images });
-window.__pfSel = (id) => { state.selectedId = id; renderStage(); renderSlotPanel(); refreshGenButtons(); };
-
-/**
- * 把这一格做成「给别的 App 画」的画布：包围盒尺寸 + 白底（或已有底图）+ 形状参考。
- * 形状参考 = 多边形外面压 12% 灰 + 边界虚线。回填时按同一个多边形裁切，外面的灰会被裁掉，
- * 所以它既能告诉你边界在哪，又不会污染成图。
- */
-async function cellSheetBlob(slot, workSide = 2048) {
-  const scale = workSide / Math.max(slot.w, slot.h);
-  const w = Math.max(1, Math.round(slot.w * scale));
-  const h = Math.max(1, Math.round(slot.h * scale));
-  const cv = document.createElement('canvas');
-  cv.width = w;
-  cv.height = h;
-  const ctx = cv.getContext('2d');
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, w, h);
-
-  const im = state.images[slot.id];
-  if (im?.href) {
-    try {
-      const img = await loadImgEl(im.href);
-      const iw = img.naturalWidth || img.width;
-      const ih = img.naturalHeight || img.height;
-      if (iw && ih) {
-        const k = Math.max(w / iw, h / ih);         // cover，和画布里的语义一致
-        const dw = iw * k, dh = ih * k;
-        ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
-      }
-    } catch { /* 底图读不出来就画白纸 */ }
-  }
-
-  const pts = (slot.poly || []).map(([x, y]) => [(x - slot.x) * scale, (y - slot.y) * scale]);
-  if (pts.length >= 3) {
-    const veil = new Path2D();
-    veil.rect(0, 0, w, h);
-    pts.forEach(([x, y], i) => (i ? veil.lineTo(x, y) : veil.moveTo(x, y)));
-    veil.closePath();
-    ctx.fillStyle = 'rgba(0,0,0,0.12)';
-    ctx.fill(veil, 'evenodd');
-
-    const edge = new Path2D();
-    pts.forEach(([x, y], i) => (i ? edge.lineTo(x, y) : edge.moveTo(x, y)));
-    edge.closePath();
-    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
-    ctx.lineWidth = Math.max(2, w / 500);
-    ctx.setLineDash([w / 90, w / 150]);
-    ctx.stroke(edge);
-    ctx.setLineDash([]);
-  }
-  return await new Promise((res) => cv.toBlob(res, 'image/png'));
-}
-
-/** 「用其他 App 画」：不经过我们的画布，直接把这一格交给别的绘画 App */
-async function openExternalPaint() {
-  const slot = state.tpl?.slots?.find((s) => s.id === state.selectedId);
-  if (!slot) { toast('先选一个格子'); return; }
-  try {
-    const blob = await cellSheetBlob(slot);
-    const name = `${state.tpl?.id || 'page'}-第${slot.order}格-底图.png`;
-    const targets = await nativeShareTargets(true);
-    if (targets?.length) { openSharePicker(targets, blob, name); return; }
-    // 壳里没有直跳能力，或者根本在浏览器里：存相册/下载，让人自己去 App 里导入
-    await exportBlob(blob, name);
-    toast('已导出底图（含形状参考）：用别的 App 打开它，画完分享回 PanelForge 即可');
-  } catch (e) {
-    console.error('[external] 失败', e);
-    toast('导出底图失败：' + e.message);
-  }
-}
-
-/** 绘制页里「导出」：把当前画面按格子形状裁好存成 PNG（两种引擎都支持） */
-async function exportPaintImage(mode = 'download') {
-  const slot = state.tpl?.slots?.find((s) => s.id === paintSlotId);
-  try {
-    let raw = null;
-    if (paintEngine === 'klecks' && paintHost) raw = await paintHost.exportPNG();
-    else if (painter) raw = await painter.toBlob();
-    if (!raw) { toast('还没有可导出的内容'); return; }
-    const out = slot ? await clipToSlot(raw, slot) : raw;
-    const name = `${state.tpl?.id || 'page'}-第${slot?.order ?? '?'}格-绘制.png`;
-    if (mode === 'share') { await sharePickOrSheet(out, name, `第 ${slot?.order ?? '?'} 格`); return; }
-    await exportBlob(out, name);
-    toast('已导出这一格的绘制图');
-  } catch (e) {
-    console.error('[paint] 导出失败', e);
-    toast('导出失败：' + e.message);
-  }
-}
-
-function closePaint() {
-  if (paintHost) { paintHost.destroy(); paintHost = null; }
-  if (painter) { painter.destroy(); painter = null; }
-  paintEngine = 'none';
-  paintSlotId = null;
-  document.body.classList.remove('painting', 'paint-engine');
-  const sheet = $('#paintSheet');
-  if (sheet) sheet.hidden = true;
-  const stage = $('#paintStage');
-  if (stage) stage.innerHTML = '';
-}
-
-/** 完成：外部引擎取图 → 按格子多边形裁 → 当这一格的图 */
-async function finishPaint() {
-  if (!paintSlotId) { closePaint(); return; }
-  const slotId = paintSlotId;
-  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
-
-  if (paintEngine === 'klecks' && paintHost) {
-    const host = paintHost;
-    const btn = $('#paintDone');
-    const old = btn?.textContent;
-    if (btn) { btn.disabled = true; btn.textContent = '取图…'; }
-    try {
-      const raw = await host.exportPNG();
-      const workSide = Math.max(host.width, host.height);
-      const clipped = slot ? await clipToSlot(raw, slot) : raw;
-      commit();
-      // maxSide = 工作分辨率 → 不缩放，保住 PNG 的清晰边缘
-      state.images[slotId] = await imageAsset(clipped, { name: 'paint', maxSide: workSide });
-      delete state.paint[slotId];   // 外部引擎不交笔画，只交成图
-      closePaint();
-      renderStage(); renderSlotPanel(); refreshScript(); queueSave();
-      toast('已画好并贴回这一格');
-    } catch (e) {
-      console.error('[paint] 取图失败', e);
-      toast('取图失败：' + e.message);
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = old || '完成'; }
-    }
-    return;
-  }
-
-  if (!painter) { closePaint(); return; }
-  const strokes = painter.strokes.map((s) => ({ ...s, pts: [...s.pts] }));
-  const workSide = Math.max(painter.w, painter.h);
-  const blob = await painter.toBlob();
-  commit();
-  state.paint[slotId] = { strokes, workSide };
-  if (blob) {
-    state.images[slotId] = await imageAsset(blob, { name: 'paint', maxSide: workSide });
-  }
-  closePaint();
-  renderStage(); renderSlotPanel(); refreshScript(); queueSave();
-  toast(strokes.length ? `已存这一格（${strokes.length} 笔）` : '笔迹已清空');
-}
-
-/** 把指针事件接到当前画布（每次 open 都是新画布，所以单独抽出来） */
-function wirePaintCanvas() {
-  const c = painter?.canvas;
-  if (!c || c.dataset.wired) return;
-  c.dataset.wired = '1';
-  c.addEventListener('pointerdown', (ev) => { painter?.begin(ev); syncPaintMeta(); });
-  c.addEventListener('pointermove', (ev) => { painter?.move(ev); });
-  const stop = (ev) => { painter?.end(ev); syncPaintMeta(); };
-  c.addEventListener('pointerup', stop);
-  c.addEventListener('pointercancel', stop);
-  c.addEventListener('pointerleave', (ev) => { if (ev.buttons) stop(ev); });
-}
-function syncPaintMeta() {
-  const btn = $('#paintUndo');
-  if (btn) btn.disabled = !(painter && painter.strokes.length);
-}
-
-function bindPaintUI() {
-  paintBound = true;
-  $('#paintTools')?.addEventListener('click', (ev) => {
-    const b = ev.target.closest('button[data-t]');
-    if (!b || !painter) return;
-    painter.setTool(b.dataset.t);
-    $$('#paintTools button').forEach((x) => x.classList.toggle('on', x === b));
-  });
-  $('#paintSize')?.addEventListener('input', (ev) => {
-    if (!painter) return;
-    painter.setSize(Number(ev.target.value));
-    $('#paintSizeVal').textContent = ev.target.value;
-  });
-  $('#paintColor')?.addEventListener('input', (ev) => { painter?.setColor(ev.target.value); });
-  $('#paintUndo')?.addEventListener('click', () => { if (painter?.undo()) syncPaintMeta(); });
-  $('#paintExport')?.addEventListener('click', () => { exportPaintImage(); });
-  // 分享：手机上把这一格直接交给别的绘画 App（原生壳走 Capacitor Share，浏览器走 Web Share）
-  $('#paintShare')?.addEventListener('click', () => { exportPaintImage('share'); });
-  // 白底 / 透明：用户自己选，记在本机
-  $('#paintPaper')?.addEventListener('click', () => { setPaintPaper(!paintPaperOn()); });
-  // 用其他 App 画：不进我们的画布，直接从格子这一栏把底图交给外部绘画 App
-  $('#btnExternalPaint')?.addEventListener('click', () => { openExternalPaint(); });
-  $('#paintCancel')?.addEventListener('click', closePaint);
-  $('#paintDone')?.addEventListener('click', () => { finishPaint(); });
-  $('#paintSheet')?.addEventListener('pointerdown', (ev) => { if (ev.target.id === 'paintStage') closePaint(); });
-  window.addEventListener('resize', () => { fitPaintCanvas(); });
-  window.addEventListener('keydown', (ev) => {
-    if (!painter && !paintHost) return;
-    if (ev.key === 'Escape') { ev.stopPropagation(); closePaint(); }
-    else if (!painter) return;   // 下面这些只对轻量笔有意义
-    else if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'z') {
-      ev.preventDefault(); ev.stopPropagation();
-      if (painter.undo()) syncPaintMeta();
-    }
-  }, true);
-}
-
-/* 自动化测试用的只读/驱动钩子（只在 ?dbg=1 / ?perf=1 下存在） */
-if (PERF || DBG) {
-  window.__pfPaint = {
-    open: (id) => openPaint(id),
-    finish: () => finishPaint(),
-    close: () => closePaint(),
-    info: () => ({
-      engine: paintEngine,
-      slot: paintSlotId,
-      hasHost: !!paintHost,
-      hasBrush: !!painter,
-      frame: !!document.querySelector('.paint-frame'),
-      sheetOpen: !document.querySelector('#paintSheet')?.hidden,
-      hostSize: paintHost ? { w: paintHost.width, h: paintHost.height } : null,
-    }),
-  };
-}
-
-/* ================================================================== *
- * 面板管理：左栏每一块可显示 / 隐藏 / 调顺序；AI 功能一个总开关
- * 布局按「模式」分开记：画师版和 AI 版各有一套，互不影响。
- * ================================================================== */
-const LAYOUT_KEY = 'pf.layout.v2';
-/** 画师版默认：AI 面板收起；AI 版默认：全部显示 */
-const layoutDefaults = () => (ARTIST
-  ? { order: ['plot', 'browse', 'chars', 'help', 'ai'], hidden: ['ai'], ai: false }
-  : { order: ['plot', 'ai', 'chars', 'browse', 'help'], hidden: [], ai: true });
-
-/** 左栏面板在 HTML 里的真实顺序（新增卡片的落位依据） */
-function orderFromDom() {
-  return [...document.querySelectorAll('.rail.left [data-panel]')].map((el) => el.dataset.panel);
-}
-
-/**
- * 把「用户保存的顺序」和「HTML 里的顺序」合并。
- * 关键：新加的面板（老用户存里没有）要落在它 HTML 里的位置，
- * 否则 applyLayout 的 appendChild 会把它挤到最前面 —— 之前"风格跟随跑到 AI 导演上面"就是这么来的。
- */
-function mergeOrder(stored, dom) {
-  const known = new Set(dom);
-  const out = (stored || []).filter((id) => known.has(id));
-  dom.forEach((id, i) => {
-    if (out.includes(id)) return;
-    const prev = dom.slice(0, i).reverse().find((p) => out.includes(p));
-    if (prev) out.splice(out.indexOf(prev) + 1, 0, id);
-    else out.unshift(id);
-  });
-  return out;
-}
-
-function readLayouts() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}');
-    return raw && typeof raw === 'object' ? raw : {};
-  } catch { return {}; }
-}
-function currentLayout() {
-  const all = readLayouts();
-  const key = ARTIST ? 'artist' : 'main';
-  const d = layoutDefaults();
-  const v = all[key] || {};
-  const dom = orderFromDom();
-  const stored = Array.isArray(v.order) && v.order.length ? v.order : d.order;
-  return {
-    // DOM 是"默认顺序"的真相：新卡片按 HTML 位置落位，老用户的自定义顺序照旧
-    order: mergeOrder(stored, dom.length ? dom : stored),
-    hidden: Array.isArray(v.hidden) ? v.hidden : d.hidden,
-    ai: typeof v.ai === 'boolean' ? v.ai : d.ai,
-  };
-}
-function saveLayout(cfg) {
-  const all = readLayouts();
-  all[ARTIST ? 'artist' : 'main'] = cfg;
-  try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(all)); } catch { /* ignore */ }
-}
-
-/** 把布局套到 DOM 上：顺序 + 显隐 + AI 总开关 */
-function applyLayout(cfg = currentLayout()) {
-  const rail = document.querySelector('.rail.left');
-  const panels = [...document.querySelectorAll('.rail.left [data-panel]')];
-  if (!rail || !panels.length) return;
-  const byId = new Map(panels.map((el) => [el.dataset.panel, el]));
-  // 按 order 依次 append：appendChild 会自动把节点挪到末尾，等于重排
-  for (const id of cfg.order) { const el = byId.get(id); if (el) rail.appendChild(el); }
-  for (const el of panels) {
-    const hide = cfg.hidden.includes(el.dataset.panel);
-    el.hidden = hide;
-    el.classList.toggle('panel-off', hide);
-  }
-  // AI 总开关：控制每格的生图区 / 候选图 / AI 优化 / Key 面板（AI 导演卡由上一条 hidden 控制）
-  document.body.dataset.ai = cfg.ai ? 'on' : 'off';
-  const chk = $('#chkAi');
-  if (chk) chk.checked = cfg.ai;
-}
-
-function renderPanelSheet() {
-  const list = $('#panelList');
-  if (!list) return;
-  const cfg = currentLayout();
-  const panels = [...document.querySelectorAll('.rail.left [data-panel]')];
-  const byId = new Map(panels.map((el) => [el.dataset.panel, el]));
-  const order = cfg.order.filter((id) => byId.has(id));
-  list.innerHTML = order.map((id, i) => {
-    const el = byId.get(id);
-    const off = cfg.hidden.includes(id);
-    return `<div class="panel-row${off ? ' off' : ''}" data-id="${escapeHtml(id)}">
-      <span class="panel-name">${escapeHtml(el.dataset.panelName || id)}</span>
-      <span class="panel-acts">
-        <button class="btn tiny" data-act="up" ${i === 0 ? 'disabled' : ''} title="上移">↑</button>
-        <button class="btn tiny" data-act="down" ${i === order.length - 1 ? 'disabled' : ''} title="下移">↓</button>
-        <button class="btn tiny" data-act="toggle">${off ? '显示' : '隐藏'}</button>
-      </span>
-    </div>`;
-  }).join('');
-}
-
-function bindPanelSheet() {
-  const open = () => { renderPanelSheet(); $('#panelSheet')?.classList.remove('hidden'); };
-  const close = () => $('#panelSheet')?.classList.add('hidden');
-  $('#btnPanels')?.addEventListener('click', open);
-  $('#btnPanelClose')?.addEventListener('click', close);
-  $('#panelSheet')?.addEventListener('click', (ev) => { if (ev.target.id === 'panelSheet') close(); });
-  $('#chkAi')?.addEventListener('change', (ev) => {
-    const cfg = currentLayout();
-    cfg.ai = !!ev.target.checked;
-    saveLayout(cfg);
-    applyLayout(cfg);
-    renderPanelSheet();
-    toast(cfg.ai ? '已启用 AI 功能' : 'AI 功能已收起（随时可以再打开）');
-  });
-  $('#panelList')?.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('button[data-act]');
-    const row = ev.target.closest('.panel-row');
-    if (!btn || !row) return;
-    const id = row.dataset.id;
-    const cfg = currentLayout();
-    const i = cfg.order.indexOf(id);
-    if (btn.dataset.act === 'up' && i > 0) {
-      [cfg.order[i - 1], cfg.order[i]] = [cfg.order[i], cfg.order[i - 1]];
-    } else if (btn.dataset.act === 'down' && i >= 0 && i < cfg.order.length - 1) {
-      [cfg.order[i + 1], cfg.order[i]] = [cfg.order[i], cfg.order[i + 1]];
-    } else if (btn.dataset.act === 'toggle') {
-      cfg.hidden = cfg.hidden.includes(id) ? cfg.hidden.filter((x) => x !== id) : [...cfg.hidden, id];
-    }
-    saveLayout(cfg);
-    applyLayout(cfg);
-    renderPanelSheet();
-  });
-  $('#btnPanelReset')?.addEventListener('click', () => {
-    const d = layoutDefaults();
-    saveLayout({ order: [...d.order], hidden: [...d.hidden], ai: d.ai });
-    applyLayout();
-    renderPanelSheet();
-    toast('已恢复默认面板布局');
-  });
-}
+window.__pfSel = (id) => { selectSlotQuick(id); renderSlotPanel(); refreshGenButtons(); };
 
 /* ================================================================== *
  * 页面画幅：改整页宽高比（格子按比例重排，不是只改导出尺寸）
@@ -1759,6 +808,7 @@ function renderStage() {
         images: state.hollow ? {} : state.images,
         selectedId: state.hollow ? null : state.selectedId,
         hoverId: state.hoverId,
+        highlightLayer: true,
         showNumbers: state.showLabels,
         showRoles: state.showLabels,
         slotOutline: true,
@@ -1790,13 +840,13 @@ function renderStage() {
     const holder = $('#canvas');
     holder.innerHTML = svg;
     queueSave();
+    // 换模板：页面从景深里浮上来；落定后再对一次缩放条（动画期间格子位置在变）
     if (state.pageEnter) {
       state.pageEnter = false;
-      replay(holder, 'page-enter');
-      // 动画放完必须摘掉类，否则每次重绘 SVG 都会重放整页入场 → 切格子时整页闪
-      clearTimeout(pageEnterTimer);
-      pageEnterTimer = setTimeout(() => holder.classList.remove('page-enter'), 900);
+      settled(fx.pageIn(holder)).then(syncSlotZoom);
     }
+    syncSlotZoom();
+    syncEditZoom();   // 手机编辑页：选中格 / 尺寸没变时立即返回
     const el = holder.querySelector('svg');
     if (el) el.addEventListener('dblclick', onCanvasDblClick);
     perfDone('render', t0);
@@ -1848,15 +898,9 @@ function haptic(ms = 18) {
   try { navigator.vibrate?.(ms); } catch { /* ignore */ }
 }
 
-function lpPulse() {
-  document.body.classList.add('pf-lp');
-  clearTimeout(lpPulse._t);
-  lpPulse._t = setTimeout(() => document.body.classList.remove('pf-lp'), 320);
-}
-
 // 生图超时：Seedream/Flux 排队 1–2 分钟是常态，默认给 120s；?imgtimeout=毫秒 可临时改（测试用）
-const IMG_TIMEOUT_MS = Number(new URLSearchParams(location.search).get('imgtimeout')) || 120000;
-const LLM_TIMEOUT_MS = 60000;    // 文本：60s 还没回来基本就是挂了
+const IMG_TIMEOUT_MS = Number(params.get('imgtimeout')) || 120000;
+    // 文本：60s 还没回来基本就是挂了
 
 /** 双击某一格：震动 → 选中它 → 进编辑页 */
 function fireDoubleTap(slot) {
@@ -1892,22 +936,16 @@ function noteTap(slot, ev) {
  * 只清「进行中」的临时状态和浮层，不动用户的内容（图片/台词/草稿都不碰）。
  */
 window.__pfUnstick = () => {
-  const before = {
-    imgJobs: Object.keys(state.imgJobs || {}).length,
-    overlays: ['#dangerSheet', '#charConfirm', '#lightbox', '#ctxMenu', '#shortcuts', '#keysheet'].filter((sel) => {
-      const el = $(sel);
-      return el && !el.classList.contains('hidden');
-    }).length,
-  };
+  const open = [...document.querySelectorAll('dialog[open], #ctxMenu:not(.hidden), .rail-pop:not(.hidden)')];
+  const before = { imgJobs: Object.keys(state.imgJobs || {}).length, overlays: open.length };
   state.imgJobs = {};
   state.autoStop = true;
   // 关浮层
-  for (const sel of ['#dangerSheet', '#charConfirm', '#lightbox', '#ctxMenu', '#shortcuts', '#keysheet', '#railPop']) {
-    $(sel)?.classList.add('hidden');
+  for (const el of open) {
+    if (el.tagName === 'DIALOG') el.close('dismiss'); else el.classList.add('hidden');
   }
-  document.querySelectorAll('.rail-pop').forEach((p) => p.classList.add('hidden'));
   // 复所有被禁用的按钮（只放开 disabled，不改文案）
- $$('button[disabled]').forEach((b) => {
+  $$('button[disabled]').forEach((b) => {
     if (b.id === 'dangerGo' || b.dataset.keepDisabled) return;
     b.disabled = false;
   });
@@ -1944,7 +982,7 @@ function bindUI() {
       // hover 高亮
       const slot = slotAt(pagePoint(ev));
       const id = slot ? slot.id : null;
-      if (id !== state.hoverId) { state.hoverId = id; renderStage(); }
+      setHover(id);
       return;
     }
     const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
@@ -1991,8 +1029,8 @@ function bindUI() {
       const slot = drag.slot;
       // 手机：同一格连点两下 → 震动 + 进这一格的编辑页（长按会和系统菜单打架，已弃用）
       const isDouble = slot ? noteTap(slot, ev) : false;
-      if (slot) { state.selectedId = slot.id; state.selBubble = null; renderStage(); renderSlotPanel(); renderBubbles(); }
-      else { state.selectedId = null; state.selBubble = null; renderStage(); renderSlotPanel(); }
+      if (slot) { selectSlotQuick(slot.id); renderSlotPanel(); renderBubbles(); }
+      else { selectSlotQuick(null); renderSlotPanel(); }
       drag = null;
       if (isDouble) fireDoubleTap(slot);
       return;
@@ -2008,7 +1046,7 @@ function bindUI() {
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', () => { drag = null; document.body.classList.remove('pf-dragging'); });
   canvas.addEventListener('pointerleave', () => {
-    if (state.hoverId) { state.hoverId = null; renderStage(); }
+    setHover(null);
   });
 
   canvas.addEventListener('wheel', (ev) => {
@@ -2019,9 +1057,9 @@ function bindUI() {
     ev.preventDefault();
     const img = state.images[slot.id];
     img.zoom = clamp((img.zoom || 1) * (ev.deltaY < 0 ? 1.08 : 0.93), 0.3, 6);
-    // 换格子要整页重绘（选中框跟着变），同一格内滚动只改属性
-    if (state.selectedId !== slot.id) { state.selectedId = slot.id; renderSlotPanel(); renderStage(); }
-    else refreshSlotImage(slot.id);
+    // 换格子只重画高亮层，图片本身只改属性
+    if (state.selectedId !== slot.id) { selectSlotQuick(slot.id); renderSlotPanel(); }
+    refreshSlotImage(slot.id);
     syncZoomSlider();
     queueSave();
   }, { passive: false });
@@ -2032,11 +1070,11 @@ function bindUI() {
     if (!state.tpl) return;
     const id = slotAt(pagePoint(ev))?.id || null;
     canvas.classList.add('dragover');
-    if (id !== state.hoverId) { state.hoverId = id; renderStage(); }
+    setHover(id);
   });
   canvas.addEventListener('dragleave', () => {
     canvas.classList.remove('dragover');
-    if (state.hoverId) { state.hoverId = null; renderStage(); }
+    setHover(null);
   });
   canvas.addEventListener('drop', () => canvas.classList.remove('dragover'));
 
@@ -2058,8 +1096,10 @@ function bindUI() {
 
     // ?：快捷键表（任何状态都能开）
     if (k === '?' || (ev.shiftKey && k === '/')) { ev.preventDefault(); toggleShortcuts(); return; }
+    // 弹窗开着：别的单键快捷键不作用到背后的画布上（Esc 交给弹窗自己关）
+    const modal = document.querySelector('dialog[open]');
+    if (modal) { if (k === 'Escape') closeModal(modal); return; }
     if (k === 'Escape') {
-      if (!$('#shortcuts').classList.contains('hidden')) { toggleShortcuts(false); return; }
       state.selectedId = null; state.selBubble = null;
       renderStage(); renderSlotPanel();
       return;
@@ -2130,8 +1170,7 @@ function bindUI() {
       ev.preventDefault();
       const dir = k === 'ArrowRight' ? 1 : -1;
       const next = state.tpl.slots[clamp(idx + dir, 0, state.tpl.slots.length - 1)];
-      state.selectedId = next.id; state.selBubble = null;
-      renderStage(); renderSlotPanel();
+      selectSlotQuick(next.id); renderSlotPanel();
       return;
     }
     if (k === '[' || k === ']') {
@@ -2158,8 +1197,7 @@ function bindUI() {
       const slot = state.tpl.slots[Number(k) - 1];
       if (slot) {
         ev.preventDefault();
-        state.selectedId = slot.id; state.selBubble = null;
-        renderStage(); renderSlotPanel();
+        selectSlotQuick(slot.id); renderSlotPanel();
       }
       return;
     }
@@ -2209,14 +1247,6 @@ function bindUI() {
   $('#btnFill').addEventListener('click', () => { $('#filePick').dataset.mode = 'fill'; $('#filePick').click(); });
   $('#btnDemo').addEventListener('click', demoFill);
 
-  // AI 导演
-  for (const id of ['llmProtocol', 'llmBase', 'llmKey', 'llmModel']) {
-    $('#' + id).addEventListener('input', () => { saveLlm(); syncLlmStatus(); });
-    $('#' + id).addEventListener('change', () => { saveLlm(); syncLlmStatus(); });
-  }
-  $('#btnLlmTest').addEventListener('click', testLlm);
-  $('#btnLlmClear').addEventListener('click', clearLlm);
-  $('#chkKeySession')?.addEventListener('change', () => { saveLlm(); syncLlmStatus(); });
   $('#btnAiDecide').addEventListener('click', runAiDecide);
   $('#btnClear').addEventListener('click', () => {
     if (!Object.keys(state.images).length) return;
@@ -2342,135 +1372,6 @@ function bindUI() {
     queueSave?.();
   });
   $('#slotPromptSent').closest('details')?.addEventListener('toggle', syncPromptMeta);
-  $('#btnKeyMgr')?.addEventListener('click', openKeySheet);
-  $('#btnKeySheetClose')?.addEventListener('click', closeKeySheet);
-  $('#keySheet')?.addEventListener('click', (ev) => { if (ev.target.id === 'keySheet') closeKeySheet(); });
-  $('#ksPreset')?.addEventListener('change', (ev) => {
-    const p = KEY_PRESETS[ev.target.value];
-    if (!p) return;
-    $('#ksProtocol').value = p.protocol;
-    $('#ksBase').value = p.baseUrl;
-    $('#ksModel').value = p.model;
-    if ('imgModel' in p) $('#ksImgModel').value = p.imgModel || '';
-    if ('imgProvider' in p) $('#ksImgProvider').value = p.imgProvider || 'openai';
-    // 每个服务商一句话提示（模型名/版本段各不相同，写死在选项里就会互相误导）
-    const baseHint = $('#ksBaseHint');
-    if (baseHint) {
-      const hints = [];
-      if (/\/api\/v\d/.test(p.baseUrl)) hints.push('这个服务商的版本段在 /api/v3，不是 /v1');
-      if (p.imgHint) hints.push(p.imgHint);
-      if (p.name === '自定义') hints.push('Base URL 填到 OpenAI 兼容的版本段为止（如 https://host/v1），模型填真实 model id');
-      baseHint.textContent = hints.join('；');
-      baseHint.classList.toggle('hidden', !hints.length);
-    }
-    // 填完自动把「模型」这一栏高亮一下，避免只改 Base URL 忘了改模型
-    $('#ksModel')?.classList.add('needs-check');
-    setTimeout(() => $('#ksModel')?.classList.remove('needs-check'), 1600);
-  });
-  $('#ksList')?.addEventListener('click', (ev) => {
-    const item = ev.target.closest('.ks-item');
-    if (!item) return;
-    const id = item.dataset.id;
-    const entry = state.keys.entries.find((e) => e.id === id);
-    const act = ev.target.closest('button')?.dataset.act;
-    if (act === 'use') {
-      state.keys.activeId = id; saveKeyStore();
-      applyKeyEntry(entry); renderKeyStatus(); renderKeySheet();
-      toast('已切换到 ' + entry.name);
-    } else if (act === 'edit') {
-      state._editingKeyId = id;
-      fillKeyForm(entry);
-      $('#ksMsg').textContent = '正在编辑「' + entry.name + '」，改完点保存';
-    } else if (act === 'del') {
-      if (!confirm('删掉「' + entry.name + '」的 Key？')) return;
-      state.keys.entries = state.keys.entries.filter((e) => e.id !== id);
-      if (state.keys.activeId === id) state.keys.activeId = state.keys.entries[0]?.id || null;
-      saveKeyStore();
-      const next = activeKeyEntry();
-      if (next) applyKeyEntry(next); else { state.llm = { protocol: 'openai', baseUrl: '', apiKey: '', model: '' }; syncLlmStatus(); }
-      renderKeyStatus(); renderKeySheet();
-    }
-  });
-  $('#ksTest')?.addEventListener('click', async () => {
-    const btn = $('#ksTest'); const old = btn.textContent;
-    btn.disabled = true; btn.textContent = '测试中…';
-    $('#ksMsg').textContent = '正在请求对话模型…';
-    try {
-      const r = await api.llmTest({ llm: formEntry() });
-      if (r?.ok) {
-        $('#ksMsg').textContent = '✅ 对话模型通了 · ' + (r.model || '') + ' · ' + (r.latencyMs || '?') + 'ms';
-        state._lastTestOk = true;
-      } else {
-        const where = r?.endpoint ? ` · POST ${String(r.endpoint).replace(/^https?:\/\//, '')} · model=${r.model || '?'}` : '';
-        // 明确说这是「对话」失败 —— 生图是另一条链路，用另一把 Key，不受影响
-        $('#ksMsg').textContent = '❌ 对话模型失败（不影响生图）：' + (r?.error || '失败') + where + (r?.hint ? ' · ' + r.hint : '');
-        state._lastTestOk = false;
-      }
-    } catch (e) {
-      $('#ksMsg').textContent = '❌ 对话模型失败：' + e.message;
-      state._lastTestOk = false;
-    } finally { btn.disabled = false; btn.textContent = old; }
-  });
-
-  /**
-   * 只测生图：真的生成一张 512×512 小图（约 0.02 元），用来确认生图这条链路。
-   * 和「测试对话」完全分开 —— 文本用哪家、生图用哪家互不影响。
-   */
-  $('#ksTestImg')?.addEventListener('click', async () => {
-    const entry = formEntry();
-    const model = entry.imgModel || '(未填生图模型)';
-    if (!confirm(`会用生图模型 ${model} 真实生成一张小图（约 0.02 元），继续吗？`)) return;
-    const btn = $('#ksTestImg'); const old = btn.textContent;
-    btn.disabled = true; btn.textContent = '生成中…';
-    $('#ksMsg').textContent = '正在调用生图接口…';
-    const t0 = Date.now();
-    try {
-      const r = await api.imageGenerate({
-        prompt: 'a simple red circle on white background, minimal',
-        size: '512x512',
-        model: entry.imgModel,
-        provider: entry.imgProvider,
-        llm: entry,
-      });
-      if (r?.ok) {
-        const host = r.endpointHost || '?';
-        $('#ksMsg').textContent = `✅ 生图通了 · ${host} · ${r.model || model} · 请求尺寸 ${r.size || '?'} · ${Date.now() - t0}ms`
-          + (r.refsUsed ? ` · 带 ${r.refsUsed} 张参考图` : '');
-        state._lastImgTestOk = true;
-      } else {
-        $('#ksMsg').textContent = '❌ 生图失败：' + (r?.error || '失败') + (r?.hint ? ' · ' + r.hint : '');
-        state._lastImgTestOk = false;
-      }
-    } catch (e) {
-      $('#ksMsg').textContent = '❌ 生图失败：' + e.message;
-      state._lastImgTestOk = false;
-    } finally { btn.disabled = false; btn.textContent = old; syncImgReady(); }
-  });
-  // 生图这些字段一变就刷新「生图就绪」提示（它和对话模型是两条独立链路）
-  ['ksImgProvider', 'ksImgModel', 'ksImgBase', 'ksImgKey', 'ksBase', 'ksKey'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('input', syncImgReady);
-    el.addEventListener('change', syncImgReady);
-  });
-  syncImgReady();
-  $('#ksSave')?.addEventListener('click', () => {
-    const e = formEntry();
-    // 允许「只有生图配置」：文本用不上 AI 的人不该被对话 Key 拦住
-    const hasChat = e.apiKey && e.baseUrl;
-    const hasImg = e.imgKey && (e.imgBaseUrl || e.baseUrl) && e.imgModel;
-    if (!hasChat && !hasImg) {
-      $('#ksMsg').textContent = '至少配一条：对话（Base URL + API Key）或生图（生图模型 + Key）';
-      return;
-    }
-    if (state._lastTestOk || state._lastImgTestOk) e.verifiedAt = Date.now();
-    upsertKey(e);
-    state._editingKeyId = null;
-    $('#ksMsg').textContent = e.verifiedAt
-      ? '已保存并验证，可以开始用了'
-      : (hasChat ? '已保存（对话未验证，可以点「测试对话」）' : '已保存生图配置（可直接用「生这一格」）');
-    toast('已保存 Key：' + e.name);
-  });
   initSlotSections();
   bindPanelSheet();
   applyLayout();
@@ -2489,47 +1390,11 @@ function bindUI() {
   $('#btnAiLine')?.addEventListener('click', () => aiWriteLines('one'));
   $('#btnAiLineReroll')?.addEventListener('click', () => aiWriteLines('again'));
   $('#btnAiLinesPage')?.addEventListener('click', () => aiWriteLines('page'));
-  $('#btnCharPick')?.addEventListener('click', () => $('#charFiles').click());
-  $('#charFiles')?.addEventListener('change', async (ev) => {
-    const files = ev.target.files;
-    if (files && files.length) await addCharCard(files);
-    ev.target.value = '';
-  });
-  $('#charList')?.addEventListener('click', async (ev) => {
-    const item = ev.target.closest('.char-item');
-    if (!item) return;
-    const id = item.dataset.id;
-    const act = ev.target.closest('button')?.dataset.act;
-    if (act === 'toggle') {
-      const i = state.activeChars.indexOf(id);
-      if (i >= 0) state.activeChars.splice(i, 1);
-      else state.activeChars.push(id);
-      renderChars(); queueSave();
-    } else if (act === 'del') {
-      state.chars = state.chars.filter((c) => c.id !== id);
-      state.activeChars = state.activeChars.filter((x) => x !== id);
-      await saveChars(); renderChars(); queueSave();
-    }
-  });
-  $('#btnCharClearAll')?.addEventListener('click', async () => {
-    if (!confirm('清空所有角色卡？参考图会一起删掉。')) return;
-    state.chars = []; state.activeChars = [];
-    await saveChars(); renderChars(); queueSave();
-  });
-  $('#btnCharExport')?.addEventListener('click', exportChars);
-  $('#btnCharImport')?.addEventListener('click', () => $('#charImportFile').click());
-  $('#charImportFile')?.addEventListener('change', async (ev) => {
-    const f = ev.target.files && ev.target.files[0];
-    if (f) await importChars(f);
-    ev.target.value = '';
-  });
   $('#btnResetDraft')?.addEventListener('click', async () => {
     if (!confirm('清空本机草稿？所有页的图片、气泡和句子都会删掉，不能恢复。')) return;
-    await idbSet('pages', null);
-    // 图片是分页单独存的，清草稿要连它们一起删，否则几 MB 会一直占着
-    for (const pg of state.pages) if (pg.id) await idbSet('img:' + pg.id, null);
-    savedImageSigs.clear();
-    state.pages = [{ tplId: state.tpl?.id || 'ref-4band-2col', name: '第 1 页', images: {}, bubbles: [], lines: {} }];
+    // 图片 / 底图 / 候选图是分页单独存的，要连它们一起删，否则几 MB 会一直占着
+    await clearDrafts();
+    state.pages = [{ id: newPageId(), tplId: state.tpl?.id || 'ref-4band-2col', name: '第 1 页', images: {}, bubbles: [], lines: {} }];
     state.pageIdx = 0; state.images = {}; state.bubbles = []; state.lines = {}; state.cands = {}; state.promptEdits = {};
     resetHistory(); renderStage(); renderSlotPanel(); renderBubbles(); renderScript(); renderPageTabs();
     toast('草稿已清空');
@@ -2571,1204 +1436,11 @@ function bindUI() {
   });
   $('#btnAddPage')?.addEventListener('click', addPage);
   $('#btnExportAll')?.addEventListener('click', exportAllPages);
-  $('#charSheet').addEventListener('input', debounce(saveLlm, 400));
   $('#btnAiPrompts').addEventListener('click', () => runAiPrompts());
   $('#btnAiSplit')?.addEventListener('click', runAiSplit);
 
-/* ================================================================== *
- * 全自动模式
- *   off    关闭（原来的左栏：剧情 → 分镜）
- *   story  分镜全自动：粘贴全文 → 我们决定页数/切格/提示词
- *   full   真正全自动：再加上台词、气泡、以及批量出图
- *
- * 三条铁律（用户明确要求）：
- *   1. 花钱的动作必须先弹确认，勾选「我已知晓」才能继续；全部页还要二次确认
- *   2. 确认里必须写明「一旦开始就不会中途停」以及大概多少钱
- *   3. 全自动的所有动作都要在前台可见（每一步打进日志），且随时能停
- * ================================================================== */
-const AUTO_KEY = 'pf.auto';
-
-/** 危险确认：返回 Promise<boolean>，必须勾选才能点「继续」 */
-function confirmDanger({ title, body, images = 0, llmCalls = 0 }) {
-  return new Promise((res) => {
-    const sheet = $('#dangerSheet');
-    if (!sheet) { res(false); return; }
-    $('#dangerTitle').textContent = title;
-    const bodyEl = $('#dangerBody');
-    bodyEl.innerHTML = body;
-    const ack = $('#dangerAck');
-    const go = $('#dangerGo');
-    if (ack) ack.checked = false;
-    if (go) go.disabled = true;
-    const cost = estimateCostHint({ images, llmCalls });
-    const tip = document.createElement('div');
-    tip.className = 'danger-cost';
-    tip.textContent = cost.text;
-    bodyEl.appendChild(tip);
-    sheet.classList.remove('hidden');
-
-    const close = (val) => {
-      sheet.classList.add('hidden');
-      sheet.removeEventListener('click', onClick);
-      ack?.removeEventListener('change', onAck);
-      go?.removeEventListener('click', onGo);
-      res(val);
-    };
-    const onAck = () => { if (go) go.disabled = !ack.checked; };
-    const onGo = () => { if (!ack?.checked) return; close(true); };
-    const onClick = (ev) => {
-      if (ev.target === sheet || ev.target.closest('[data-cancel]') || ev.target.closest('[data-cancel2]')) close(false);
-    };
-    ack?.addEventListener('change', onAck);
-    go?.addEventListener('click', onGo);
-    sheet.addEventListener('click', onClick);
-  });
-}
-
-function autoLog(line, kind = '') {
-  const box = $('#autoLog');
-  if (!box) return;
-  box.classList.remove('hidden');
-  const row = document.createElement('div');
-  row.className = 'al-row' + (kind ? ' al-' + kind : '');
-  row.textContent = line;
-  box.appendChild(row);
-  box.scrollTop = box.scrollHeight;
-}
-
-function autoText() {
-  return ($('#autoText')?.value || '').trim();
-}
-
-function autoEstimate() {
-  const text = autoText();
-  if (!text) { toast('先把全文粘进来'); return null; }
-  const est = estimateLayout(text);
-  const st = $('#autoStat');
-  if (st) {
-    st.textContent = est.note;
-    st.dataset.pages = String(est.pages);
-    st.dataset.panels = String(est.panels);
-  }
-  return est;
-}
-
-/** 切换全自动模式：换左栏内容 + 显示悬浮按钮 */
-function setAutoMode(mode, opts = {}) {
-  const m = ['off', 'story', 'full'].includes(mode) ? mode : 'off';
-  state.autoMode = m;
-  const root = document.documentElement;
-  if (m === 'off') delete root.dataset.auto; else root.dataset.auto = m;
-  const autoCard = $('#autoCard');
-  const plotBox = $('#plot')?.closest('.card') || null;
-  // 注意：两块是**并列的卡片**。曾经把全自动面板塞进剧情卡片里再隐藏卡片，面板跟着一起消失（bug）
-  if (autoCard) autoCard.classList.toggle('hidden', m === 'off');
-  if (plotBox) plotBox.classList.toggle('hidden', m !== 'off');
-  $$('#autoSeg button').forEach((b) => b.classList.toggle('on', (b.dataset.auto || 'off') === m));
-  // 指示条要按模式变色：把当前模式写进 data-mode（纯 CSS 无法知道哪个按钮是激活态）
-  const segEl = $('#autoSeg');
-  if (segEl) segEl.dataset.mode = m;
-  const name = $('#autoModeName');
-  const title = $('#autoModeTitle');
-  const desc = $('#autoModeDesc');
-  if (name) name.textContent = m === 'full' ? '真正全自动' : '分镜自动';
-  if (title) title.textContent = m === 'full' ? '真正全自动' : '分镜自动';
-  if (desc) {
-    desc.textContent = m === 'full'
-      ? '从分镜、提示词、出图到台词与气泡全由 AI 完成，全程前台可见、随时可停'
-      : '决定画几页、每页怎么切；你只改提示词和男女主形象';
-  }
-  const stack = $('#fabStack');
-  if (stack) stack.classList.toggle('hidden', m === 'off');
-  if (!opts.silent) store.set(AUTO_KEY, m === 'off' ? null : m);
-}
-
-/* ---------------- 批量出图（悬浮按钮） ---------------- */
-async function currentPagePanels() {
-  savePage();
-  const page = pagePlan();
-  return page?.panels || (state.tpl?.slots || []).map((sl) => ({ id: sl.id }));
-}
-
-/** 生成当前页所有还没有图的格子 */
-async function genPageImages() {
-  const panels = await currentPagePanels();
-  const queue = imageQueueForPage(panels, state.images || {});
-  if (!queue.length) { toast('这一页每格都有图了'); return 0; }
-  const ok = await confirmDanger({
-    title: '生成这一页的 ' + queue.length + ' 张图',
-    body: '<ul class="danger-list">'
-      + '<li><b>一键生成该页</b>：把这一页每个还没图的分镜依次生成</li>'
-      + '<li>用的就是<b>每格现在的提示词</b> —— 你手改过的、规则生成的，都按原样发出去，'
-      + '<b>不会</b>先做 AI 优化（要 AI 优化请用顶栏「全自动」）</li>'
-      + '<li>点了就会一路做完，中途不会停（关掉页面会中断，但已发出的请求照样扣费）</li>'
-      + '<li>每张图都会进候选，不满意的可以单独换</li>'
-      + '</ul>',
-    images: queue.length,
-  });
-  if (!ok) return 0;
-  return runImageQueue(queue.map((slotId) => ({ page: state.pageIdx, slotId })), '这一页');
-}
-
-/** 生成全部页所有还没有图的格子（二次确认） */
-async function genAllImages() {
-  savePage();
-  const pagesOfPanels = [];
-  for (let i = 0; i < state.pages.length; i++) {
-    if (i === state.pageIdx) { pagesOfPanels.push(pagePlan()?.panels || []); continue; }
-    const tpl = await fetchTemplate(state.pages[i].tplId);
-    pagesOfPanels.push((tpl?.slots || []).map((sl) => ({ id: sl.id })));
-  }
-  const imagesByPage = state.pages.map((pg, i) => (i === state.pageIdx ? (state.images || {}) : (pg.images || {})));
-  const queue = imageQueueAll(pagesOfPanels, imagesByPage);
-  if (!queue.length) { toast('所有页面都有图了'); return 0; }
-  const pagesTouched = new Set(queue.map((q) => q.page)).size;
-
-  const first = await confirmDanger({
-    title: '生成全部 ' + queue.length + ' 张图（跨 ' + pagesTouched + ' 页）',
-    body: '<ul class="danger-list">'
-      + '<li><b>一键生成全部分镜</b>：共 <b>' + state.pages.length + ' 页</b>，其中 <b>' + pagesTouched + ' 页</b>缺图，共 <b>' + queue.length + ' 张</b></li>'
-      + '<li>用的是<b>每格现有提示词</b>（含你手改过的），<b>不会</b>先做 AI 优化</li>'
-      + '<li><b>开始后不会停</b>，直到这 ' + queue.length + ' 张全部跑完</li>'
-      + '<li>会花掉大量 token / 额度，这是本项目里最贵的一个按钮</li>'
-      + '</ul>',
-    images: queue.length,
-  });
-  if (!first) return 0;
-
-  const second = await confirmDanger({
-    title: '你真的确定吗？',
-    body: '<div class="danger-big">' + state.pages.length + ' 页 · ' + queue.length + ' 张图</div>'
-      + '<ul class="danger-list">'
-      + '<li>这是最终确认，点「继续」后立刻开始扣费</li>'
-      + '<li>想反悔只有「停止」按钮（当前这张会跑完，后面的不再发）</li>'
-      + '</ul>',
-    images: queue.length,
-  });
-  if (!second) return 0;
-  return runImageQueue(queue, '全部页');
-}
-
-/** 顺序跑队列：一次一张，失败重试 1 次，随时可停 */
-async function runImageQueue(queue, scopeLabel = '') {
-  state.autoStop = false;
-  const btnStop = $('#btnAutoStop');
-  if (btnStop) btnStop.disabled = false;
-  let done = 0;
-  let failed = 0;
-  const t0 = Date.now();
-  autoLog('▶ 开始生成' + scopeLabel + '：' + queue.length + ' 张', 'start');
-  for (const item of queue) {
-    if (state.autoStop) { autoLog('■ 已停止（已发出的请求会跑完）', 'stop'); break; }
-    if (item.page !== state.pageIdx) await switchPage(item.page);
-    const before = !!state.images[item.slotId];
-    autoLog('· 第 ' + (item.page + 1) + ' 页 · ' + item.slotId + '：请求中…');
-    try { await generateSlotImage(item.slotId, { askChars: false }); } catch { /* 内部已提示 */ }
-    if (!before && state.images[item.slotId]) { done++; autoLog('✓ ' + item.slotId + ' 完成（' + done + '/' + queue.length + '）', 'ok'); continue; }
-    autoLog('… ' + item.slotId + ' 失败，重试 1 次');
-    try { await generateSlotImage(item.slotId, { askChars: false }); } catch { /* ignore */ }
-    if (state.images[item.slotId]) { done++; autoLog('✓ ' + item.slotId + ' 重试成功（' + done + '/' + queue.length + '）', 'ok'); }
-    else { failed++; autoLog('✗ ' + item.slotId + ' 仍然失败', 'bad'); }
-  }
-  if (btnStop) btnStop.disabled = true;
-  const secs = Math.round((Date.now() - t0) / 1000);
-  autoLog('完成：成功 ' + done + ' 张 · 失败 ' + failed + ' 张 · 用时 ' + secs + 's', done ? 'ok' : 'bad');
-  toast('批量出图结束：成功 ' + done + (failed ? ' / 失败 ' + failed : ''));
-  return done;
-}
-
-/* ---------------- 全自动工作流 ---------------- */
-/** 全自动：把一份 plan 装进当前页（aiPlan 优先，其次 state.plan.pages[0]） */
-function adoptAutoPlan(plan, segment) {
-  if (!plan) return;
-  if (state.aiPlan && state.aiPlan.template?.id === state.tpl?.id) state.aiPlan = plan;
-  else {
-    state.plan = {
-      pages: [{ pageIndex: state.pageIdx + 1, segment: segment || '', analysis: null, templateScore: null, plan }],
-    };
-  }
-  renderScript();
-  renderSlotPanel();
-}
-
-/**
- * 角色确认（真正全自动专用）
- * 在花钱警示之后、开始生成之前，把「这一话会出现谁、设定是什么、有没有参考图」摊开确认。
- * 返回 Promise<boolean>：true = 角色没问题，可以开始。
- */
-function confirmCharacters({ pages = 1, panels = 0 } = {}) {
-  return new Promise((res) => {
-    document.querySelector('#charConfirm')?.remove();
-    const chars = (state.chars || []);
-    const active = new Set(state.activeChars || []);
-    const hero = ($('#autoHero')?.value || '').trim();
-    const heroine = ($('#autoHeroine')?.value || '').trim();
-    const sheet = ($('#charSheet')?.value || '').trim();
-    const rows = chars.length
-      ? chars.map((c) => {
-        const on = active.has(c.id);
-        const refs = (c.images || []).length;
-        const warn = on && !refs;
-        return '<div class="cc-row' + (on ? ' on' : '') + (warn ? ' warn' : '') + '">'
-          + '<span class="cc-dot">' + (on ? '●' : '○') + '</span>'
-          + '<b>' + escapeHtml(c.name || '未命名') + '</b>'
-          + (c.note ? '<span class="cc-note">' + escapeHtml(c.note) + '</span>' : '')
-          + '<span class="cc-refs">' + (refs ? '参考图 ' + refs + ' 张' : '没有参考图') + '</span>'
-          + (on ? '' : '<span class="cc-off">未启用</span>')
-          + (warn ? '<span class="cc-warn">⚠ 启用了但没有参考图，脸会飘</span>' : '')
-          + '</div>';
-      }).join('')
-      : '<div class="muted small">还没有角色卡。这一话的人物形象只靠下面的文字设定 —— 建议至少给主角加一张参考图。</div>';
-
-    const box = document.createElement('div');
-    box.className = 'keysheet';
-    box.id = 'charConfirm';
-    box.innerHTML = `
-      <div class="ks-panel" style="max-width:560px">
-        <div class="ks-head">
-          <b>先确认角色形象</b>
-          <span class="muted small">这一步不花钱，但少了它后面几十张图的脸会不一致</span>
-          <button class="btn tiny" data-cancel>关闭</button>
-        </div>
-        <div class="ks-body">
-          <div class="cc-sum">要做 ${pages} 页 · 约 ${panels} 个分镜、${panels} 张图</div>
-          <div class="cc-list">${rows}</div>
-          <div class="cc-sheet">角色设定：${escapeHtml(sheet || [hero ? '男主：' + hero : '', heroine ? '女主：' + heroine : ''].filter(Boolean).join('；') || '（空）')}</div>
-          <div class="row2">
-            <button class="btn tiny" id="ccGoFix">先去补角色</button>
-            <button class="btn primary" id="ccGo">角色没问题，开始生成</button>
-          </div>
-        </div>
-      </div>`;
-    document.body.appendChild(box);
-    const close = (val) => { box.remove(); res(val); };
-    box.addEventListener('click', (ev) => {
-      if (ev.target === box || ev.target.closest('[data-cancel]')) { close(false); return; }
-      if (ev.target.closest('#ccGoFix')) {
-        close(false);
-        // 把角色卡滚进视野并聚焦到名字输入框，让用户直接开始补
-        document.querySelector('.chars')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        setTimeout(() => document.querySelector('#charName')?.focus(), 400);
-        toast('先去补角色：加参考图或改设定，再从「全自动」重新开始');
-        return;
-      }
-      if (ev.target.closest('#ccGo')) close(true);
-    });
-  });
-}
-
-async function autoRun() {
-  const text = autoText();
-  if (!text) { toast('先把全文粘进来'); return; }
-  const mode = state.autoMode === 'full' ? 'full' : 'story';
-  const est = autoEstimate();
-  if (!est) return;
-
-  const hero = ($('#autoHero')?.value || '').trim();
-  const heroine = ($('#autoHeroine')?.value || '').trim();
-  const sheet = [hero ? '男主：' + hero : '', heroine ? '女主：' + heroine : ''].filter(Boolean).join('；');
-  if (sheet) {
-    const el = $('#charSheet');
-    if (el && !el.value.trim()) el.value = sheet;
-    state.charSheet = (el?.value || sheet).trim();
-  }
-
-  const steps = buildAutoSteps({ mode, pages: est.pages, panelsPerPage: est.panelsPerPage });
-  const imgCount = mode === 'full' ? est.panels : 0;
-  const ok = await confirmDanger({
-    title: mode === 'full' ? '真正全自动：全部交给 AI' : '分镜全自动：只做分镜与提示词',
-    body: '<ul class="danger-list">'
-      + '<li>分 <b>' + est.pages + ' 页</b>，约 <b>' + est.panels + ' 个分镜</b>'
-      + (mode === 'full'
-        ? '，约 <b>' + est.panels + ' 张图</b>、约 <b>' + est.panels + ' 句台词</b>（台词/旁白/内心由 AI 决定，气泡也由它布置）'
-        : '；台词与出图不自动做（之后可用右下角悬浮按钮单独触发）')
-      + '</li>'
-      + '<li>共 ' + steps.length + ' 个步骤，每一步都打进下面的日志，你能看见内容是怎么一步步出来的</li>'
-      + '<li><b>可以随时点「停止」</b>（已发出的请求会跑完，之后的不再发）</li>'
-      + (mode === 'full' ? '<li>提示词用 AI 优化过的版本，不是规则模板</li>' : '')
-      + '</ul>',
-    images: imgCount,
-    llmCalls: steps.filter((x) => x.cost === 'llm').length,
-  });
-  if (!ok) return;
-
-  if (mode === 'full') {
-    // 花钱警示之后、真正开始之前：再确认一次角色形象（用户要求）
-    const charOk = await confirmCharacters({ pages: est.pages, panels: est.panels });
-    if (!charOk) { autoLog('已取消：先确认角色形象'); return; }
-  }
-
-  state.autoStop = false;
-  const btnStart = $('#btnAutoStart');
-  const btnStop = $('#btnAutoStop');
-  if (btnStart) btnStart.disabled = true;
-  if (btnStop) btnStop.disabled = false;
-  const t0 = Date.now();
-  autoLog('▶ 全自动开始（' + (mode === 'full' ? '真正全自动' : '分镜自动') + '）：' + est.pages + ' 页', 'start');
-
-  try {
-    const pageTexts = splitTextIntoPages(text, est.pages);
-    autoLog('① 全文 ' + est.chars + ' 字 → 切成 ' + est.pages + ' 页（每页约 ' + Math.round(est.chars / est.pages) + ' 字）');
-
-    for (let i = 0; i < est.pages; i++) {
-      if (state.autoStop) break;
-      const pageText = pageTexts[i] || '';
-      autoLog('② 第 ' + (i + 1) + ' 页：挑版式 + 切格…');
-      let decided = false;
-      if (i === 0) {
-        try {
-          const res = await api.match({
-            plot: pageText,
-            culture: $('#culture')?.value || 'all',
-            genre: $('#genre')?.value || 'all',
-            ratio: $('#ratio')?.value || 'auto',
-            limit: 6,
-          });
-          const top = res?.results?.[0];
-          if (top?.id) {
-            await selectTemplate(top.id);
-            autoLog('   · 选到「' + top.name + '」（' + top.panels + ' 格）', 'ok');
-            decided = true;
-          }
-        } catch { /* ignore */ }
-      } else {
-        await addPage();
-      }
-      if (!decided && i === 0 && !state.tpl) throw new Error('还没有可用的版式');
-
-      autoLog('③ 第 ' + (i + 1) + ' 页：把这一页的原文切成每格…');
-      try {
-        const cut = await api.aiSplit({
-          plot: pageText || text,
-          templateId: state.tpl.id,
-          pageWidth: state.exportWidth,
-          characterSheet: state.charSheet,
-        });
-        if (cut?.ok && cut.plan) { adoptAutoPlan(cut.plan, pageText); autoLog('   · AI 切分完成', 'ok'); }
-        else throw new Error(cut?.error || '切分失败');
-      } catch (e) {
-        autoLog('   · AI 切分没成（' + String(e.message).slice(0, 40) + '），改用规则切分');
-        try {
-          const rp = await api.plan({ plot: pageText || text, templateId: state.tpl.id, pageWidth: state.exportWidth });
-          if (rp?.plan) adoptAutoPlan(rp.plan, pageText);
-        } catch { /* ignore */ }
-      }
-
-      autoLog('④ 第 ' + (i + 1) + ' 页：AI 优化逐格提示词…');
-      try {
-        await runAiPrompts({ silent: true });
-        autoLog('   · 提示词已用 AI 优化过', 'ok');
-      } catch (e) {
-        autoLog('   · 提示词优化失败（保留规则版）：' + String(e.message).slice(0, 40), 'bad');
-      }
-
-      if (mode === 'full') {
-        if (state.autoStop) break;
-        autoLog('⑤ 第 ' + (i + 1) + ' 页：写台词/旁白并挂气泡…');
-        try { await aiWriteLines('page', { silent: true }); autoLog('   · 台词与气泡布置完成', 'ok'); }
-        catch (e) { autoLog('   · 台词失败：' + String(e.message).slice(0, 40), 'bad'); }
-        if (state.autoStop) break;
-        autoLog('⑥ 第 ' + (i + 1) + ' 页：逐格生成图片…');
-        const panels = await currentPagePanels();
-        const queue = imageQueueForPage(panels, state.images || {});
-        await runImageQueue(queue.map((slotId) => ({ page: state.pageIdx, slotId })), '第 ' + (i + 1) + ' 页');
-      }
-      savePage();
-      autoLog('— 第 ' + (i + 1) + ' 页完成 —', 'ok');
-    }
-  } catch (e) {
-    autoLog('✗ 中断：' + e.message, 'bad');
-    toast('全自动中断：' + e.message);
-  } finally {
-    if (btnStart) btnStart.disabled = false;
-    if (btnStop) btnStop.disabled = true;
-    const secs = Math.round((Date.now() - t0) / 1000);
-    autoLog(state.autoStop ? '■ 已停止 · 用时 ' + secs + 's' : '✓ 全自动结束 · 用时 ' + secs + 's', state.autoStop ? 'stop' : 'ok');
-  }
-}
-
-/* ---------------- 绑定 ---------------- */
-function bindAutoUI() {
-  setAutoMode(store.get(AUTO_KEY) || 'off', { silent: true });
-  $$('#autoSeg button').forEach((b) => b.addEventListener('click', () => setAutoMode(b.dataset.auto || 'off')));
-  $('#btnAutoEstimate')?.addEventListener('click', () => autoEstimate());
-  $('#btnAutoFile')?.addEventListener('click', () => $('#autoFile').click());
-  $('#autoFile')?.addEventListener('change', async (ev) => {
-    const f = ev.target.files?.[0];
-    if (!f) return;
-    try {
-      const t = await f.text();
-      $('#autoText').value = t.slice(0, 200000);
-      autoEstimate();
-      toast('已读入：' + f.name);
-    } catch { toast('文件读不出来（换 .txt 试试）'); }
-    ev.target.value = '';
-  });
-  $('#btnAutoStart')?.addEventListener('click', () => autoRun());
-  $('#btnAutoStop')?.addEventListener('click', () => {
-    state.autoStop = true;
-    autoLog('… 收到停止指令：当前请求会跑完，后面的不再发', 'stop');
-  });
-  $('#fabGenPage')?.addEventListener('click', () => genPageImages());
-  $('#fabGenAll')?.addEventListener('click', () => genAllImages());
-}
-
-// 调试/自动化钩子
-window.__pfAuto = () => ({
-  mode: state.autoMode || 'off',
-  running: !!(state.autoMode && state.autoStop === false && $('#btnAutoStart')?.disabled),
-  log: [...document.querySelectorAll('#autoLog .al-row')].map((r) => r.className + '|' + r.textContent),
-});
-window.__pfAutoSet = (m) => setAutoMode(m);
-
-  bindAutoUI();
-  // 页面被隐藏或卸载前，把还没落盘的草稿立刻写一次
-  const flushNow = () => { if (dirty) { try { flushSave(); } catch { /* ignore */ } } };
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushNow(); });
-  window.addEventListener('pagehide', flushNow);
-  window.__pfFlush = () => flushSave();
-  bindSlotZoom();
-  bindInboxUI();
-  installRails();
-
-/* ================================================================== *
- * 交互收件箱：拖放 / 粘贴 / 气泡拖入 / 候选大图 / 右键菜单
- *
- * 设计原则：
- *   1. 任何「能把图片放进来」的地方都支持三种入口：点按钮选文件、拖进来、Ctrl+V 粘贴
- *   2. 拖放目标以「指针下面是什么」为准（画布 → 那一格；角色卡 → 角色参考图）
- *   3. 右键菜单用我们自己的（浏览器默认菜单在编辑器里很难用），
- *      但输入框里保留文本操作项，不让人失去剪切/粘贴
- * ================================================================== */
-
-let inboxArea = 'slot';   // 'slot' | 'char'：粘贴时往哪儿放
-
-function firstImageFromDataTransfer(dt) {
-  if (!dt) return [];
-  const out = [];
-  if (dt.files && dt.files.length) {
-    for (const f of dt.files) if (/^image\//i.test(f.type)) out.push(f);
-  }
-  if (!out.length && dt.items) {
-    for (const it of dt.items) {
-      if (it.kind === 'file') { const f = it.getAsFile(); if (f && /^image\//i.test(f.type)) out.push(f); }
-    }
-  }
-  return out;
-}
-
-/** 指针落在哪：画布 / 角色卡 / 其它 */
-function dropZoneOf(el) {
-  if (!el || !el.closest) return null;
-  if (el.closest('#styleFollow')) return 'sample';   // 拖到「风格跟随」= 加样图
-  if (el.closest('.chars')) return 'char';
-  if (el.closest('#canvas') || el.closest('#stage') || el.closest('.paint-stage')) return 'canvas';
-  return null;
-}
-
-async function acceptImages(files, { zone, ev } = {}) {
-  const imgs = (files || []).filter((f) => f && /^image\//i.test(f.type));
-  if (!imgs.length) return false;
-  if (zone === 'sample') {
-    setStyleFollow(followSamples() ? styleMode() : 'sample');
-    await addSamples(imgs);
-    return true;
-  }
-  if (zone === 'char') {
-    await addCharCard(imgs);
-    toast(`已加入 ${imgs.length} 张角色参考图`);
-    return true;
-  }
-  if (!state.tpl) { toast('先选一套版式'); return false; }
-  // 多张图：按阅读顺序填进空格子（没有空格就从第一格开始覆盖）
-  if (imgs.length > 1) {
-    const empty = state.tpl.slots.filter((s) => !state.images[s.id]);
-    const list = empty.length ? empty : state.tpl.slots;
-    const n = Math.min(imgs.length, list.length);
-    commit();
-    for (let i = 0; i < n; i++) await putImage(list[i].id, imgs[i], { render: false, noCommit: true });
-    state.selectedId = list[n - 1]?.id || state.selectedId;
-    renderStage(); renderSlotPanel(); refreshScript();
-    toast(`已按阅读顺序填入 ${n} 格${imgs.length > n ? `（还剩 ${imgs.length - n} 张没地方放）` : ''}`);
-    return true;
-  }
-  // 一张图：优先「指针下那一格」，否则当前选中的格子
-  let slotId = state.selectedId;
-  if (ev && zone === 'canvas') {
-    const s = slotAt(pagePoint(ev));
-    if (s) slotId = s.id;
-  }
-  if (!slotId) { toast('先点一个格子，再拖图进来'); return false; }
-  await putImage(slotId, imgs[0]);
-  const slot = state.tpl.slots.find((s) => s.id === slotId);
-  toast(`已填入第 ${slot?.order ?? '?'} 格`);
-  return true;
-}
-
-/* ---------------- 拖放 + 粘贴 ---------------- */
-/** 拖进来的文件里挑出「文本类」的（原文/大纲/脚本） */
-const TEXT_EXT = /\.(txt|md|markdown|text|csv|tsv|journal|log)$/i;
-function textFilesFromDataTransfer(dt) {
-  if (!dt) return [];
-  const out = [];
-  const push = (f) => {
-    if (!f) return;
-    // docx/pdf 这类也算「文本候选」—— 收下来才能给一句明确的「读不了，请另存 txt」
-    const DOC_EXT = /\.(docx|doc|pdf|epub|rtf)$/i;
-    const isText = /^text\//i.test(f.type) || TEXT_EXT.test(f.name || '') || DOC_EXT.test(f.name || '');
-    if (isText) out.push(f);
-  };
-  if (dt.files && dt.files.length) for (const f of dt.files) push(f);
-  if (!out.length && dt.items) {
-    for (const it of dt.items) if (it.kind === 'file') push(it.getAsFile());
-  }
-  return out;
-}
-
-/** 判断落点是哪个文本框：全自动的全文框 / 普通模式的剧情框 */
-function textTargetOf(el) {
-  if (!el || !el.closest) return null;
-  if (el.closest('#autoPanel, #autoCard')) return '#autoText';
-  if (el.closest('.match, #plot')) return '#plot';
-  return null;
-}
-
-/** 把文本文件读进对应的文本框；读不了（比如 docx）就说清楚 */
-async function acceptTextFiles(files, { targetSel } = {}) {
-  const list = (files || []).filter(Boolean);
-  if (!list.length) return false;
-  const f = list[0];
-  const sel = targetSel || (state.autoMode && state.autoMode !== 'off' ? '#autoText' : '#plot');
-  const ta = $(sel);
-  if (!ta) return false;
-  // docx / pdf / epub：浏览器里要额外依赖才能解，别假装支持
-  if (/\.(docx|doc|pdf|epub|rtf)$/i.test(f.name || '')) {
-    toast('这个格式读不了：请另存为 .txt / .md 再拖进来（docx 在浏览器里需要额外依赖）');
-    return false;
-  }
-  try {
-    const text = await f.text();
-    if (!text || !text.trim()) { toast('这个文件是空的'); return false; }
-    ta.value = text.slice(0, 200000);
-    ta.dispatchEvent(new Event('input', { bubbles: true }));
-    if (sel === '#autoText') autoEstimate();
-    const chars = text.replace(/\s+/g, '').length;
-    toast(`已读入「${f.name}」：${chars} 字${sel === '#autoText' ? '，已估算页数' : ''}`);
-    ta.focus();
-    // 光标放到末尾，方便接着写
-    try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch { /* ignore */ }
-    return true;
-  } catch (e) {
-    toast('读文件失败：' + e.message);
-    return false;
-  }
-}
-
-/* ---------------- 选中格子的悬浮缩放条 ---------------- */
-function slotZoomEls() {
-  return { box: $('#slotZoom'), range: $('#slotZoomRange'), val: $('#slotZoomVal') };
-}
-
-/** 把缩放条贴到「当前选中格子」的正右侧；没有图就藏起来 */
-function syncSlotZoom() {
-  const { box, range, val } = slotZoomEls();
-  if (!box) return;
-  const svg = $('#canvas')?.querySelector('svg');
-  const slot = state.tpl?.slots?.find((x) => x.id === state.selectedId);
-  const img = state.selectedId ? state.images[state.selectedId] : null;
-  const view = document.body.dataset.view || '';
-  // 只在「画布」视图显示：以前写的是 view !== 'edit'，于是在剧情/模板库/导出视图里
-  // 也会显示——那几屏 #canvas 是 display:none，getBoundingClientRect 全 0，
-  // 缩放条就被定到了视口左上角（用户看到的那条小条）。
-  const showIt = !!(svg && slot && img && !state.hollow && view === 'canvas');
-  if (!showIt) { box.classList.add('hidden'); return; }
-  // 再兜一层：svh 还没排版（宽高为 0）时也不显示
-  {
-    const pre = svg.getBoundingClientRect();
-    if (pre.width < 8 || pre.height < 8) { box.classList.add('hidden'); return; }
-  }
-
-  // 用 position:fixed + 视口坐标：完全不依赖 offsetParent。
-  // （踩过两次坑：offsetParent 会因祖先被加 transform 而变，算出来的位置在同步和 resize 时不一致）
-  const sRect = svg.getBoundingClientRect();
-  const tpl = state.tpl.page;
-  const kx = sRect.width / tpl.w;
-  const ky = sRect.height / tpl.h;
-  const x = sRect.left + (slot.x + slot.w) * kx + 10;
-  const y = sRect.top + (slot.y + slot.h / 2) * ky;
-
-  box.classList.remove('hidden');
-  box.style.left = Math.round(x) + 'px';
-  box.style.top = Math.round(y) + 'px';
-  box.style.transform = 'translateY(-50%)';
-
-  // 直接观察 svg 自身尺寸：加载后期版心还会变宽一点（453→466），只在 #canvas 上挂 RO 抓不到
-  if (typeof ResizeObserver === 'function' && svg !== syncSlotZoom._svg) {
-    syncSlotZoom._ro?.disconnect();
-    syncSlotZoom._svg = svg;
-    syncSlotZoom._ro = new ResizeObserver(() => {
-      try { syncSlotZoom(); } catch { /* ignore */ }
-    });
-    syncSlotZoom._ro.observe(svg);
-  }
-
-  const pct = Math.round((img.zoom || 1) * 100);
-  if (val) val.textContent = pct + '%';
-  if (range && document.activeElement !== range) range.value = String(Math.min(400, Math.max(30, pct)));
-}
-
-/** 调试/测试用：某一格的屏幕矩形（从模板几何 + SVG 缩放换算，与图片溢出一概无关） */
-window.__pfSlotRect = (id = state.selectedId) => {
-  const canvas = $('#canvas');
-  const svg = canvas?.querySelector('svg');
-  const slot = state.tpl?.slots?.find((x) => x.id === id);
-  if (!svg || !slot) return null;
-  const r = svg.getBoundingClientRect();
-  const page = state.tpl.page;
-  const kx = r.width / page.w;
-  const ky = r.height / page.h;
-  return {
-    left: r.left + slot.x * kx,
-    top: r.top + slot.y * ky,
-    right: r.left + (slot.x + slot.w) * kx,
-    bottom: r.top + (slot.y + slot.h) * ky,
-    width: slot.w * kx,
-    height: slot.h * ky,
-  };
-};
-
-/** 设置当前格的缩放（30%–400%），走热路径只改这一张图 */
-function setSlotZoom(pct) {
-  const id = state.selectedId;
-  const img = id ? state.images[id] : null;
-  if (!img) return;
-  const next = clamp(Number(pct) / 100, 0.3, 4);
-  if (Math.abs(next - (img.zoom || 1)) < 0.001) return;
-  img.zoom = next;
-  if (typeof refreshSlotImage === 'function') refreshSlotImage(id);
-  else renderStage();
-  syncSlotZoom();
-  const zv = $('#zoomVal');
-  if (zv) zv.textContent = Math.round(next * 100) + '%';
-  const zr = $('#zoom');
-  if (zr) zr.value = String(Math.round(next * 100));
-  queueSave();
-}
-
-function bindSlotZoom() {
-  const { box, range, val } = slotZoomEls();
-  if (!box || box.dataset.ready) return;
-  box.dataset.ready = '1';
-  // 挂到 body：position:fixed 就不再受任何祖先 transform 影响
-  if (box.parentElement !== document.body) document.body.appendChild(box);
-  range?.addEventListener('input', (ev) => setSlotZoom(ev.target.value));
-  box.addEventListener('click', (ev) => {
-    const step = ev.target.closest('[data-step]');
-    if (step) {
-      const img = state.images[state.selectedId];
-      const cur = Math.round((img?.zoom || 1) * 100);
-      setSlotZoom(cur + Number(step.dataset.step) * 8);
-      return;
-    }
-    if (ev.target.closest('#slotZoomVal')) setSlotZoom(100);
-  });
-  window.addEventListener('resize', syncSlotZoom);
-  document.addEventListener('scroll', syncSlotZoom, { passive: true, capture: true });
-  // 画布每次重绘（换页/换格/改图）都会替换 svg —— 盯住它，重算缩放条位置
-  const canvasEl = $('#canvas');
-  // 画布每次重绘都会换 svg；但「刚换完」那一刻布局可能还没稳定（实测会算出偏 288px 的假位置），
-  // 所以连续同步两次：rAF 一次、稍后再一次；尺寸变化再交给 ResizeObserver。
-  // 重绘后连续同步一小段：加载后期版心会变宽、进页动画也会缩放画布，
-  // 这些变化 ResizeObserver 看不见（它只报布局盒，不报 transform），所以按时间点补几帧。
-  const syncTwice = () => {
-    for (const t of [0, 50, 120, 250, 500, 900]) {
-      setTimeout(() => { try { syncSlotZoom(); } catch { /* ignore */ } }, t);
-    }
-  };
-  if (canvasEl && !canvasEl.dataset.zoomObserver) {
-    canvasEl.dataset.zoomObserver = '1';
-    let raf = 0;
-    new MutationObserver(() => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(syncTwice);
-    }).observe(canvasEl, { childList: true });
-    if (typeof ResizeObserver === 'function') {
-      const ro = new ResizeObserver(() => { try { syncSlotZoom(); } catch { /* ignore */ } });
-      ro.observe(canvasEl);
-      const stageEl = canvasEl.closest('.stage') || canvasEl.parentElement;
-      if (stageEl) ro.observe(stageEl);
-    }
-  }
-  syncTwice();
-}
-
-/* ---------------- 拖放提示：毛玻璃卡片 + 格式说明 ---------------- */
-const DROP_KINDS = {
-  image: { title: '放入图片', formats: 'JPG / PNG / WebP / GIF / AVIF / SVG', ico: '▤' },
-  text: { title: '放入原文文件', formats: 'TXT / MD / CSV / TSV / LOG', ico: '🅃' },
-  bubble: { title: '放入气泡', formats: '松手就放到画面上', ico: '💬' },
-};
-
-function showDropHint(kind, targetEl) {
-  const el = $('#dropHint');
-  if (!el || !targetEl) return;
-  const spec = DROP_KINDS[kind] || DROP_KINDS.image;
-  $('#dhIco').textContent = spec.ico;
-  $('#dhTitle').textContent = spec.title;
-  $('#dhFormats').textContent = spec.formats;
-  const r = targetEl.getBoundingClientRect();
-  el.classList.remove('hidden');
-  el.style.left = Math.round(r.left) + 'px';
-  el.style.top = Math.round(r.top) + 'px';
-  el.style.width = Math.round(r.width) + 'px';
-  el.style.height = Math.round(r.height) + 'px';
-}
-
-function hideDropHint() {
-  $('#dropHint')?.classList.add('hidden');
-}
-
-function installImageInbox() {
-  const canvas = $('#canvas');
-
-  // 记录最近一次交互区域，供 Ctrl+V 决定往哪放
-  document.addEventListener('pointerdown', (ev) => {
-    const zone = dropZoneOf(ev.target);
-    if (zone === 'sample') inboxArea = 'sample';
-    else if (zone === 'char') inboxArea = 'char';
-    else if (zone === 'canvas' || ev.target.closest?.('#railRight')) inboxArea = 'slot';
-  }, true);
-  document.addEventListener('focusin', (ev) => {
-    if (ev.target.closest?.('#styleFollow')) inboxArea = 'sample';
-    else if (ev.target.closest?.('.chars')) inboxArea = 'char';
-  }, true);
-
-  // 拖到画布/角色卡上时给出可放置的视觉反馈
-  document.addEventListener('dragover', (ev) => {
-    const hasImages = firstImageFromDataTransfer(ev.dataTransfer).length > 0;
-    const hasText = textFilesFromDataTransfer(ev.dataTransfer).length > 0;
-    const isBubble = ev.dataTransfer?.types?.includes('text/pf-bubble');
-    if (!hasImages && !hasText && !isBubble) return;
-    // 文本文件优先落在文本框上
-    const textSel = hasText && !hasImages ? textTargetOf(ev.target) : null;
-    // 合成事件的 target 可能是 document，用坐标兜底判断落在画布上
-    const zone = textSel
-      ? 'text'
-      : (dropZoneOf(ev.target) || (Number.isFinite(ev.clientX) && $('#canvas svg') ? 'canvas' : null));
-    if (!zone) return;
-    ev.preventDefault();
-    ev.dataTransfer.dropEffect = 'copy';
-    document.body.dataset.dropZone = zone;
-    // 毛玻璃提示：盖在目标区域上，写明能放什么格式
-    if (textSel) showDropHint('text', $(textSel));
-    else if (isBubble && !hasImages) showDropHint('bubble', $('#canvas svg') || $('#canvas'));
-    else showDropHint('image', zone === 'char' ? $('.chars') : ($('#canvas svg') || $('#canvas')));
-  });
-  document.addEventListener('dragleave', (ev) => {
-    if (ev.target === document || !ev.relatedTarget) { delete document.body.dataset.dropZone; hideDropHint(); }
-  });
-
-  document.addEventListener('drop', async (ev) => {
-    hideDropHint();
-    const bubbleType = ev.dataTransfer?.getData('text/pf-bubble');
-    // 事件可能派发在 document 上（合成事件 / 某些浏览器），这时用坐标兜底判断落在画布
-    const zone = dropZoneOf(ev.target)
-      || (Number.isFinite(ev.clientX) && $('#canvas svg') ? 'canvas' : null);
-    delete document.body.dataset.dropZone;
-    if (bubbleType) {
-      if (!zone || zone === 'char') return;
-      ev.preventDefault();
-      const pt = pagePoint(ev);
-      const slot = slotAt(pt);
-      if (!state.tpl) { toast('先选一套版式'); return; }
-      const b = addBubble(bubbleType, { at: pt, noCommit: false });
-      if (b) {
-        if (slot) { state.selectedId = slot.id; renderSlotPanel(); }
-        toast(`已把「${BUBBLES[bubbleType]?.zh || bubbleType}」放到画面上，拖它调位置`);
-      }
-      return;
-    }
-    // 先看是不是文本文件（原文/大纲），它落在文本框上就填文本框
-    const texts = textFilesFromDataTransfer(ev.dataTransfer);
-    const textSel = texts.length ? textTargetOf(ev.target) : null;
-    if (texts.length && (textSel || !firstImageFromDataTransfer(ev.dataTransfer).length)) {
-      ev.preventDefault();
-      await acceptTextFiles(texts, { targetSel: textSel });
-      return;
-    }
-    const files = firstImageFromDataTransfer(ev.dataTransfer);
-    if (!files.length) return;
-    ev.preventDefault();
-    await acceptImages(files, { zone, ev });
-  });
-
-  // Ctrl+V 粘贴图片（全站唯一的粘贴入口）：落点 = 最近一次交互的区域（样图 / 角色卡 / 画布）
-  document.addEventListener('paste', async (ev) => {
-    const files = firstImageFromDataTransfer(ev.clipboardData);
-    if (!files.length) return;   // 文本粘贴不拦
-    const inField = ev.target.closest?.('input, textarea');
-    const focus = document.activeElement;
-    const zone = inboxArea === 'sample' || focus?.closest?.('#styleFollow') ? 'sample'
-      : inboxArea === 'char' || focus?.closest?.('.chars') ? 'char' : 'canvas';
-    ev.preventDefault();
-    // 输入框里粘图片没意义（会变成字），但用户常常是在输入框聚焦时按的 Ctrl+V
-    if (await acceptImages(files, { zone }) && inField && zone === 'canvas') toast('已把剪贴板里的图片放进当前格子');
-  });
-}
-
-/* ---------------- 气泡库可拖拽 ---------------- */
-function makeBubbleLibDraggable() {
-  const lib = $('#bubGrid');
-  if (!lib || lib.dataset.draggableReady) return;
-  lib.dataset.draggableReady = '1';
-  const SEL = '.bub-item[data-id]';
-  lib.addEventListener('dragstart', (ev) => {
-    const btn = ev.target.closest(SEL);
-    if (!btn) return;
-    const type = btn.dataset.id;
-    ev.dataTransfer.setData('text/pf-bubble', type);
-    ev.dataTransfer.setData('text/plain', BUBBLES[type]?.zh || type);
-    ev.dataTransfer.effectAllowed = 'copy';
-    btn.classList.add('dragging');
-  });
-  lib.addEventListener('dragend', (ev) => {
-    ev.target.closest(SEL)?.classList.remove('dragging');
-    delete document.body.dataset.dropZone;
-    hideDropHint();
-  });
-  // 气泡项是 .bub-item[data-id]，标记成可拖（每次重渲染后都要补）
-  const mark = () => {
-    lib.querySelectorAll(SEL).forEach((b) => {
-      b.draggable = true;
-      const zh = BUBBLES[b.dataset.id]?.zh || b.dataset.id;
-      b.title = `${zh} · 拖到画面上直接放置（也可以点一下加到当前格）`;
-    });
-  };
-  mark();
-  new MutationObserver(mark).observe(lib, { childList: true, subtree: true });
-}
-
-/* ---------------- 候选图大图预览 ---------------- */
-function openLightbox(list, index = 0, opts = {}) {
-  if (!list || !list.length) return;
-  let i = Math.max(0, Math.min(list.length - 1, index));
-  let box = $('#lightbox');
-  if (box) box.remove();
-  box = document.createElement('div');
-  box.className = 'keysheet lightbox';
-  box.id = 'lightbox';
-  box.innerHTML = `
-    <div class="lb-panel">
-      <div class="lb-head">
-        <b id="lbCount">–</b>
-        <span class="muted small">← → 切换 · Esc 关闭 · 滚轮缩放</span>
-        <button class="btn tiny" data-close>关闭</button>
-      </div>
-      <div class="lb-stage"><img id="lbImg" alt="候选图预览" draggable="false"></div>
-      <div class="row2 lb-acts">
-        <button class="btn tiny" id="lbPrev">上一张</button>
-        <button class="btn tiny" id="lbNext">下一张</button>
-        <button class="btn tiny primary" id="lbUse">用这张</button>
-        <button class="btn tiny" id="lbEdit">用这张进画布改</button>
-        <button class="btn tiny danger" id="lbDel">删掉这张</button>
-      </div>
-    </div>`;
-  document.body.appendChild(box);
-
-  const img = $('#lbImg', box);
-  let scale = 1;
-  const sync = () => {
-    img.src = list[i];
-    scale = 1;
-    img.style.transform = 'scale(1)';
-    $('#lbCount', box).textContent = `第 ${i + 1} / ${list.length} 张`;
-    $('#lbPrev', box).disabled = i <= 0;
-    $('#lbNext', box).disabled = i >= list.length - 1;
-  };
-  const close = () => { box.remove(); document.removeEventListener('keydown', onKey, true); };
-  const onKey = (ev) => {
-    if (ev.key === 'Escape') { ev.stopPropagation(); close(); }
-    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); if (i > 0) { i--; sync(); } }
-    else if (ev.key === 'ArrowRight') { ev.preventDefault(); if (i < list.length - 1) { i++; sync(); } }
-  };
-  document.addEventListener('keydown', onKey, true);
-
-  box.addEventListener('click', (ev) => {
-    if (ev.target === box || ev.target.closest('[data-close]')) { close(); return; }
-  });
-  $('#lbPrev', box).addEventListener('click', () => { if (i > 0) { i--; sync(); } });
-  $('#lbNext', box).addEventListener('click', () => { if (i < list.length - 1) { i++; sync(); } });
-  $('#lbUse', box).addEventListener('click', async () => { close(); await applyCand(i); });
-  $('#lbEdit', box).addEventListener('click', async () => { close(); await applyCandAndEdit(i); });
-  $('#lbDel', box).addEventListener('click', () => {
-    const sid = state.selectedId;
-    const arr = candsOf(sid);
-    if (!arr.length) return;
-    arr.splice(i, 1);
-    renderCands();
-    if (!arr.length) { close(); return; }
-    i = Math.min(i, arr.length - 1);
-    list = arr;
-    sync();
-  });
-  box.querySelector('.lb-stage').addEventListener('wheel', (ev) => {
-    ev.preventDefault();
-    scale = Math.min(4, Math.max(0.4, scale * (ev.deltaY < 0 ? 1.1 : 0.9)));
-    img.style.transform = `scale(${scale})`;
-  }, { passive: false });
-  sync();
-}
-
-/* ---------------- 右键菜单 ---------------- */
-const CTX_TRANSFORM = [
-  { key: 'zoomIn', label: '放大', hint: '+', run: (id) => nudgeImage(id, 'zoom', 1.12) },
-  { key: 'zoomOut', label: '缩小', hint: '−', run: (id) => nudgeImage(id, 'zoom', 1 / 1.12) },
-  { sep: true },
-  { key: 'left', label: '靠左', run: (id) => alignImage(id, 'left') },
-  { key: 'hcenter', label: '水平居中', run: (id) => alignImage(id, 'hcenter') },
-  { key: 'right', label: '靠右', run: (id) => alignImage(id, 'right') },
-  { key: 'top', label: '靠上', run: (id) => alignImage(id, 'top') },
-  { key: 'vcenter', label: '垂直居中', run: (id) => alignImage(id, 'vcenter') },
-  { key: 'bottom', label: '靠下', run: (id) => alignImage(id, 'bottom') },
-  { sep: true },
-  { key: 'cover', label: '填满裁切', run: (id) => setImageMode(id, 'cover') },
-  { key: 'contain', label: '完整显示', run: (id) => setImageMode(id, 'contain') },
-  { key: 'reset', label: '复位位置', run: (id) => resetImageTransform(id) },
-];
-
-function nudgeImage(id, field, factor) {
-  const img = state.images[id];
-  if (!img) return;
-  commit();
-  if (field === 'zoom') img.zoom = clamp((img.zoom || 1) * factor, 0.3, 6);
-  renderStage(); renderSlotPanel(); queueSave();
-}
-function alignImage(id, dir) {
-  const img = state.images[id];
-  if (!img) return;
-  commit();
-  const big = 260;   // 用足够大的位移把图推到边界（渲染时会被格子裁剪）
-  img.mode = img.mode || 'cover';
-  if (dir === 'left') img.panX = -big;
-  if (dir === 'right') img.panX = big;
-  if (dir === 'hcenter') img.panX = 0;
-  if (dir === 'top') img.panY = -big;
-  if (dir === 'bottom') img.panY = big;
-  if (dir === 'vcenter') img.panY = 0;
-  renderStage(); renderSlotPanel(); queueSave();
-}
-function setImageMode(id, mode) {
-  const img = state.images[id];
-  if (!img) return;
-  commit();
-  img.mode = mode;
-  renderStage(); renderSlotPanel(); queueSave();
-  toast(mode === 'contain' ? '完整显示（可能留白）' : '填满裁切');
-}
-function resetImageTransform(id) {
-  const img = state.images[id];
-  if (!img) return;
-  commit();
-  img.zoom = 1; img.panX = 0; img.panY = 0;
-  renderStage(); renderSlotPanel(); queueSave();
-}
-
-function ctxItem(label, run, opts = {}) {
-  return { label, run, ...opts };
-}
-
-/** 根据右键位置算出该显示哪些菜单项 */
-function buildContextMenu(ev) {
-  // 真实右键的 target 就是被点的元素；只有合成事件派发在 document/body 上时才用坐标兜底
-  const raw = ev.target;
-  const usable = raw && raw.closest && raw !== document && raw !== document.body && raw !== document.documentElement;
-  const target = usable ? raw : (document.elementFromPoint(ev.clientX, ev.clientY) || raw);
-  const sel = state.selectedId;
-
-  // ① 输入框/文本域：保留文本操作（不用浏览器菜单，但功能要对等）
-  if (target.closest?.('input, textarea, [contenteditable="true"]')) {
-    const el = target.closest('input, textarea, [contenteditable="true"]');
-    const hasSel = (el.selectionStart ?? 0) !== (el.selectionEnd ?? 0);
-    return {
-      title: '文本',
-      items: [
-        ctxItem('复制', () => { el.focus(); document.execCommand('copy'); }, { disabled: !hasSel }),
-        ctxItem('剪切', () => { el.focus(); document.execCommand('cut'); }, { disabled: !hasSel }),
-        ctxItem('粘贴', () => { el.focus(); toast('用 Ctrl+V 粘贴（浏览器不允许脚本代按）'); }, { hint: 'Ctrl+V' }),
-        { sep: true },
-        ctxItem('全选', () => { el.focus(); el.select?.(); }),
-      ],
-    };
-  }
-
-  // ② 候选图
-  const cand = target.closest?.('.cand');
-  if (cand) {
-    const i = Number(cand.dataset.i) || 0;
-    return {
-      title: '候选图',
-      items: [
-        ctxItem('放大看细节', () => openLightbox(candsOf(sel), i)),
-        ctxItem('用这张', () => applyCand(i)),
-        ctxItem('用这张进画布改', () => applyCandAndEdit(i)),
-        { sep: true },
-        ctxItem('删掉这张', () => {
-          const arr = candsOf(sel);
-          arr.splice(i, 1);
-          renderCands();
-        }),
-      ],
-    };
-  }
-
-  // ③ 画布（含某一格的图）
-  const inCanvas = target.closest?.('#canvas') || target.closest?.('#stage');
-  if (inCanvas) {
-    const pt = pagePoint(ev);
-    const slot = slotAt(pt);
-    const sid = slot?.id || sel;
-    if (!sid) return null;
-    const hasImg = !!state.images[sid];
-    const items = [];
-    if (hasImg) {
-      items.push(...CTX_TRANSFORM.map((it) => (it.sep ? it : { ...it, run: () => it.run(sid) })));
-      items.push({ sep: true });
-      items.push(ctxItem('看大图', () => { state.selectedId = sid; window.__pfLightbox(0); }));
-      items.push(ctxItem('替换图片…', () => { state.selectedId = sid; $('#filePick').dataset.mode = 'slot'; $('#filePick').click(); }));
-      items.push(ctxItem('绘制这一格', () => { state.selectedId = sid; openPaint(sid); }));
-      items.push(ctxItem('导出这一格', async () => { state.selectedId = sid; await exportSlotImage(); }));
-      items.push({ sep: true });
-      items.push(ctxItem('清空这一格的图', () => {
-        commit();
-        delete state.images[sid];
-        renderStage(); renderSlotPanel(); refreshScript(); queueSave();
-        toast('已清空这一格的图');
-      }, { danger: true }));
-    } else {
-      items.push(ctxItem('选图片填入这一格', () => { state.selectedId = sid; renderSlotPanel(); $('#filePick').dataset.mode = 'slot'; $('#filePick').click(); }));
-      items.push(ctxItem('AI 生成这一格', () => { state.selectedId = sid; renderSlotPanel(); generateSlotImage(sid); }));
-      items.push(ctxItem('绘制这一格', () => { state.selectedId = sid; openPaint(sid); }));
-    }
-    // 选中的格与右键的格不同时，先把它选上，动作才不会作用错对象
-    const firstRun = items.find((x) => x.run);
-    if (firstRun) {
-      const orig = firstRun.run;
-      firstRun.run = () => { state.selectedId = sid; renderSlotPanel(); orig(); };
-    }
-    return { title: slot ? `第 ${slot.order} 格` : '画布', items };
-  }
-
-  // ④ 气泡
-  // 画面里的气泡渲染成 <g data-bubble="<id>">（见 lib/svg.mjs），不是 .bub / data-bubble-id
-  const bub = target.closest?.('g[data-bubble]');
-  if (bub) {
-    const id = bub.getAttribute('data-bubble');
-    return {
-      title: '气泡',
-      items: [
-        ctxItem('换样式', () => { state.selBubble = id; renderStage(); renderBubbles(); $('#bubbleDock')?.scrollIntoView({ block: 'nearest' }); }),
-        ctxItem('编辑文字', () => { state.selBubble = id; renderStage(); renderBubbles(); $('#bubText')?.focus(); }),
-        ctxItem('复制一个', () => { state.selBubble = id; duplicateBubble(); }),
-        { sep: true },
-        ctxItem('删除', () => { state.selBubble = id; deleteBubble(); }, { danger: true }),
-      ],
-    };
-  }
-
-  // ⑤ 全局
-  return {
-    title: 'PanelForge',
-    items: [
-      ctxItem('AI 生成这一格', () => generateSlotImage(state.selectedId)),
-      ctxItem('绘制这一格', () => openPaint(state.selectedId)),
-      { sep: true },
-      ctxItem('导出这一页 PNG', () => exportPNG()),
-      ctxItem('快捷键表', () => toggleShortcuts(true), { hint: '?' }),
-    ],
-  };
-}
-
-function installContextMenu() {
-  let menu = $('#ctxMenu');
-  if (!menu) {
-    menu = document.createElement('div');
-    menu.id = 'ctxMenu';
-    menu.className = 'ctx-menu hidden';
-    document.body.appendChild(menu);
-  }
-  const hide = () => menu.classList.add('hidden');
-
-  document.addEventListener('contextmenu', (ev) => {
-    // 触屏长按也会派发 contextmenu：那不是用户要的右键菜单，直接吞掉（编辑用双击）
-    const fromTouch = ev.pointerType === 'touch' || ev.sourceCapabilities?.firesTouchEvents === true;
-    if (fromTouch) { ev.preventDefault(); return; }
-    const spec = buildContextMenu(ev);
-    if (!spec || !spec.items?.length) return;   // 没有我们的上下文 → 保留浏览器菜单
-    ev.preventDefault();
-    menu.innerHTML = `<div class="ctx-title">${escapeHtml(spec.title || '')}</div>`
-      + spec.items.map((it, i) => (it.sep
-        ? '<div class="ctx-sep"></div>'
-        : `<button class="ctx-item${it.disabled ? ' disabled' : ''}${it.danger ? ' danger' : ''}" data-i="${i}" ${it.disabled ? 'disabled' : ''}>
-             <span>${escapeHtml(it.label)}</span>${it.hint ? `<kbd>${escapeHtml(it.hint)}</kbd>` : ''}
-           </button>`)).join('');
-    menu.classList.remove('hidden');
-    // 贴边修正
-    const r = menu.getBoundingClientRect();
-    const x = Math.min(ev.clientX, window.innerWidth - r.width - 8);
-    const y = Math.min(ev.clientY, window.innerHeight - r.height - 8);
-    menu.style.left = Math.max(6, x) + 'px';
-    menu.style.top = Math.max(6, y) + 'px';
-    menu._spec = spec;
-  });
-
-  menu.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('.ctx-item');
-    if (!btn || btn.disabled) { hide(); return; }
-    const i = Number(btn.dataset.i);
-    const item = menu._spec?.items?.[i];
-    hide();
-    try { item?.run?.(); } catch (e) { toast('操作失败：' + e.message); }
-  });
-  document.addEventListener('pointerdown', (ev) => {
-    if (!menu.contains(ev.target)) hide();
-  }, true);
-  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hide(); });
-  window.addEventListener('blur', hide);
-}
-
-/* ---------------- 绑定 ---------------- */
-
-function bindInboxUI() {
-  installImageInbox();
-  makeBubbleLibDraggable();
-  installContextMenu();
-  // 候选图：点缩略图直接看大图（原来的「点一下用这张」仍在右键/大图里）
-  $('#candGrid')?.addEventListener('click', (ev) => {
-    const del = ev.target.closest('[data-del]');
-    if (del) return;                       // 删除按钮走原逻辑
-    const editBtn = ev.target.closest('[data-edit]');
-    if (editBtn) return;                   // ✎ 走原逻辑
-    const card = ev.target.closest('.cand');
-    if (!card) return;
-    if (ev.altKey || ev.shiftKey) return;  // 按住修饰键时保留原来的「直接用」行为
-    ev.stopImmediatePropagation?.();
-    ev.preventDefault();
-    openLightbox(candsOf(state.selectedId), Number(card.dataset.i) || 0);
-  }, true);
-}
-
-window.__pfLightbox = (i = 0) => {
-  const list = (candsOf(state.selectedId) || []).slice();
-  if (!list.length && state.images[state.selectedId]) list.push(state.images[state.selectedId].href);
-  return openLightbox(list, i);
-};
-window.__pfContextMenu = (ev) => buildContextMenu(ev);
-window.__pfInbox = () => inboxArea;
-
-  // 快捷键表
+                  // 快捷键表
   $('#btnShortcuts').addEventListener('click', () => toggleShortcuts(true));
-  $('#btnCloseShortcuts').addEventListener('click', () => toggleShortcuts(false));
-  $('#shortcuts').addEventListener('click', (ev) => { if (ev.target.id === 'shortcuts') toggleShortcuts(false); });
 
   // 气泡素材库
   $('#bubTabs').addEventListener('click', (ev) => {
@@ -3831,6 +1503,7 @@ window.__pfInbox = () => inboxArea;
     commitThrottled(900);
     state.lines[state.selectedId] = ev.target.value;
     saveLines();
+    queueSave();   // 内容变了自己排存盘（以前靠「下一次整页重绘顺手存」，选格不再整页重绘后就会漏）
     syncSuggest(); syncSecSummary();
     // 句子变了 → 气泡推荐要跟着换（按内容挑气泡）
     clearTimeout(lineBubTimer);
@@ -3864,7 +1537,7 @@ window.__pfInbox = () => inboxArea;
     const c = ev.target.closest('[data-w]');
     if (!c) return;
     state.exportWidth = Number(c.dataset.w);
-    $('#exportW').value = String(state.exportWidth);
+    setRange($('#exportW'), state.exportWidth);
     $('#wVal').textContent = state.exportWidth + 'px';
     renderExportKv(); syncSizeUI();
   });
@@ -3990,20 +1663,6 @@ async function importByUrl() {
   }
 }
 
-const fileToDataURL = (file) => new Promise((res, rej) => {
-  const r = new FileReader();
-  r.onload = () => res(r.result);
-  r.onerror = rej;
-  r.readAsDataURL(file);
-});
-
-const imageSize = (href) => new Promise((res) => {
-  const img = new Image();
-  img.onload = () => res({ w: img.naturalWidth, h: img.naturalHeight });
-  img.onerror = () => res({ w: 1000, h: 1000 });
-  img.src = href;
-});
-
 /* 占位图：预览「图片塞进各种形状格子」的效果 */
 async function demoFill() {
   if (!state.tpl) return;
@@ -4053,22 +1712,23 @@ function makePlaceholder(slot) {
   return c.toDataURL('image/jpeg', 0.85);
 }
 
-/* ================================================================== *
- * 右栏：格子
- * ================================================================== */
-/* ---------------- 格子面板：「这一格说什么」/「这一格的分镜」/「图片」三段各自折叠 ---------------- */
-const SLOT_SEC_KEY = 'pf.slotsec';
 /** 默认展开哪些段：「分镜」默认收起（它是查资料用的，日常最占地方） */
 const SLOT_SEC_OPEN = { text: true, image: true, ai: true, board: false };
 function initSlotSections() {
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(SLOT_SEC_KEY) || '{}') || {}; } catch { /* ignore */ }
+  const saved = store.json(KEYS.slotSec, {});
   for (const sec of $$('#slotPanel .slot-sec')) {
     const key = sec.dataset.sec;
     const head = sec.querySelector('.sec-head');
-    const body = sec.querySelector('.sec-body');
+    // 折叠用 grid 0fr↔1fr：内容要包进唯一的一层 .sec-inner
+    const body = sec.querySelector(':scope > .sec-body');
+    if (body && !body.querySelector(':scope > .sec-inner')) {
+      const inner = document.createElement('div');
+      inner.className = 'sec-inner';
+      inner.append(...body.childNodes);
+      body.append(inner);
+    }
     const apply = (open, animate) => {
-      animateFold(sec, body, open, { instant: !animate });
+      setFold(sec, open, { instant: !animate });
       head.setAttribute('aria-expanded', open ? 'true' : 'false');
     };
     // 用户手动开关过的以记录为准，没动过的按上面这张默认表
@@ -4077,7 +1737,7 @@ function initSlotSections() {
       const open = sec.classList.contains('collapsed');
       apply(open, true);
       saved[key] = open;
-      try { localStorage.setItem(SLOT_SEC_KEY, JSON.stringify(saved)); } catch { /* ignore */ }
+      store.setJSON(KEYS.slotSec, saved);
     });
   }
 }
@@ -4114,48 +1774,6 @@ function syncPromptMeta() {
   }
   $('#btnPromptReset').classList.toggle('hidden', !b.edited && src !== 'mine');
   $('#slotPromptSent').textContent = b.full || '—';
-}
-
-/**
- * 折叠 / 展开（卡片、格子面板、气泡库共用）
- * 量出当前高度和目标高度，用 Web Animations 走一段弹簧；
- * 终态交给 CSS 的 .collapsed（height:0 + visibility:hidden），所以动画被打断也不会卡在半截。
- */
-const FOLD_EASE = 'linear(0, 0.0128, 0.0467, 0.0955, 0.1544, 0.2194, 0.2874, 0.3559, 0.4232, 0.488, 0.5491, 0.6062, 0.6587, 0.7065, 0.7497, 0.7882, 0.8224, 0.8524, 0.8786, 0.9013, 0.9207, 0.9373, 0.9512, 0.9629, 0.9726, 0.9806, 0.987, 0.9922, 0.9963, 0.9994, 1.0018, 1.0036, 1.0048, 1.0056, 1.0061, 1.0063, 1.0063, 1.0061, 1.0058, 1.0055, 1.0051, 1.0047, 1.0043, 1.0038, 1.0034, 1.003, 1.0026, 1.0023, 1)';
-function animateFold(container, body, open, { instant = false } = {}) {
-  if (!container || !body) return;
-  const wasOpen = !container.classList.contains('collapsed');
-  const from = body.getBoundingClientRect().height;
-  body.getAnimations?.().forEach((a) => a.cancel());
-  container.classList.toggle('collapsed', !open);
-  if (instant || wasOpen === open || !body.animate || !motionOK()) return;
-
-  const to = open ? body.scrollHeight : 0;
-  const frames = open
-    ? [{ height: from + 'px', opacity: 0, visibility: 'visible' }, { opacity: 1, offset: 0.55 }, { height: to + 'px', opacity: 1, visibility: 'visible' }]
-    : [{ height: from + 'px', opacity: 1, visibility: 'visible' }, { opacity: 0, offset: 0.6 }, { height: '0px', opacity: 0, visibility: 'visible' }];
-  container.classList.add('folding');
-  let anim;
-  const opt = { duration: open ? 560 : 420, easing: open ? FOLD_EASE : 'cubic-bezier(.32,.72,0,1)' };
-  try { anim = body.animate(frames, opt); } catch { anim = body.animate(frames, { ...opt, easing: 'cubic-bezier(.32,.72,0,1)' }); }
-  const done = () => container.classList.remove('folding');
-  anim.addEventListener('finish', done);
-  anim.addEventListener('cancel', done);
-}
-
-/** 小框折叠：内联样式驱动，保证真的塌下去 */
-function applySlotCollapse() {
-  const panel = document.querySelector('#slotPanel');
-  if (!panel) return;
-  for (const k of [...panel.children].filter((c) => !c.classList.contains('slot-head'))) {
-    k.style.overflow = 'hidden';
-    k.style.transition = 'max-height .45s cubic-bezier(.25,.8,.25,1), opacity .28s, margin .3s';
-    k.style.maxHeight = state.slotCollapsed ? '0px' : 'none';
-    k.style.opacity = state.slotCollapsed ? '0' : '1';
-    k.style.marginTop = state.slotCollapsed ? '0px' : '';
-  }
-  panel.classList.toggle('collapsed', state.slotCollapsed);
-  document.querySelector('#btnSlotCollapse')?.classList.toggle('open', !state.slotCollapsed);
 }
 
 /**
@@ -4215,7 +1833,7 @@ function renderSlotPanel() {
   if (idxEl.dataset.slot !== slot.id) {
     const first = !idxEl.dataset.slot;
     idxEl.dataset.slot = slot.id;
-    if (!first) { replay(idxEl, 'pop'); replay($('#slotPanel'), 'swap'); }
+    if (!first) { fx.pop(idxEl); fx.swapIn($('#slotPanel'), 'slotSwap'); }
   }
   idxEl.textContent = slot.order;
   $('#slotRole').textContent = panel ? `${panel.roleZh}` : slot.role;
@@ -4260,7 +1878,7 @@ function renderSlotPanel() {
     ? `已自动放在生图提示词<b>最前面</b>；用别的工具出图时也可单独复制。${escapeHtml(shape.hintZh || '')}`
     : '已自动放在生图提示词<b>最前面</b>。';
 
-  $('#zoom').value = Math.round((img?.zoom || 1) * 100);
+  setRange($('#zoom'), Math.round((img?.zoom || 1) * 100));
   $('#zoomVal').textContent = Math.round((img?.zoom || 1) * 100) + '%';
   $('#btnFitMode').textContent = img?.mode === 'contain' ? '当前：完整显示' : '当前：填满裁切';
 
@@ -4281,7 +1899,7 @@ function renderSlotPanel() {
 function syncZoomSlider() {
   const img = state.images[state.selectedId];
   if (!img) return;
-  $('#zoom').value = Math.round(img.zoom * 100);
+  setRange($('#zoom'), Math.round(img.zoom * 100));
   $('#zoomVal').textContent = Math.round(img.zoom * 100) + '%';
 }
 
@@ -4309,126 +1927,13 @@ function pagePlan() {
   return p?.plan || (p && p.panels ? p : null) || (state.plan && state.plan.panels ? state.plan : null);
 }
 
-/* ================================================================== *
- * AI 导演
- * ================================================================== */
-const LLM_STORE = 'pf.llm.v1';
-const CHAR_STORE = 'pf.char.v1';
-
-function loadLlm() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(LLM_STORE) || 'null');
-    if (saved) state.llm = { ...state.llm, ...saved };
-  } catch { /* ignore */ }
-  try { state.charSheet = localStorage.getItem(CHAR_STORE) || ''; } catch { /* ignore */ }
-  $('#llmProtocol').value = state.llm.protocol || 'openai';
-  $('#llmBase').value = state.llm.baseUrl || '';
-  $('#llmKey').value = state.llm.apiKey || '';
-  $('#llmModel').value = state.llm.model || '';
-  if ($('#imgModel')) $('#imgModel').value = state.llm.imgModel || '';
-  if ($('#imgProvider')) $('#imgProvider').value = state.llm.imageProvider || 'openai';
-  $('#charSheet').value = state.charSheet;
-  if ($('#chkKeySession')) $('#chkKeySession').checked = !!state.llm.sessionOnly;
-}
-
-function saveLlm() {
-  const sessionOnly = !!$('#chkKeySession')?.checked;
-  // 注意：这里是**从表单重建** state.llm，所以任何表单项之外的字段都必须显式带过来。
-  // 曾经漏了 imgBaseUrl / imgKey —— 生图前会调用本函数，于是「生图专用 Base URL」被抹掉、
-  // 请求回落到对话那条 baseUrl（用户看到的 api.deepseek.com/images/generations 就是这么来的）。
-  state.llm = {
-    ...state.llm,
-    protocol: $('#llmProtocol').value,
-    baseUrl: $('#llmBase').value.trim(),
-    apiKey: $('#llmKey').value.trim(),
-    model: $('#llmModel').value.trim(),
-    imgModel: $('#imgModel') ? $('#imgModel').value.trim() : (state.llm.imgModel || ''),
-    imageProvider: $('#imgProvider') ? $('#imgProvider').value : (state.llm.imageProvider || 'openai'),
-    imgBaseUrl: $('#imgBaseUrl') ? $('#imgBaseUrl').value.trim() : (state.llm.imgBaseUrl || ''),
-    imgKey: $('#imgKey') ? $('#imgKey').value.trim() : (state.llm.imgKey || ''),
-    sessionOnly,
-  };
-  state.charSheet = $('#charSheet').value.trim();
-  try {
-    // 勾了「仅本次会话」就不把 Key 写进浏览器存储
-    localStorage.setItem(LLM_STORE, JSON.stringify({ ...state.llm, apiKey: sessionOnly ? '' : state.llm.apiKey }));
-  } catch { /* ignore */ }
-  try { localStorage.setItem(CHAR_STORE, state.charSheet); } catch { /* ignore */ }
-}
-
-function clearLlm() {
-  try { localStorage.removeItem(LLM_STORE); } catch { /* ignore */ }
-  state.llm = { protocol: 'openai', baseUrl: '', apiKey: '', model: '' };
-  $('#llmBase').value = ''; $('#llmKey').value = ''; $('#llmModel').value = '';
-  if ($('#imgModel')) $('#imgModel').value = '';
-  syncLlmStatus();
-  toast('已清除本机 AI 配置');
-}
-
-async function syncLlmStatus() {
-  const el = $('#llmStatus');
-  const badge = $('#llmBadge');
-  if (!el) return;
-  const local = !!state.llm.apiKey;
-  let server = null;
-  try { server = await api.llmStatus(); } catch { /* ignore */ }
-  if (server?.staticMode) {
-    el.className = local ? 'llm-status ok' : 'llm-status';
-    el.textContent = local
-      ? `浏览器直连 · ${state.llm.protocol} · ${state.llm.model || '默认模型'}（Key 只在你这台机器上）`
-      : '静态版也能用 AI：在上面填自己的 Key（只在浏览器里，不上传）。规则路不用 Key，随时可用';
-    badge.textContent = local ? '就绪' : '待填 Key';
-    badge.style.color = local ? 'var(--ok)' : 'var(--dim)';
-    return;
-  }
-  if (local) {
-    el.className = 'llm-status ok';
-    el.textContent = `本机已填 Key · ${state.llm.protocol} · ${state.llm.model || '默认模型'}`;
-    badge.textContent = '就绪';
-    badge.style.color = 'var(--ok)';
-  } else if (server?.configured) {
-    el.className = 'llm-status ok';
-    el.textContent = `服务端环境变量已配置 · ${server.protocol} · ${server.model}`;
-    badge.textContent = '就绪';
-    badge.style.color = 'var(--ok)';
-  } else {
-    el.className = 'llm-status';
-    el.textContent = '未配置 · 规则路照常可用（AI 路需你填 Key，或设 LLM_API_KEY）';
-    badge.textContent = '未配置';
-    badge.style.color = '';
-  }
-}
-
-async function testLlm() {
-  const btn = $('#btnLlmTest');
-  const old = btn.textContent;
-  btn.disabled = true; btn.textContent = '测试中…';
-  saveLlm();
-  try {
-    const r = await api.llmTest({ llm: state.llm });
-    if (r.ok) {
-      $('#llmStatus').className = 'llm-status ok';
-      $('#llmStatus').textContent = `连接成功 · ${r.model} · ${r.latencyMs}ms`;
-      toast(`连接成功 ${r.latencyMs}ms`);
-    } else {
-      $('#llmStatus').className = 'llm-status bad';
-      $('#llmStatus').textContent = `${r.error || '失败'}${r.hint ? ' · ' + r.hint : ''}`;
-      toast('连接失败：' + (r.code || r.error));
-    }
-  } catch (e) {
-    toast('连接失败：' + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = old;
-  }
-}
-
 async function runAiDecide() {
   const plot = $('#plot').value.trim();
   if (!plot) { toast('先写一段剧情吧'); $('#plot').focus(); return; }
   saveLlm();
   const btn = $('#btnAiDecide');
   const old = btn.textContent;
-  btn.disabled = true;
+  setBusy(btn, true);
   btn.textContent = 'AI 正在读剧情、挑版式、排戏…';
   const box = $('#aiResult');
   box.classList.remove('hidden');
@@ -4472,7 +1977,7 @@ async function runAiDecide() {
   } catch (e) {
     box.innerHTML = `<b class="err-title">调用失败</b><div class="rs">${escapeHtml(e.message)}</div>`;
   } finally {
-    btn.disabled = false;
+    setBusy(btn, false);
     btn.textContent = old;
   }
 }
@@ -4502,7 +2007,7 @@ async function runMatch() {
   if (!plot) { toast('先写一段剧情吧（哪怕两句话）'); $('#plot').focus(); return; }
   state.plot = plot;
   const btn = $('#btnMatch');
-  btn.disabled = true;
+  setBusy(btn, true);
   btn.querySelector('span').textContent = '匹配中…';
   try {
     const res = await api.match({
@@ -4523,7 +2028,7 @@ async function runMatch() {
   } catch (e) {
     toast('匹配失败：' + e.message);
   } finally {
-    btn.disabled = false;
+    setBusy(btn, false);
     btn.querySelector('span').textContent = '按规则匹配';
   }
 }
@@ -4553,7 +2058,7 @@ function renderMatchResults(results) {
       </div>
       <div class="sc">${r.score.toFixed(1)}</div>
     </div>`).join('');
-  stagger(box, '.res');
+  staggerIn(box, '.res');
   box.querySelectorAll('.res').forEach((el) => {
     el.addEventListener('click', () => { selectTemplate(el.dataset.id); goCanvasOnCompact(); });
   });
@@ -4603,7 +2108,8 @@ function renderScript() {
     db.classList.add('hidden');
   }
 
-  $('#scriptList').innerHTML = panels.map((p) => `
+  const list = $('#scriptList');
+  list.innerHTML = panels.map((p) => `
     <div class="sc-card" data-id="${p.id}">
       <div class="top">
         <span class="no">${p.order}</span>
@@ -4625,9 +2131,11 @@ function renderScript() {
         <button class="btn tiny" data-act="fill">填入选中格</button>
       </div>
     </div>`).join('');
-  stagger($('#scriptList'), '.sc-card', 10);
+  // 只有换了版式 / 格子变了才依次浮现（以前每改一个字、每次重绘都整排重放一遍）
+  const listKey = state.tpl.id + ':' + panels.map((p) => p.id).join(',');
+  if (list.dataset.key !== listKey) { list.dataset.key = listKey; staggerIn(list, '.sc-card', { cap: 10 }); }
 
- $('#scriptList').querySelectorAll('.sc-card').forEach((card) => {
+  list.querySelectorAll('.sc-card').forEach((card) => {
     const p = panels.find((x) => x.id === card.dataset.id);
     card.addEventListener('click', (ev) => {
       const act = ev.target.closest('button')?.dataset.act;
@@ -4635,8 +2143,8 @@ function renderScript() {
       else if (act === 'prefix') copyText(p.shape?.prefixEn || '', '形状开头词已复制');
       else if (act === 'prefixZh') copyText(p.shape?.prefixZh || '', '中文形状词已复制');
       else if (act === 'promptZh') copyText(p.promptZh || '', '中文提示词已复制');
-      else if (act === 'fill') { state.selectedId = p.id; renderStage(); renderSlotPanel(); toast('已选中第 ' + p.order + ' 格'); }
-      else { state.selectedId = p.id; renderStage(); renderSlotPanel(); }
+      else if (act === 'fill') { selectSlotQuick(p.id); renderSlotPanel(); toast('已选中第 ' + p.order + ' 格'); }
+      else { selectSlotQuick(p.id); renderSlotPanel(); }
     });
   });
 }
@@ -4679,13 +2187,24 @@ function renderCands() {
   if (!strip || !grid) return;
   const list = state.selectedId ? candsOf(state.selectedId) : [];
   strip.classList.toggle('hidden', list.length === 0);
-  if (!list.length) { grid.innerHTML = ''; return; }
-  grid.innerHTML = list.map((href, i) => `
-    <button class="cand" data-i="${i}" title="点一下用这张">
-      <img src="${escapeHtml(href)}" alt="候选 ${i + 1}">
+  if (!list.length) { grid.innerHTML = ''; grid._html = ''; grid._n = 0; return; }
+  const html = list.map((href, i) => `
+    <button type="button" class="cand" data-i="${i}" title="点一下用这张">
+      <img src="${escapeHtml(href)}" alt="候选 ${i + 1}" decoding="async">
       <span class="del" data-del="${i}" title="删掉这张">×</span>
       <span class="edit" data-edit="${i}" title="用这张进画布继续画（AI 出稿 → 手改）">✎</span>
     </button>`).join('');
+  // 每次选格 / 重绘右栏都会叫到这里：内容没变就不碰 DOM（以前每次都重建、入场动画整排重放）
+  if (grid._html === html) return;
+  const fresh = grid.dataset.sid !== state.selectedId;
+  const grew = list.length > (grid._n || 0);
+  grid._html = html;
+  grid._n = list.length;
+  grid.dataset.sid = state.selectedId;
+  grid.innerHTML = html;
+  // 换了格子：整排依次浮现；同一格新出了一张：只让新的那张（排在最前）浮上来；删图不动
+  if (fresh) staggerIn(grid, '.cand', { cap: 8 });
+  else if (grew) fx.rise(grid.firstElementChild);
 }
 
 /** 候选图 → 直接用这张进画布（AI 出稿、画师接手的那一步） */
@@ -4718,548 +2237,7 @@ function applyCand(i) {
   }).catch((e) => toast('这张图读不出来：' + e.message));
 }
 
-/* ---------------- 多服务商 Key 管理 ---------------- */
-const KEYS_STORE = 'pf.keys.v1';
-
-const KEY_PRESETS = {
-  deepseek: { name: 'DeepSeek', protocol: 'openai', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', imgModel: '' },
-  openai: { name: 'OpenAI', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', imgModel: 'gpt-image-1' },
-  siliconflow: { name: '硅基流动', protocol: 'openai', baseUrl: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-72B-Instruct', imgModel: 'Kwai-Kolors/Kolors' },
-  anthropic: { name: 'Anthropic', protocol: 'anthropic', baseUrl: 'https://api.anthropic.com', model: 'claude-3-5-sonnet-latest', imgModel: '' },
-  moonshot: { name: 'Moonshot', protocol: 'openai', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', imgModel: '' },
-  // 火山方舟（豆包）：版本段是 /api/v3，不是 /v1；模型要填 model id 或接入点 ep-xxxx。
-  // 这里的默认值只是「能跑通的最小示例」，具体以你控制台里开通的模型为准。
-  volcengine: {
-    name: '火山方舟（豆包）', protocol: 'openai',
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    // 对话模型留空：账号里有哪些模型只有控制台知道，填死一个不存在的 ID 只会让人以为配置错了
-    model: '',
-    imgProvider: 'volcengine',
-    imgModel: 'doubao-seedream-5-0-pro-260628',
-    imgHint: 'Model ID 从方舟「模型广场」复制（带日期后缀，如 doubao-seedream-5-0-pro-260628）；'
-      + '生图不需要对话模型，想用 AI 排戏/切分再填一个对话模型的 ID',
-  },
-  dashscope: {
-    name: '通义百炼', protocol: 'openai',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    model: 'qwen-plus',
-    imgProvider: 'openai',
-    imgModel: 'wanx2.1-t2i-turbo',
-    imgHint: '百炼兼容模式：文本 qwen-plus；生图用 wanx2.1-t2i-turbo（异步任务在部分模型上不支持，失败就换 wanx2.1-t2i-plus）',
-  },
-  custom: { name: '自定义', protocol: 'openai', baseUrl: '', model: '', imgModel: '' },
-};
-
-function loadKeyStore() {
-  let store = { entries: [], activeId: null };
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEYS_STORE) || 'null');
-    if (raw && Array.isArray(raw.entries)) store = raw;
-  } catch { /* ignore */ }
-  // 从旧单条配置迁移
-  try {
-    const old = JSON.parse(localStorage.getItem(LLM_STORE) || 'null');
-    if (old && old.apiKey && !store.entries.length) {
-      store.entries.push({
-        id: 'k' + Date.now().toString(36), name: '我的服务商', protocol: old.protocol || 'openai',
-        baseUrl: old.baseUrl || '', model: old.model || '', apiKey: old.apiKey,
-        imgProvider: old.imageProvider || 'openai', imgModel: old.imgModel || '',
-        verifiedAt: 0,
-      });
-      store.activeId = store.entries[0].id;
-    }
-  } catch { /* ignore */ }
-  state.keys = store;
-  const active = store.entries.find((e) => e.id === store.activeId) || store.entries[0] || null;
-  if (active) applyKeyEntry(active);
-  renderKeyStatus();
-}
-
-function saveKeyStore() {
-  try { localStorage.setItem(KEYS_STORE, JSON.stringify(state.keys)); } catch { /* ignore */ }
-}
-
-function activeKeyEntry() {
-  return state.keys.entries.find((e) => e.id === state.keys.activeId) || null;
-}
-
-function applyKeyEntry(e) {
-  state.llm = {
-    protocol: e.protocol || 'openai',
-    baseUrl: e.baseUrl || '',
-    model: e.model || '',
-    apiKey: e.apiKey || '',
-    imageProvider: e.imgProvider || 'openai',
-    imgModel: e.imgModel || '',
-    imgBaseUrl: e.imgBaseUrl || '',
-    imgKey: e.imgKey || '',
-    sessionOnly: false,
-  };
-  $('#llmProtocol').value = state.llm.protocol;
-  $('#llmBase').value = state.llm.baseUrl;
-  $('#llmModel').value = state.llm.model;
-  $('#llmKey').value = state.llm.apiKey;
-  if ($('#imgProvider')) $('#imgProvider').value = state.llm.imageProvider;
-  if ($('#imgModel')) $('#imgModel').value = state.llm.imgModel;
-  syncLlmStatus();
-}
-
-function renderKeyStatus() {
-  const cur = activeKeyEntry();
-  const nameEl = $('#aiCurName');
-  const metaEl = $('#aiCurMeta');
-  const btn = $('#btnKeyMgr');
-  if (!nameEl) return;
-  if (cur) {
-    nameEl.textContent = cur.name || '已配置';
-    metaEl.textContent = `${cur.model || '默认模型'} · ${cur.verifiedAt ? '已验证' : '未验证'} · ${state.keys.entries.length} 个 Key`;
-    btn.textContent = cur.verifiedAt ? '管理 Key' : '输入 Key';
-  } else {
-    nameEl.textContent = '未配置 Key';
-    metaEl.textContent = '规则路照常可用，AI 是可选加速';
-    btn.textContent = '输入 Key';
-  }
-}
-
-function renderKeySheet() {
-  const list = $('#ksList');
-  if (!list) return;
-  if (!state.keys.entries.length) {
-    list.innerHTML = '<div class="muted small" style="padding:8px 2px">还没有保存的 Key。在右边填一个，点「保存并使用」。</div>';
-    return;
-  }
-  list.innerHTML = state.keys.entries.map((e) => {
-    const on = e.id === state.keys.activeId;
-    return `<div class="ks-item${on ? ' on' : ''}" data-id="${e.id}">
-      <span class="ks-radio">${on ? '●' : '○'}</span>
-      <div class="ks-info">
-        <b>${escapeHtml(e.name || '未命名')}</b>
-        <span>${escapeHtml(e.model || '默认模型')} · ${escapeHtml(e.baseUrl || '')}</span>
-        <span class="ks-key">${e.apiKey ? 'sk-••••' + String(e.apiKey).slice(-4) : '无 Key'}${e.verifiedAt ? ' · 已验证' : ''}</span>
-      </div>
-      <div class="ks-acts">
-        <button class="btn tiny" data-act="use">${on ? '当前' : '使用'}</button>
-        <button class="btn tiny" data-act="edit">编辑</button>
-        <button class="btn tiny danger" data-act="del">删</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function openKeySheet() {
-  renderKeySheet();
-  $('#keySheet').classList.remove('hidden');
-}
-
-function closeKeySheet() { $('#keySheet').classList.add('hidden'); }
-
-/** 生图这条链路到底配好了没 —— 独立于对话模型，避免「对话挂了以为生图也废了」 */
-function syncImgReady() {
-  const el = $('#ksImgReady');
-  if (!el) return;
-  const provider = $('#ksImgProvider')?.value || state.llm?.imageProvider || 'openai';
-  const model = ($('#ksImgModel')?.value || '').trim() || (state.llm?.imgModel || '');
-  const base = ($('#ksImgBase')?.value || '').trim() || (state.llm?.imgBaseUrl || '') || ($('#ksBase')?.value || '').trim() || (state.llm?.baseUrl || '');
-  const ownKey = ($('#ksImgKey')?.value || '').trim() || (state.llm?.imgKey || '');
-  const fallbackKey = ($('#ksKey')?.value || '').trim() || (state.llm?.apiKey || '');
-  const key = ownKey || fallbackKey;
-  const providerName = { volcengine: '火山方舟 Seedream', openai: 'OpenAI 兼容', siliconflow: '硅基流动', stability: 'Stability' }[provider] || provider;
-  if (!model) { el.textContent = '生图还没配好：缺生图模型'; el.dataset.ok = '0'; return; }
-  if (!key) { el.textContent = '生图还没配好：缺 Key（生图 Key 或上面的 API Key 都行）'; el.dataset.ok = '0'; return; }
-  const keySrc = ownKey ? '生图专用 Key' : '共用上面的 Key';
-  const tail = ownKey || !fallbackKey ? '' : '（注意：上面那把 Key 可能属于另一家，测试对话失败也不影响这里）';
-  el.textContent = `生图就绪：${providerName} · ${model} · ${base.replace(/^https?:\/\//, '')} · ${keySrc} ****${String(key).slice(-4)}${tail}`;
-  el.dataset.ok = '1';
-}
-
-function fillKeyForm(e) {
-  if (!e) return;
-  $('#ksProtocol').value = e.protocol || 'openai';
-  $('#ksBase').value = e.baseUrl || '';
-  $('#ksModel').value = e.model || '';
-  $('#ksKey').value = e.apiKey || '';
-  $('#ksImgProvider').value = e.imgProvider || 'openai';
-  $('#ksImgModel').value = e.imgModel || '';
-  // 生图专属（留空 = 复用上面那条）
-  if ($('#ksImgBase')) $('#ksImgBase').value = e.imgBaseUrl || '';
-  if ($('#ksImgKey')) $('#ksImgKey').value = e.imgKey || '';
-  const more = document.querySelector('.ks-more');
-  if (more) more.open = !!(e.imgBaseUrl || e.imgKey);
-}
-
-function formEntry() {
-  return {
-    id: state._editingKeyId || 'k' + Date.now().toString(36),
-    name: ($('#ksPreset').selectedOptions[0]?.textContent || '服务商').trim(),
-    protocol: $('#ksProtocol').value,
-    baseUrl: $('#ksBase').value.trim(),
-    model: $('#ksModel').value.trim(),
-    apiKey: $('#ksKey').value.trim(),
-    imgProvider: $('#ksImgProvider').value,
-    imgModel: $('#ksImgModel').value.trim(),
-    imgBaseUrl: ($('#ksImgBase')?.value || '').trim(),
-    imgKey: ($('#ksImgKey')?.value || '').trim(),
-    verifiedAt: 0,
-  };
-}
-
-function upsertKey(entry) {
-  const i = state.keys.entries.findIndex((x) => x.id === entry.id);
-  if (i >= 0) state.keys.entries[i] = { ...state.keys.entries[i], ...entry };
-  else state.keys.entries.push(entry);
-  state.keys.activeId = entry.id;
-  saveKeyStore();
-  applyKeyEntry(state.keys.entries.find((x) => x.id === entry.id));
-  renderKeyStatus();
-  renderKeySheet();
-}
-
-/* ---------------- 角色参考图 ---------------- */
-async function loadChars() {
-  try {
-    const list = await Promise.race([idbGet('chars'), new Promise((r) => setTimeout(() => r(null), 1200))]);
-    if (Array.isArray(list)) state.chars = list;
-  } catch { /* ignore */ }
-  renderChars();
-}
-
-async function saveChars() {
-  await idbSet('chars', state.chars);
-}
-
-function renderChars() {
-  const box = document.querySelector('#charList');
-  if (!box) return;
-  if (!state.chars.length) {
-    box.innerHTML = '<span class="muted small">还没有角色卡。加一张参考图，以后每次生图都会自动带上。</span>';
-    return;
-  }
-  box.innerHTML = state.chars.map((c) => {
-    const on = state.activeChars.includes(c.id);
-    return `<div class="char-item${on ? ' on' : ''}" data-id="${c.id}">
-      <div class="char-thumbs">${(c.images || []).slice(0, 3).map((h) => `<img src="${escapeHtml(h)}" alt="">`).join('')}</div>
-      <div class="char-meta">
-        <b>${escapeHtml(c.name || '未命名')}</b>
-        <span>${escapeHtml(c.note || '')}</span>
-      </div>
-      <div class="char-acts">
-        <button class="btn tiny" data-act="toggle">${on ? '停用' : '启用'}</button>
-        <button class="btn tiny danger" data-act="del">删</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function addCharCard(files) {
-  const nameEl = document.querySelector('#charName');
-  const noteEl = document.querySelector('#charNote');
-  const name = (nameEl?.value || '').trim() || '角色 ' + (state.chars.length + 1);
-  const note = (noteEl?.value || '').trim();
-  const picked = [...files].slice(0, 3);
-  const images = [];
-  for (const f of picked) {
-    try {
-      const href = await shrinkImage(f, 512);
-      images.push(href);
-    } catch { /* 跳过读不出的 */ }
-  }
-  if (!images.length) { toast('这几张图读不出来，换一张试试'); return; }
-  state.chars.push({ id: 'c' + Date.now().toString(36), name, note, images });
-  state.activeChars.push(state.chars[state.chars.length - 1].id);
-  if (nameEl) nameEl.value = '';
-  if (noteEl) noteEl.value = '';
-  await saveChars();
-  renderChars();
-  queueSave();
-  toast('已保存角色「' + name + '」并启用');
-}
-
-/** 参考图统一压到 512px 长边，省空间也够模型认人 */
-function shrinkImage(file, max) {
-  return new Promise((res, rej) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, max / Math.max(img.width, img.height));
-      const w = Math.max(1, Math.round(img.width * k));
-      const h = Math.max(1, Math.round(img.height * k));
-      const c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      c.getContext('2d').drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(url);
-      res(c.toDataURL('image/jpeg', 0.86));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('图片读不出来')); };
-    img.src = url;
-  });
-}
-
-/** 当前启用的角色 → { block: 提示词片段, refs: [dataURL] } */
-/** 风格跟随模式（char / sample / both / none） */
-function styleMode() {
-  const m = state.styleFollow;
-  return ['char', 'sample', 'both', 'none'].includes(m) ? m : 'char';
-}
-function followChars() { return styleMode() === 'char' || styleMode() === 'both'; }
-function followSamples() { return styleMode() === 'sample' || styleMode() === 'both'; }
-
-/**
- * 这一次要发给生图模型的人设/风格信息。
- * 统一入口：人设图、样图都从这里出，避免"某个按钮忘了带参考图"这类不一致。
- */
-function activeCharPayload() {
-  const parts = [];
-  const refs = [];
-
-  if (followChars()) {
-    const chars = state.chars.filter((c) => state.activeChars.includes(c.id));
-    if (chars.length) {
-      parts.push('角色一致性：' + chars.map((c) => `${c.name}${c.note ? '（' + c.note + '）' : ''}`).join('；')
-        + '。外观、发型、服装、年龄必须与参考图完全一致，不要换脸。');
-      refs.push(...chars.flatMap((c) => c.images || []));
-    }
-  }
-
-  if (followSamples()) {
-    const samples = (state.samples || []).filter((x) => x && x.href);
-    if (samples.length) {
-      parts.push(`风格一致性：严格照参考样图的画风、线宽、上色方式与配色，不要擅自更换画风（共 ${samples.length} 张样图）。`);
-      refs.push(...samples.map((x) => x.href));
-    }
-  }
-
-  return { block: parts.join(' '), refs: refs.slice(0, 6) };
-}
-
-/* ---------------- 角色卡的导出 / 导入（团队共用同一批人） ---------------- */
-const CHARS_MAX = 60;
-/** 去重指纹：名字 + 第一张参考图 */
-const charKey = (c) => `${(c.name || '').trim()}||${(c.images || [])[0] || ''}`;
-
-function exportChars() {
-  if (!state.chars.length) { toast('还没有角色卡可导出'); return; }
-  const payload = {
-    app: 'panel-forge',
-    kind: 'character-cards',
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    chars: state.chars.map((c) => ({
-      name: c.name || '',
-      note: c.note || '',
-      active: state.activeChars.includes(c.id),
-      images: (c.images || []).slice(0, 3),
-    })),
-  };
-  const stamp = new Date().toISOString().slice(0, 10);
-  downloadText(JSON.stringify(payload, null, 2), `角色卡-${stamp}.json`, 'application/json;charset=utf-8');
-  toast(`已导出 ${payload.chars.length} 张角色卡`);
-}
-
-/** 从 JSON 导入：本机已有的（名字＋参考图都一样）自动跳过，重复导入不会堆一堆 */
-async function importChars(file) {
-  if (file.size > 24 * 1024 * 1024) { toast('这个文件太大了（超过 24MB），拆成两份再导'); return null; }
-  let data;
-  try {
-    data = JSON.parse(await file.text());
-  } catch {
-    toast('这个文件不是合法的 JSON'); return null;
-  }
-  // 兼容两种：导出时生成的整包，或者干脆是一个角色数组
-  const list = Array.isArray(data) ? data : (Array.isArray(data?.chars) ? data.chars : null);
-  if (!list) { toast('JSON 里没找到角色卡，请用「导出角色卡」生成的那份文件'); return null; }
-
-  const seen = new Set(state.chars.map(charKey));
-  const room = Math.max(0, CHARS_MAX - state.chars.length);
-  const fresh = [];
-  let skipped = 0, noImg = 0;
-  for (const raw of list.slice(0, 200)) {
-    const images = (Array.isArray(raw?.images) ? raw.images : [])
-      .filter((h) => typeof h === 'string' && /^data:image\//i.test(h)).slice(0, 3);
-    if (!images.length) { noImg++; continue; }
-    const card = {
-      id: 'c' + Math.random().toString(36).slice(2, 10),
-      name: String(raw?.name || '').trim().slice(0, 40) || '角色',
-      note: String(raw?.note || '').trim().slice(0, 120),
-      images,
-    };
-    const key = charKey(card);
-    if (seen.has(key) || fresh.length >= room) { skipped++; continue; }
-    seen.add(key);
-    fresh.push({ card, active: raw?.active !== false });
-  }
-  if (!fresh.length) {
-    toast(room <= 0 ? `角色卡最多 ${CHARS_MAX} 张，先删几张再导入`
-      : noImg ? '导入的角色都没有参考图，没法用'
-        : '这些角色卡本机已经有了');
-    return null;
-  }
-  for (const { card } of fresh) state.chars.push(card);
-  for (const { card, active } of fresh) if (active) state.activeChars.push(card.id);
-  await saveChars();
-  renderChars();
-  queueSave();
-  const tail = [skipped ? `${skipped} 张重复` : '', noImg ? `${noImg} 张缺参考图` : ''].filter(Boolean).join('，');
-  toast(`导入 ${fresh.length} 张角色卡${tail ? `（跳过 ${tail}）` : ''}`);
-  return { added: fresh.length, skipped, noImg };
-}
-
-/* ---------------- 多页：IndexedDB 草稿（关掉浏览器也不丢） ---------------- */
-const DB_NAME = 'panelforge';
-const DB_STORE = 'drafts';
-let dbPromise = null;
-let dirty = false;
-let saveTimer = 0;
-
-function openDb() {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((res) => {
-    try {
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
-      };
-      req.onsuccess = () => res(req.result);
-      req.onerror = () => res(null);
-    } catch { res(null); }
-  });
-  return dbPromise;
-}
-
-/**
- * 草稿存储分两块：
- *   drafts/pages      小记录（模板、句子、气泡、图片的变换；**不含图片字节**）
- *   drafts/img:<页id> 图片 Blob，只在那一页换了图时才重写
- * 这样改一句台词只写几 KB，不用把几 MB 的图重写一遍（手机上那一下停顿很明显）。
- */
-let pageSeq = 0;
-const savedImageSigs = new Map(); // pageId → 图片指纹
-const blobIds = new WeakMap();
-let blobSeq = 0;
-const blobIdOf = (blob) => {
-  if (!blob) return 0;
-  let id = blobIds.get(blob);
-  if (!id) { id = ++blobSeq; blobIds.set(blob, id); }
-  return id;
-};
-const imageSig = (images) => Object.entries(images || {})
-  .map(([k, v]) => `${k}#${blobIdOf(v?.blob)}#${v?.iw || 0}x${v?.ih || 0}`).join('|');
-const stripBlobs = (images) => Object.fromEntries(Object.entries(images || {}).map(([k, v]) => {
-  if (!v) return [k, v];
-  const { blob, ...rest } = v;
-  return [k, rest];
-}));
-const blobMap = (images) => Object.fromEntries(Object.entries(images || {})
-  .filter(([, v]) => v && v.blob).map(([k, v]) => [k, v.blob]));
-
-/** 老草稿里的图是 data URL：转成 Blob（顺手按 IMG_MAX_SIDE 降采样），之后存盘就不用再搬那几 MB */
-async function upgradeImages(images) {
-  const out = {};
-  for (const [k, v] of Object.entries(images || {})) {
-    if (!v) continue;
-    if (v.blob) { out[k] = { ...v, href: urlForBlob(v.blob) }; continue; }
-    if (!/^data:image\//i.test(String(v.href || ''))) { out[k] = { ...v }; continue; }
-    try {
-      const a = await imageAsset(v.href, { name: v.name || 'image' });
-      out[k] = { ...a, zoom: v.zoom ?? 1, panX: v.panX ?? 0, panY: v.panY ?? 0, mode: v.mode || 'cover' };
-    } catch { out[k] = { ...v }; }
-  }
-  return out;
-}
-
-async function idbSet(key, value) {
-  const db = await openDb();
-  if (!db) return false;
-  return new Promise((res) => {
-    try {
-      const tx = db.transaction(DB_STORE, 'readwrite');
-      tx.objectStore(DB_STORE).put(value, key);
-      tx.oncomplete = () => res(true);
-      tx.onerror = () => res(false);
-    } catch { res(false); }
-  });
-}
-
-async function idbGet(key) {
-  const db = await openDb();
-  if (!db) return null;
-  return new Promise((res) => {
-    try {
-      const tx = db.transaction(DB_STORE, 'readonly');
-      const r = tx.objectStore(DB_STORE).get(key);
-      r.onsuccess = () => res(r.result || null);
-      r.onerror = () => res(null);
-    } catch { res(null); }
-  });
-}
-
-function queueSave() {
-  dirty = true;
-  clearTimeout(saveTimer);
-  // 给自动化测试一个可等待的「保存中」标记（固定 sleep 在慢机器上会抖）
-  window.__pfSaveBusy = true;
-  saveTimer = setTimeout(saveDraft, 1200);
-}
-
-/**
- * 立即落盘（跳过 queueSave 的 1200ms 防抖）。
- * 场景：刚拖完图就刷新/关页面 —— 防抖还没到点，草稿里就没有这张图。
- */
-async function flushSave() {
-  if (!state.tpl || !state.pages.length) return false;
-  clearTimeout(saveTimer);
-  try { await saveDraft(); return true; }
-  catch { return false; }
-}
-
-async function saveDraft() {
-  if (!state.tpl || !state.pages.length) return;
-  const t0 = perfNow();
-  savePage();
-  for (const pg of state.pages) if (!pg.id) pg.id = 'pg' + (++pageSeq);
-  const meta = {
-    pages: state.pages.map((pg) => ({ ...pg, images: stripBlobs(pg.images) })),
-    pageIdx: state.pageIdx, savedAt: Date.now(), v: 2,
-  };
-  const ok = await idbSet('pages', meta);
-  if (ok) dirty = false;
-  // 图片单独写，而且只有那一页真的换了图才写
-  let blobBytes = 0;
-  for (const pg of state.pages) {
-    const sig = imageSig(pg.images);
-    if (savedImageSigs.get(pg.id) === sig) continue;
-    const blobs = blobMap(pg.images);
-    await idbSet('img:' + pg.id, blobs);
-    savedImageSigs.set(pg.id, sig);
-    for (const b of Object.values(blobs)) blobBytes += b.size || 0;
-  }
-  if (PERF) {
-    perf.saves++;
-    perf.lastSaveBytes = JSON.stringify(meta).length + blobBytes;
-    perfDone('save', t0);
-  }
-  window.__pfSaveBusy = false;
-}
-
-async function loadDraft() {
-  const d = await idbGet('pages');
-  if (!d || !Array.isArray(d.pages) || !d.pages.length) return null;
-  for (const pg of d.pages) {
-    // 图片字节单独存着，先装回 Blob，再（老草稿）把 data URL 换成 Blob
-    const stored = pg.id ? await idbGet('img:' + pg.id) : null;
-    if (stored) {
-      for (const [slot, blob] of Object.entries(stored)) {
-        if (pg.images?.[slot] && blob instanceof Blob) pg.images[slot].blob = blob;
-      }
-    }
-    pg.images = await upgradeImages(pg.images);
-    if (!pg.id) pg.id = 'pg' + (++pageSeq);
-    savedImageSigs.set(pg.id, imageSig(pg.images));
-  }
-  return d;
-}
-
-function pageLabel(pg, i) {
+ function pageLabel(pg, i) {
   return (pg && pg.name) || '第 ' + (i + 1) + ' 页';
 }
 
@@ -5368,7 +2346,7 @@ async function exportAllPages() {
   savePage();
   const btn = $('#btnExportAll');
   const old = btn.textContent;
-  btn.disabled = true;
+  setBusy(btn, true);
   let n = 0;
   try {
     for (let i = 0; i < state.pages.length; i++) {
@@ -5391,7 +2369,7 @@ async function exportAllPages() {
   } catch (e) {
     toast('导出中断：' + e.message);
   } finally {
-    btn.disabled = false;
+    setBusy(btn, false);
     btn.textContent = old;
   }
 }
@@ -5470,7 +2448,7 @@ async function aiWriteLines(mode = 'one', { silent = false } = {}) {
 
   const btns = ['#btnAiLine', '#btnAiLineReroll', '#btnAiLinesPage'].map((x) => $(x)).filter(Boolean);
   const labels = btns.map((b) => b.textContent);
-  btns.forEach((b, i) => { b.disabled = true; if (i === 0) b.textContent = 'AI 正在写…'; });
+  btns.forEach((b, i) => { setBusy(b, true); if (i === 0) b.textContent = 'AI 正在写…'; });
   saveLlm();
   try {
     const avoid = mode === 'again'
@@ -5540,7 +2518,7 @@ async function aiWriteLines(mode = 'one', { silent = false } = {}) {
     showErrorDetail('写台词失败', e);
     return null;
   } finally {
-    btns.forEach((b, i) => { b.disabled = false; b.textContent = labels[i]; });
+    btns.forEach((b, i) => { setBusy(b, false); b.textContent = labels[i]; });
   }
 }
 
@@ -5550,15 +2528,18 @@ async function aiWriteLines(mode = 'one', { silent = false } = {}) {
  * @param {{askChars?: boolean}} opts askChars=false：批量队列里不再逐张弹「没有角色参考图」确认
  *   （批量开始前的危险确认里已经说明过，一次跑 20 张就弹 20 次是灾难）
  */
-async function generateSlotImage(targetId = state.selectedId, { askChars = true } = {}) {
-  if (!state.tpl || !targetId) { toast('先点一个格子'); return; }
+/**
+ * 给一格生图。quiet：批量生图用 —— 不弹提示、不问角色图，失败直接抛给调用方记日志。
+ */
+async function generateSlotImage(targetId = state.selectedId, { askChars = true, quiet = false } = {}) {
+  if (!state.tpl || !targetId) { if (!quiet) toast('先点一个格子'); return; }
   // 锁定格子：生成期间你点别的格子，结果也只回到这一格（以前是回到「点击时选中的那格」→ 会串格）
   const sid = targetId;
   const panel = currentPlanPanel(sid);
   const slot = state.tpl.slots.find((s) => s.id === sid);
   const cellLabel = slot ? `第 ${slot.order} 格` : '这一格';
   state.imgJobs = state.imgJobs || {};
-  if (state.imgJobs[sid]) { toast(`${cellLabel}正在生成，等它出来`); return; }
+  if (state.imgJobs[sid]) { if (!quiet) toast(`${cellLabel}正在生成，等它出来`); return; }
   state.imgJobs[sid] = true;
   refreshGenButtons();
   saveLlm();
@@ -5580,16 +2561,21 @@ async function generateSlotImage(targetId = state.selectedId, { askChars = true 
       slotId: sid,
     }), IMG_TIMEOUT_MS, `${cellLabel}生图`);
     if (!res?.ok) throw new Error((res?.code ? res.code + '：' : '') + (res?.error || '生图失败'));
-    let href = res.href;
-    if (!href && res.b64) href = 'data:image/png;base64,' + res.b64;
-    if (!href && res.url) href = await api.proxyImage ? await blobToDataURL(await api.proxyImage(res.url)) : res.url;
-    if (!href) throw new Error('生图接口没有返回可用的图片');
+    let src = res.href || (res.b64 ? 'data:image/png;base64,' + res.b64 : '');
+    // 只给了 URL：能走代理就拉成 Blob（导出时不会因为跨域把画布弄脏），否则只能直接用 URL
+    if (!src && res.url) src = api.proxyImage ? await api.proxyImage(res.url) : res.url;
+    if (!src) throw new Error('生图接口没有返回可用的图片');
+    // 候选图存 blob URL（以前存 data URL：DOM 里塞几 MB base64，每次存草稿还整段重写）
+    let cand = typeof src === 'string' ? src : '';
+    try { cand = await blobUrlOf(src); } catch { /* 跨域拿不到字节：保留原 URL */ }
     const list = candsOf(sid);
-    list.unshift(href);
+    list.unshift(cand);
     if (list.length > 8) list.pop();
     commit();
-    state.images[sid] = await imageAsset(href, { name: 'ai' });
+    state.images[sid] = await imageAsset(cand || src, { name: 'ai' });
     renderStage(); renderSlotPanel(); refreshScript(); renderCands();
+    queueSave();
+    if (quiet) return;
     const ignoredRefs = Number(res?.refsIgnored) || 0;
     const stillOnCell = state.selectedId === sid;
     if (ignoredRefs) {
@@ -5602,6 +2588,7 @@ async function generateSlotImage(targetId = state.selectedId, { askChars = true 
       toast(`${cellLabel}已生成（没有跳过去，还停在你现在看的这格）`);
     }
   } catch (e) {
+    if (quiet) throw e;
     // 短提示 + 完整面板：toast 装不下长错误，用户报过「报错信息不全」
     const code = e?.code ? `（${e.code}）` : '';
     toast(`生图失败${code} · 已弹出详情`);
@@ -5628,7 +2615,7 @@ async function runAiSplit() {
   if (!plot) { toast('先在左栏粘贴源文本'); return; }
   const btn = $('#btnAiSplit');
   const old = btn.textContent;
-  btn.disabled = true;
+  setBusy(btn, true);
   btn.textContent = '切分中…';
   $('#scriptHint').textContent = 'AI 正在把源文本切成每格…';
   try {
@@ -5660,7 +2647,7 @@ async function runAiSplit() {
     $('#scriptHint').textContent = '切分出错：' + e.message;
     toast('切分失败：' + e.message);
   } finally {
-    btn.disabled = false;
+    setBusy(btn, false);
     btn.textContent = old;
   }
 }
@@ -5676,7 +2663,7 @@ async function runAiPrompts({ silent = false } = {}) {
   saveLlm();
   const btn = $('#btnAiPrompts');
   const old = btn.textContent;
-  btn.disabled = true;
+  setBusy(btn, true);
   btn.textContent = '优化中…';
   try {
     const page = pagePlan();
@@ -5708,7 +2695,7 @@ async function runAiPrompts({ silent = false } = {}) {
     if (e.hint) $('#scriptHint').textContent = `${e.message} · ${e.hint}`;
     return null;
   } finally {
-    btn.disabled = false;
+    setBusy(btn, false);
     btn.textContent = old;
   }
 }
@@ -5890,8 +2877,7 @@ function toggleCheck(sel) {
 function toggleShortcuts(force) {
   const el = $('#shortcuts');
   if (!el) return;
-  const show = force === undefined ? el.classList.contains('hidden') : !!force;
-  el.classList.toggle('hidden', !show);
+  if (force ?? !el.open) openModal(el); else closeModal(el);
 }
 
 function jumpNextEmpty() {
@@ -6000,25 +2986,34 @@ function renderBubbles() {
     ids = [...new Set([...used, 'talk-ellipse', 'narration-box', 'burst-spike', 'thought-cloud', 'caption-tab'])].slice(0, 8);
   }
 
-  grid.innerHTML = ids.map((id) => {
+  const html = ids.map((id) => {
     const on = sel && sel.type === id;
     const best = matched && matched.type === id;
     return `
-    <div class="bub-item${on ? ' on' : ''}${best ? ' best' : ''}" data-id="${id}"
+    <button type="button" class="bub-item${on ? ' on' : ''}${best ? ' best' : ''}" data-id="${id}" draggable="true"
          title="${escapeHtml(BUBBLES[id]?.hintZh || '')}${best ? ' · ' + escapeHtml(matched.why) : ''}">
       ${bubbleThumb(id, 92)}
       <span>${escapeHtml(BUBBLES[id]?.zh || id)}${best ? ' · 配这段字' : ''}</span>
-    </div>`;
+    </button>`;
   }).join('');
-
-  stagger(grid, '.bub-item');
-  grid.querySelectorAll('.bub-item').forEach((el) => {
-    // 已经选中一个气泡时，点下面的样式 = 换样式（不新建）
-    el.addEventListener('click', () => {
+  // 内容没变就不碰 DOM：renderBubbles 在每次选格、每次改字时都会被叫到，
+  // 以前每次都重建 8 个缩略图 SVG、重新绑监听、整排重放浮现动画
+  if (grid._html !== html) {
+    grid._html = html;
+    grid.innerHTML = html;
+    const key = state.bubTab + ':' + ids.join(',');
+    if (grid.dataset.key !== key) { grid.dataset.key = key; staggerIn(grid, '.bub-item'); }
+  }
+  if (!grid.dataset.bound) {
+    grid.dataset.bound = '1';
+    grid.addEventListener('click', (ev) => {
+      const el = ev.target.closest('.bub-item');
+      if (!el) return;
+      // 已经选中一个气泡时，点下面的样式 = 换样式（不新建）
       if (selectedBubble()) { setBubbleType(el.dataset.id); return; }
       addBubble(el.dataset.id);
     });
-  });
+  }
 
   renderBubbleInspector();
 }
@@ -6031,7 +3026,6 @@ function setBubbleType(type) {
   if (b.type === type) { toast('已经是这个样式了'); return false; }
   commit();
   const page = state.tpl.page;
-  const scale = page.w / 1000;
   const cx = b.x + b.w / 2;
   const cy = b.y + b.h / 2;
   const ratio = def.w / def.h;
@@ -6048,7 +3042,7 @@ function setBubbleType(type) {
   b.y = Math.round(clamp(cy - b.h / 2, 0, page.h - b.h));
   b.baseW = b.w; b.baseH = b.h;
   state.bubUse[type] = (state.bubUse[type] || 0) + 1;
-  try { localStorage.setItem('pf.bub.use', JSON.stringify(state.bubUse)); } catch { /* ignore */ }
+  store.setJSON(KEYS.bubUse, state.bubUse);
   renderStage();
   renderBubbles();
   toast(`样式换成「${def.zh}」`);
@@ -6063,12 +3057,12 @@ function renderBubbleInspector() {
   const tn = $('#bubTypeName');
   if (tn) tn.textContent = BUBBLES[b.type]?.zh || b.type;
   $('#opVal').textContent = Math.round((b.opacity ?? 1) * 100) + '%';
-  $('#bubOpacity').value = Math.round((b.opacity ?? 1) * 100);
+  setRange($('#bubOpacity'), Math.round((b.opacity ?? 1) * 100));
   const sc = Math.round(((b.w / (b.baseW || b.w)) || 1) * 100);
   $('#sizeVal').textContent = sc + '%';
-  $('#bubSize').value = clamp(sc, 40, 220);
+  setRange($('#bubSize'), clamp(sc, 40, 220));
   $('#rotVal').textContent = (b.rot || 0) + '°';
-  $('#bubRot').value = b.rot || 0;
+  setRange($('#bubRot'), b.rot || 0);
   $('#bubText').value = b.text || '';
 }
 
@@ -6082,7 +3076,7 @@ function addBubble(type, opts = {}) {
   state.bubbles.push(b);
   state.selBubble = b.id;
   state.bubUse[type] = (state.bubUse[type] || 0) + 1;
-  try { localStorage.setItem('pf.bub.use', JSON.stringify(state.bubUse)); } catch { /* ignore */ }
+  store.setJSON(KEYS.bubUse, state.bubUse);
   renderStage();
   renderBubbles();
   toast(`已加入「${BUBBLES[type]?.zh || type}」`);
@@ -6110,16 +3104,13 @@ function duplicateBubble() {
   renderBubbles();
 }
 
-/* ---------- 本格句子 ---------- */
-const LINES_KEY = (id) => 'pf.lines.' + id;
-
 function loadLines(tplId) {
-  try { state.lines = JSON.parse(localStorage.getItem(LINES_KEY(tplId)) || '{}') || {}; } catch { state.lines = {}; }
+  state.lines = store.json(KEYS.lines(tplId), {});
 }
 
 function saveLines() {
   if (!state.tpl) return;
-  try { localStorage.setItem(LINES_KEY(state.tpl.id), JSON.stringify(state.lines)); } catch { /* ignore */ }
+  store.setJSON(KEYS.lines(state.tpl.id), state.lines);
 }
 
 function currentLine() {
@@ -6129,351 +3120,17 @@ function currentLine() {
 }
 
 /* ================================================================== *
- * 工具
- * ================================================================== */
-function toast(msg) {
-  const el = $('#toast');
-  el.textContent = msg;
-  el.classList.add('on');
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => el.classList.remove('on'), 2200);
-}
-
-function copyText(text, msg) {
-  if (!text) return;
-  navigator.clipboard?.writeText(text).then(() => toast(msg || '已复制')).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text; document.body.appendChild(ta); ta.select();
-    document.execCommand('copy'); ta.remove(); toast(msg || '已复制');
-  });
-}
-
-function downloadBlob(blob, name) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-}
-
-/** blob → base64（不带 dataURL 前缀），给原生插件用 */
-function blobToBase64(blob) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => {
-      const s = String(r.result || '');
-      const i = s.indexOf(',');
-      res(i >= 0 ? s.slice(i + 1) : s);
-    };
-    r.onerror = () => rej(new Error('读图片失败'));
-    r.readAsDataURL(blob);
-  });
-}
-
-/**
- * 有原生「存相册」插件就走它（Android WebView 不支持 <a download>，网页那套会静默失败）。
- * 返回 true = 已存进相册；false = 交给调用方退回下载。
- */
-async function saveToGallery(blob, name) {
-  const plugin = window.Capacitor?.Plugins?.SaveImage;
-  if (!plugin?.save) return false;
-  try {
-    const data = await blobToBase64(blob);
-    const r = await plugin.save({ data, name, mime: blob.type || 'image/png' });
-    toast(`已存到相册：${r?.path || 'Pictures/PanelForge'}`);
-    return true;
-  } catch (e) {
-    console.warn('[save] 相册保存失败', e);
-    toast('存相册失败：' + (e?.message || e));
-    return false;
-  }
-}
-
-/** 导出（能存相册就存相册，否则下载） */
-async function exportBlob(blob, name) {
-  if (await saveToGallery(blob, name)) return;
-  downloadBlob(blob, name);
-}
-
-function downloadText(text, name, mime = 'text/plain;charset=utf-8') {
-  downloadBlob(new Blob([text], { type: mime }), name);
-}
-
-/* ================================================================== *
  * 外观层：主题 / 平台快捷键 / 手机视图 / 滑块填充 / 静态版链接
  * ================================================================== */
 
 function initChrome() {
-  initTheme();
+  initAppearance();
   initSegIndicators();
   initRanges();
   initPlatformKeys();
   initMoreMenu();
   initViews();
   initStaticLinks();
-}
-
-/** 当前强调色（画布里的选中框 / 格号跟着变） */
-function currentTint() {
-  const v = getComputedStyle(document.documentElement).getPropertyValue('--tint').trim();
-  return /^#|^rgb|^hsl|^color/.test(v) ? v : '#007aff';
-}
-
-function initTheme() {
-  const btn = $('#btnTheme');
-  const pop = $('#appearancePop');
-  if (!btn || !pop) return;
-  const root = document.documentElement;
-  let mode = store.get(THEME_KEY) || 'auto';
-  let accent = store.get(ACCENT_KEY) || 'blue';
-
-  const syncMeta = () => {
-    const dark = mode === 'auto' ? sysDarkMQ.matches : mode === 'dark';
-    for (const meta of $$('meta[name="theme-color"]')) {
-      meta.content = mode === 'auto' ? (meta.media.includes('dark') ? '#000000' : '#f2f2f7') : (dark ? '#000000' : '#f2f2f7');
-    }
-  };
-  const setMode = (m) => {
-    mode = m;
-    if (m === 'auto') delete root.dataset.theme; else root.dataset.theme = m;
-    btn.innerHTML = THEME_ICONS[m];
-    $$('#modeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
-    store.set(THEME_KEY, m === 'auto' ? null : m);
-    syncMeta();
-    renderStage();
-  };
-  const setAccent = (a) => {
-    accent = a;
-    if (a === 'blue') delete root.dataset.accent; else root.dataset.accent = a;
-    const info = ACCENTS.find((x) => x.id === a) || ACCENTS[0];
-    $('#accentName').textContent = info.zh;
-    $$('#swatches .swatch').forEach((sw) => {
-      const on = sw.dataset.a === a;
-      sw.classList.toggle('on', on);
-      sw.setAttribute('aria-checked', on ? 'true' : 'false');
-    });
-    store.set(ACCENT_KEY, a === 'blue' ? null : a);
-    renderStage();
-  };
-
-  // 色板
-  const check = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.4 2.9 2.9 6-6.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  $('#swatches').innerHTML = ACCENTS.map((a) =>
-    `<button type="button" class="swatch" role="radio" data-a="${a.id}" title="${a.zh}" aria-label="${a.zh}" style="--sw-l:${a.l};--sw-d:${a.d}">${check}</button>`).join('');
-  $('#swatches').setAttribute('role', 'radiogroup');
-  $$('#swatches .swatch').forEach((sw) => sw.addEventListener('click', () => {
-    if (sw.dataset.a === accent) return;
-    withTransition('accent', () => setAccent(sw.dataset.a));
-  }));
-
-  // 主题：从点击位置圆形扩散
-  $$('#modeSeg button').forEach((b) => b.addEventListener('click', (ev) => {
-    const m = b.dataset.mode;
-    if (m === mode) return;
-    const wasDark = root.dataset.theme === 'dark' || (!root.dataset.theme && sysDarkMQ.matches);
-    const willDark = m === 'dark' || (m === 'auto' && sysDarkMQ.matches);
-    if (wasDark === willDark) { setMode(m); return; }  // 看起来没变（比如 自动→浅色），不做扩散
-    const t = withTransition('theme', () => setMode(m));
-    if (!t) return;
-    const x = ev.clientX || innerWidth - 40, y = ev.clientY || 30;
-    const r = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-    t.ready.then(() => {
-      root.animate(
-        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
-        { duration: 650, easing: 'cubic-bezier(.32,.72,0,1)', pseudoElement: '::view-transition-new(root)' },
-      );
-    }).catch(() => {});
-  }));
-
-  // 界面风格：经典 / iOS 26 液态玻璃（可选皮肤，只换令牌，不动组件代码）
-  const setUi = (name) => {
-    const skin = name === 'ios26' ? 'ios26' : 'classic';
-    if (skin === 'ios26') root.dataset.ui = 'ios26'; else delete root.dataset.ui;
-    $('#uiName').textContent = skin === 'ios26' ? '液态玻璃' : '经典';
-    $$('#uiSeg button').forEach((b) => b.classList.toggle('on', (b.dataset.ui === 'ios26') === (skin === 'ios26')));
-    store.set(UI_KEY, skin === 'ios26' ? 'ios26' : null);
-  };
-  $$('#uiSeg button').forEach((b) => b.addEventListener('click', () => {
-    if ((b.dataset.ui === 'ios26') === (root.dataset.ui === 'ios26')) return;
-    withTransition('ui', () => setUi(b.dataset.ui));
-  }));
-
-  // 皮肤：经典 / 灵动可爱 / 高级简约（只换色板+圆角+动效令牌，组件代码零改动）
-  // 与上面的「界面风格」正交：玻璃管材质，皮肤管色板。
-  const SKIN_KEY = 'pf.skin';
-  const SKIN_LABEL = { classic: '经典', cute: '灵动可爱', minimal: '高级简约' };
-  const setSkin = (name, animate = true) => {
-    const id = SKIN_LABEL[name] ? name : 'classic';
-    const apply = () => {
-      if (id === 'classic') delete root.dataset.skin; else root.dataset.skin = id;
-      const label = $('#skinName');
-      if (label) label.textContent = SKIN_LABEL[id];
-      $$('#skinSeg button').forEach((b) => b.classList.toggle('on', b.dataset.skin === id));
-      // 主题色板变了，画布底色/圆角也跟着走，重算一次布局尺寸
-      try { window.dispatchEvent(new Event('resize')); } catch { /* ignore */ }
-    };
-    if (animate && document.startViewTransition) withTransition('skin', apply);
-    else apply();
-    store.set(SKIN_KEY, id === 'classic' ? null : id);
-  };
-  $$('#skinSeg button').forEach((b) => b.addEventListener('click', () => {
-    if ((b.dataset.skin || 'classic') === (root.dataset.skin || 'classic')) return;
-    setSkin(b.dataset.skin);
-  }));
-  // 启动时恢复上次的皮肤
-  setSkin(store.get(SKIN_KEY) || 'classic', false);
-  window.__pfSkin = () => root.dataset.skin || 'classic';
-
-  // 版本号：唯一真源是仓库根 VERSION，构建时写进 <meta name="app-version">（scripts/set-version.mjs）
-  const VERSION = document.querySelector('meta[name="app-version"]')?.content || '0.0.0';
-  const verEl = $('#appVersion');
-  if (verEl) verEl.textContent = `PanelForge v${VERSION}`;
-  window.__pfVersion = () => VERSION;
-
-  // 语言：中文（源语言）/ English / Bahasa Indonesia
-  const LANG_LABEL = { zh: '中文', en: 'English', id: 'Bahasa Indonesia' };
-  const setLang = (lang) => {
-    const id = setI18nLang(lang);      // i18n 内部会立刻把整页重翻一遍
-    $('#langName').textContent = LANG_LABEL[id] || id;
-    const tb = $('#btnLang');
-    if (tb) {
-      tb.textContent = LANG_LABEL[id] || id;   // 按钮上就是当前语言本身（不是地球图标/国旗）
-      tb.setAttribute('aria-expanded', pop.classList.contains('open') ? 'true' : 'false');
-    }
-    $$('#langSeg button').forEach((b) => b.classList.toggle('on', b.dataset.lang === id));
-    store.set(LANG_KEY, id === 'zh' ? null : id);
-  };
-  const rebuildAll = () => {
-    renderList(); renderSlotPanel(); renderScript(); renderBubbles(); renderPageTabs(); renderCands(); renderChars();
-  };
-  $$('#langSeg button').forEach((b) => b.addEventListener('click', () => {
-    if (b.dataset.lang === getLang()) return;
-    // 用中文原文重建动态块（模板库/右栏/气泡/页签），i18n 的 observer 会把新节点翻掉
-    setI18nLang('zh');
-    rebuildAll();
-    setLang(b.dataset.lang);
-    rebuildAll();
-  }));
-  // 顶栏那个低调的语言按钮：点开外观面板（语言选项就在里面）
-  $('#btnLang')?.addEventListener('click', (ev) => {
-    ev.stopPropagation();
-    open(!pop.classList.contains('open'));
-    setLang(getLang());                 // 顺手同步一下 aria-expanded
-  });
-
-  // 减弱动态效果
-  const chk = $('#chkReduceMotion');
-  chk.checked = root.dataset.motion === 'reduced';
-  chk.addEventListener('change', () => {
-    if (chk.checked) root.dataset.motion = 'reduced'; else delete root.dataset.motion;
-    store.set(MOTION_KEY, chk.checked ? 'reduced' : null);
-  });
-
-  // 开关面板
-  const open = (on) => {
-    pop.classList.toggle('open', on);
-    btn.setAttribute('aria-expanded', on ? 'true' : 'false');
-  };
-  btn.addEventListener('click', (ev) => { ev.stopPropagation(); open(!pop.classList.contains('open')); });
-  document.addEventListener('click', (ev) => { if (!pop.contains(ev.target) && ev.target !== btn) open(false); });
-  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && pop.classList.contains('open')) open(false); }, true);
-
-  sysDarkMQ.addEventListener?.('change', () => { syncMeta(); renderStage(); });
-  setMode(mode);
-  setAccent(accent);
-  // 皮肤：URL 上的 ?ui= 优先（方便发给别人看），否则用记住的
-  setUi(new URLSearchParams(location.search).get('ui') || store.get(UI_KEY) || 'classic');
-  // 语言按钮的初始高亮（语言本身在 init 开头已经装好了）
-  setLang(getLang());
-  // 另一个标签页改了语言：跟着变（storage 事件只在"别的"标签页触发）
-  addEventListener('storage', (ev) => {
-    if (ev.key !== LANG_KEY && ev.key !== null) return;
-    const want = store.get(LANG_KEY) || 'zh';
-    if (want === getLang()) return;
-    rebuildAll();
-    setLang(want);
-    rebuildAll();
-  });
-}
-
-/* ================================================================== *
- * 动效辅助
- * ================================================================== */
-/** 分段控件 / 右栏标签：加一块会滑动的选中底 */
-function initSegIndicators() {
-  const groups = $$('.seg, #tabs');
-  const ro = window.ResizeObserver ? new ResizeObserver((es) => es.forEach((e) => placeInd(e.target))) : null;
-  for (const g of groups) {
-    if (g.querySelector(':scope > .seg-ind')) continue;
-    const ind = document.createElement('span');
-    ind.className = 'seg-ind';
-    ind.setAttribute('aria-hidden', 'true');
-    g.prepend(ind);
-    g.classList.add('has-ind');
-    placeInd(g);
-    requestAnimationFrame(() => requestAnimationFrame(() => g.classList.add('ready')));
-    // .on 由各自的点击逻辑切换，这里只负责跟着挪
-    new MutationObserver(() => placeInd(g)).observe(g, { subtree: true, attributes: true, attributeFilter: ['class', 'aria-selected'] });
-    g.addEventListener('pointerdown', (ev) => { if (ev.target.closest('button')) g.classList.add('pressing'); });
-    const up = () => g.classList.remove('pressing');
-    g.addEventListener('pointerup', up); g.addEventListener('pointerleave', up); g.addEventListener('pointercancel', up);
-    ro?.observe(g);
-  }
-}
-function placeInd(g) {
-  const ind = g.querySelector(':scope > .seg-ind');
-  const on = g.querySelector(':scope > button.on, :scope > button[aria-selected="true"]');
-  if (!ind) return;
-  if (!on || !on.offsetWidth) { ind.style.opacity = on ? '' : '0'; return; }
-  ind.style.opacity = '';
-  ind.style.setProperty('--x', on.offsetLeft + 'px');
-  ind.style.setProperty('--w', on.offsetWidth + 'px');
-}
-
-/** 滑块左侧填充：用 --p 画出 iOS 那种「已选部分是蓝色」的轨道 */
-function paintRange(el) {
-  const min = Number(el.min || 0), max = Number(el.max || 100);
-  const v = Number(el.value);
-  const p = max > min ? ((v - min) / (max - min)) * 100 : 0;
-  el.style.setProperty('--p', p.toFixed(2) + '%');
-}
-function initRanges() {
-  // 代码里直接改 .value 时也要重画，所以包一层 setter
-  const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-  if (desc && desc.set && !HTMLInputElement.prototype.__pfRange) {
-    Object.defineProperty(HTMLInputElement.prototype, 'value', {
-      ...desc,
-      set(v) { desc.set.call(this, v); if (this.type === 'range') paintRange(this); },
-    });
-    HTMLInputElement.prototype.__pfRange = true;
-  }
-  $$('input[type=range]').forEach(paintRange);
-  document.addEventListener('input', (ev) => { if (ev.target?.type === 'range') paintRange(ev.target); });
-}
-
-/** Mac 显示 ⌘ ⌥ ⇧，其它平台显示 Ctrl / Alt / Shift */
-function initPlatformKeys() {
-  if (IS_MAC) {
-    const map = { Ctrl: '⌘', Alt: '⌥', Shift: '⇧', Enter: '↩', Del: '⌫' };
-    $$('#shortcuts kbd').forEach((k) => { if (map[k.textContent]) k.textContent = map[k.textContent]; });
-    $$('.help li').forEach((li) => {
-      li.innerHTML = li.innerHTML.replace(/Ctrl\+/g, '⌘').replace(/Alt\+/g, '⌥ ');
-    });
-    const note = $('.sc-note');
-    if (note) note.textContent = note.textContent.replace('带 Ctrl 的组合键', '带 ⌘ 的组合键');
-  } else {
-    $$('.kbd-mod-enter').forEach((k) => { k.textContent = 'Ctrl ⏎'; });
-  }
-}
-
-function initMoreMenu() {
-  const btn = $('#btnMore');
-  const menu = $('#topActions');
-  if (!btn || !menu) return;
-  const set = (open) => { menu.classList.toggle('open', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); };
-  btn.addEventListener('click', (ev) => { ev.stopPropagation(); set(!menu.classList.contains('open')); });
-  document.addEventListener('click', (ev) => { if (!menu.contains(ev.target)) set(false); });
-  menu.addEventListener('click', () => set(false));
 }
 
 /** 手机 / 平板竖屏：底部标签栏切换「模板库 / 剧情 / 画布 / 编辑 / 分镜与导出」 */
@@ -6487,7 +3144,7 @@ function syncSlotFab(has) {
 
 /** 静态版没有服务端：/api/* 链接改指向仓库里的文档 */
 function initStaticLinks() {
-  if (!window.PF_STATIC) return;
+  if (!STATIC) return;
   const docs = $('#lnkDocs'), sheet = $('#lnkSheet'), tools = $('#lnkTools');
   if (docs) docs.href = REPO_URL + '/blob/main/docs/API.md';
   if (tools) { tools.href = REPO_URL + '/blob/main/docs/AI-INTEGRATION.md'; tools.textContent = 'AI 接入说明'; }
@@ -6518,129 +3175,18 @@ function syncSecSummary() {
   $('#secImageSum').textContent = [img ? '已填图' : '空', nc ? `${nc} 张候选` : '', edited ? '提示词已手改' : ''].filter(Boolean).join(' · ');
 }
 
-/* ================================================================== *
- * 真正启动（必须留在文件最后：这时上面所有 const 都已初始化完成）
- * ================================================================== */
-/* ---------------- 风格跟随：样图 ---------------- */
-const SAMPLES_MAX = 6;
-
-function renderSamples() {
-  const box = $('#sampleBox');
-  const grid = $('#sampleGrid');
-  if (!box || !grid) return;
-  box.classList.toggle('hidden', !followSamples());
-  $$('#styleSeg button').forEach((b) => b.classList.toggle('on', (b.dataset.follow || 'char') === styleMode()));
-  const hint = $('#styleHint');
-  if (hint) {
-    hint.textContent = {
-      char: '跟角色参考图',
-      sample: '跟样图的画风',
-      both: '人设图 + 样图都参考',
-      none: '不参考任何图',
-    }[styleMode()];
-  }
-  grid.innerHTML = (state.samples || []).map((sp, i) => `
-    <div class="sample-item" data-i="${i}">
-      <img src="${escapeHtml(sp.href)}" alt="样图 ${i + 1}">
-      <button class="sample-del" type="button" data-del="${i}" title="删掉这张">×</button>
-    </div>`).join('') + ((state.samples || []).length < SAMPLES_MAX
-    ? '<button class="sample-add" type="button" id="btnSampleAddInner" title="加样图（也可以直接拖进来 / Ctrl+V）">＋</button>'
-    : '');
-}
-
-async function addSamples(files) {
-  const list = (files || []).filter((f) => f && /^image\//i.test(f.type || ''));
-  if (!list.length) return 0;
-  const room = SAMPLES_MAX - (state.samples || []).length;
-  if (room <= 0) { toast(`样图最多 ${SAMPLES_MAX} 张`); return 0; }
-  const use = list.slice(0, room);
-  for (const f of use) {
-    try {
-      const asset = await imageAsset(f, { name: 'sample' });
-      state.samples.push(asset);
-    } catch { /* 跳过坏图 */ }
-  }
-  renderSamples();
-  persistSamples();
-  toast(`已加入 ${use.length} 张样图（共 ${state.samples.length} 张）`);
-  return use.length;
-}
-
-function removeSample(i) {
-  state.samples.splice(i, 1);
-  renderSamples();
-  persistSamples();
-}
-
-let sampleSaveTimer = 0;
-function persistSamples() {
-  clearTimeout(sampleSaveTimer);
-  sampleSaveTimer = setTimeout(async () => {
-    try {
-      const urls = [];
-      for (const sp of state.samples || []) {
-        // href 是 blob URL，先取回 Blob 再转 dataURL（blobToDataURL 只接受 Blob）
-        const blob = await (await fetch(sp.href)).blob();
-        urls.push(await blobToDataURL(blob));
-      }
-      await idbSet('samples', { urls, savedAt: Date.now() });
-    } catch { /* ignore */ }
-  }, 400);
-}
-
-async function restoreSamples() {
-  try {
-    const rec = await idbGet('samples');
-    const urls = rec?.urls || [];
-    const out = [];
-    for (const u of urls) {
-      try { out.push(await imageAsset(u, { name: 'sample' })); } catch { /* 跳过 */ }
-    }
-    if (out.length) { state.samples = out; renderSamples(); }
-  } catch { /* ignore */ }
-}
-
-function setStyleFollow(mode) {
-  const m = ['char', 'sample', 'both', 'none'].includes(mode) ? mode : 'char';
-  state.styleFollow = m;
-  try { localStorage.setItem('pf.stylefollow', m); } catch { /* ignore */ }
-  renderSamples();
-  queueSave?.();
-  toast({
-    char: '生图会跟人设图',
-    sample: '生图会跟样图的画风',
-    both: '人设图 + 样图都会参考',
-    none: '生图不参考任何图（每格可能长得不一样）',
-  }[m]);
-}
-
-window.__pfStyle = () => ({
-  mode: styleMode(),
-  samples: (state.samples || []).length,
-  followChars: followChars(),
-  followSamples: followSamples(),
+/* 模块共享的核心能力（见 ctx.mjs：功能模块从这里取，不直接 import app.js，免得成环） */
+Object.assign(app, {
+  queueSave, renderStage, renderSlotPanel, renderBubbles, renderScript, renderCands, refreshScript, refreshSlotImage,
+  savePage, switchPage, addPage, selectTemplate, fetchTemplate, pagePlan, candsOf, applyCand, applyCandAndEdit,
+  slotAt, pagePoint, putImage, generateSlotImage, aiWriteLines, runAiPrompts, exportPNG, syncZoomSlider, toggleShortcuts,
+  addBubble, selectedBubble, duplicateBubble, deleteBubble,
+  activateTab, currentPlanPanel, activeCharPayload, toast,
+  /** 换语言：动态生成的块用当前语言重建 */
+  rebuildLocalized() {
+    renderList({ rebuild: true }); renderSlotPanel(); renderScript(); renderBubbles(); renderPageTabs(); renderCands(); renderChars();
+  },
 });
-
-function bindStyleFollow() {
-  try {
-    const saved = localStorage.getItem('pf.stylefollow');
-    if (saved) state.styleFollow = saved;
-  } catch { /* ignore */ }
-  renderSamples();
-  restoreSamples();
-  $$('#styleSeg button').forEach((b) => b.addEventListener('click', () => setStyleFollow(b.dataset.follow)));
-  $('#btnSamplePick')?.addEventListener('click', () => $('#sampleFiles').click());
-  $('#sampleFiles')?.addEventListener('change', async (ev) => {
-    await addSamples([...(ev.target.files || [])]);
-    ev.target.value = '';
-  });
-  $('#sampleGrid')?.addEventListener('click', (ev) => {
-    const del = ev.target.closest('[data-del]');
-    if (del) { removeSample(Number(del.dataset.del)); return; }
-    if (ev.target.closest('#btnSampleAddInner')) $('#sampleFiles').click();
-  });
-
-}
 
 init().catch((e) => {
   console.error(e);

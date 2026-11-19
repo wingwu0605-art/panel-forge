@@ -23,16 +23,23 @@ window.addEventListener("unhandledrejection", function (e) {
 });
 </script>
 <script>
-  /* 主题：auto（跟随系统）/ light / dark —— 在样式加载前设置，避免闪白 */
+  /* 外观在样式表加载前就写到 <html> 上，避免闪：
+     data-scheme 实际明暗 · data-theme 手动选的明暗 · data-style 风格（经典不写）· data-accent 强调色（跟随风格不写）
+     ?style=（或旧的 ?ui=ios26）只是预览，不改你记住的风格。旧版的 pf.skin / pf.ui.v1 在这里也认（theme.mjs 会迁移） */
   (function () {
-    try {
-      var d = document.documentElement;
-      var t = localStorage.getItem('pf.theme');
-      if (t === 'light' || t === 'dark') d.dataset.theme = t;
-      var a = localStorage.getItem('pf.accent');
-      if (a && a !== 'blue') d.dataset.accent = a;
-      if (localStorage.getItem('pf.motion') === 'reduced') d.dataset.motion = 'reduced';
-    } catch (e) {}
+    var d = document.documentElement;
+    var g = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    var q = new URLSearchParams(location.search);
+    var t = g('pf.theme');
+    if (t === 'light' || t === 'dark') d.dataset.theme = t;
+    var dark = t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+    d.dataset.scheme = dark ? 'dark' : 'light';
+    var st = q.get('style') || (q.get('ui') === 'ios26' ? 'glass' : '') || g('pf.style');
+    if (!st) { var sk = g('pf.skin'); st = (sk === 'cute' || sk === 'minimal') ? sk : (g('pf.ui.v1') === 'ios26' ? 'glass' : ''); }
+    if (/^(glass|minimal|cute)$/.test(st)) d.dataset.style = st;
+    var a = g('pf.accent');
+    if (a && a !== 'default' && a !== 'blue') d.dataset.accent = a;
+    if (g('pf.motion') === 'reduced') d.dataset.motion = 'reduced';
   })();
 </script>
 <title>PanelForge 分镜坊 · 中·日·韩 漫画分镜模板库</title>
@@ -50,24 +57,20 @@ window.addEventListener("unhandledrejection", function (e) {
     <button type="button" data-mode="light"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M10 1.8v2.1M10 16.1v2.1M1.8 10h2.1M16.1 10h2.1M4.2 4.2l1.5 1.5M14.3 14.3l1.5 1.5M4.2 15.8l1.5-1.5M14.3 5.7l1.5-1.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>浅色</button>
     <button type="button" data-mode="dark"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.4 12.6A7 7 0 0 1 7.4 3.6a7 7 0 1 0 9 9Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>深色</button>
   </div>
-  <div class="pop-label"><span>强调色</span><b id="accentName">蓝色</b></div>
+  <div class="pop-label"><span>风格</span><b id="styleName">经典</b></div>
+  <div class="style-grid" id="uiStyleSeg" role="radiogroup" aria-label="界面风格">
+    <button type="button" data-style="classic" role="radio"><i class="style-chip" aria-hidden="true"></i>经典</button>
+    <button type="button" data-style="glass" role="radio"><i class="style-chip" aria-hidden="true"></i>液态玻璃</button>
+    <button type="button" data-style="minimal" role="radio"><i class="style-chip" aria-hidden="true"></i>高级简约</button>
+    <button type="button" data-style="cute" role="radio"><i class="style-chip" aria-hidden="true"></i>灵动可爱</button>
+  </div>
+  <div class="pop-label"><span>强调色</span><b id="accentName">跟随风格</b></div>
   <div class="swatches" id="swatches"></div>
   <div class="pop-label"><span>语言</span><b id="langName">中文</b></div>
-  <div class="seg ui-seg" id="langSeg">
+  <div class="seg lang-seg" id="langSeg">
     <button type="button" data-lang="zh">中文</button>
     <button type="button" data-lang="en">English</button>
     <button type="button" data-lang="id">Bahasa Indonesia</button>
-  </div>
-  <div class="pop-label"><span>界面风格</span><b id="uiName">经典</b></div>
-  <div class="seg ui-seg" id="uiSeg">
-    <button type="button" data-ui="classic">经典</button>
-    <button type="button" data-ui="ios26">液态玻璃</button>
-  </div>
-  <div class="pop-label"><span>皮肤</span><b id="skinName">经典</b></div>
-  <div class="seg ui-seg" id="skinSeg">
-    <button type="button" data-skin="classic">经典</button>
-    <button type="button" data-skin="cute">灵动可爱</button>
-    <button type="button" data-skin="minimal">高级简约</button>
   </div>
   <div class="pop-row">
     <label class="switch"><input type="checkbox" id="chkReduceMotion"> 减弱动态效果</label>
@@ -496,74 +499,75 @@ window.addEventListener("unhandledrejection", function (e) {
               <button class="btn tiny" id="btnResetPan">复位位置</button>
             </div>
 
-                <!-- AI 生成：与「这一格说什么 / 分镜 / 图片」同级的第四段，可单独收起 -->
-    <section class="slot-sec" data-sec="ai">
-      <button type="button" class="sec-head" aria-expanded="true">
-        <span>AI 生成</span><span class="sec-sum" id="secAiSum"></span><span class="caret"><svg viewBox="0 0 12 12" width="10" height="10"><path d="M2 4.2 6 8l4-3.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      </button>
-      <div class="sec-body">
-              <div class="prompt-box prompt-edit">
-                <div class="prompt-head">
-                  <span>生图提示词 · <b id="promptState">规则切分</b></span>
-                  <span class="ph-acts">
-                    <button class="btn tiny hidden" id="btnPromptReset" title="清掉自己的写法，回到自动">恢复自动</button>
-                    <button class="btn tiny" id="btnCopyPrompt">复制</button>
-                  </span>
-                </div>
-                <!-- 三源共存：规则切分 / AI 生成 / 自己写，一键切换；开头词始终保留 -->
-                <div class="seg tiny-seg prompt-src" id="promptSrc" role="tablist" aria-label="提示词来源">
-                  <button type="button" data-src="rule" class="on">规则切分</button>
-                  <button type="button" data-src="ai">AI 生成</button>
-                  <button type="button" data-src="mine">自己写</button>
-                </div>
-                <label class="switch block prompt-prefix" title="形状开头词（构图前缀）—— 自己写的时候也会自动保留在最前面">
-                  <input type="checkbox" id="chkPrefix" checked> 带开头词 <span class="muted small" id="prefixPeek">—</span>
-                </label>
-                <textarea id="slotPrompt" rows="6" spellcheck="false" placeholder="写一段剧情并匹配后，这里会出现贴合这一格的提示词；也可以切到「自己写」"></textarea>
-                <div class="neg-row">
-                  <span>避免出现</span>
-                  <input id="slotNegative" type="text" spellcheck="false" placeholder="text, watermark, extra fingers …">
-                </div>
-                <details class="sent-preview">
-                  <summary>实际发给生图模型的完整内容</summary>
-                  <pre id="slotPromptSent">—</pre>
-                </details>
-              </div>
-              <div class="ai-gen">
-                <div class="seg slot-ai-mode" id="slotAiMode" role="tablist" aria-label="AI 动作">
-                  <button type="button" data-m="img" class="on">生图</button>
-                  <button type="button" data-m="prompt">只写提示词</button>
-                </div>
-                <button class="btn wide ai-soft" id="btnAiImage" title="按上面的选择：直接生图，或只让 AI 重写这一格提示词">生这一格</button>
-              </div>
-              <div class="cand-strip hidden" id="candStrip">
-                <div class="cand-head">
-                  <span>这一格的候选图</span>
-                  <span class="cand-acts">
-                    <button class="btn tiny" id="btnCandNext" title="换一张（随机）">换一张</button>
-                    <button class="btn tiny" id="btnCandClear">清空候选</button>
-                  </span>
-                </div>
-                <div class="cand-grid" id="candGrid"></div>
-              </div>
-
-              <div class="prompt-box shape-box">
-                <div class="prompt-head">
-                  <span>形状开头词 · <b id="shapeName">—</b></span>
-                  <button class="btn tiny" id="btnCopyShape" title="英文版，粘到国际模型提示词最前面">复制英文</button>
-                </div>
-                <pre id="shapePrefix">—</pre>
-                <div class="prompt-head sub">
-                  <span>中文版 · <b class="muted">喂国内模型更稳</b></span>
-                  <button class="btn tiny" id="btnCopyShapeZh">复制中文</button>
-                </div>
-                <pre id="shapePrefixZh">—</pre>
-                <div class="shape-tip" id="shapeTip">已经自动放在上面生图提示词的最前面；自己用别的工具出图时也可以单独复制。</div>
-              </div>
-      </div>
-    </section>
 
             <div class="kv" id="slotKv"></div>
+          </div>
+        </section>
+
+        <!-- AI 生成：与「这一格说什么 / 分镜 / 图片」同级的第四段，可单独收起 -->
+        <section class="slot-sec" data-sec="ai">
+          <button type="button" class="sec-head" aria-expanded="true">
+            <span>AI 生成</span><span class="sec-sum" id="secAiSum"></span><span class="caret"><svg viewBox="0 0 12 12" width="10" height="10"><path d="M2 4.2 6 8l4-3.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="sec-body">
+                  <div class="prompt-box prompt-edit">
+                    <div class="prompt-head">
+                      <span>生图提示词 · <b id="promptState">规则切分</b></span>
+                      <span class="ph-acts">
+                        <button class="btn tiny hidden" id="btnPromptReset" title="清掉自己的写法，回到自动">恢复自动</button>
+                        <button class="btn tiny" id="btnCopyPrompt">复制</button>
+                      </span>
+                    </div>
+                    <!-- 三源共存：规则切分 / AI 生成 / 自己写，一键切换；开头词始终保留 -->
+                    <div class="seg tiny-seg prompt-src" id="promptSrc" role="tablist" aria-label="提示词来源">
+                      <button type="button" data-src="rule" class="on">规则切分</button>
+                      <button type="button" data-src="ai">AI 生成</button>
+                      <button type="button" data-src="mine">自己写</button>
+                    </div>
+                    <label class="switch block prompt-prefix" title="形状开头词（构图前缀）—— 自己写的时候也会自动保留在最前面">
+                      <input type="checkbox" id="chkPrefix" checked> 带开头词 <span class="muted small" id="prefixPeek">—</span>
+                    </label>
+                    <textarea id="slotPrompt" rows="6" spellcheck="false" placeholder="写一段剧情并匹配后，这里会出现贴合这一格的提示词；也可以切到「自己写」"></textarea>
+                    <div class="neg-row">
+                      <span>避免出现</span>
+                      <input id="slotNegative" type="text" spellcheck="false" placeholder="text, watermark, extra fingers …">
+                    </div>
+                    <details class="sent-preview">
+                      <summary>实际发给生图模型的完整内容</summary>
+                      <pre id="slotPromptSent">—</pre>
+                    </details>
+                  </div>
+                  <div class="ai-gen">
+                    <div class="seg slot-ai-mode" id="slotAiMode" role="tablist" aria-label="AI 动作">
+                      <button type="button" data-m="img" class="on">生图</button>
+                      <button type="button" data-m="prompt">只写提示词</button>
+                    </div>
+                    <button class="btn wide ai-soft" id="btnAiImage" title="按上面的选择：直接生图，或只让 AI 重写这一格提示词">生这一格</button>
+                  </div>
+                  <div class="cand-strip hidden" id="candStrip">
+                    <div class="cand-head">
+                      <span>这一格的候选图</span>
+                      <span class="cand-acts">
+                        <button class="btn tiny" id="btnCandNext" title="换一张（随机）">换一张</button>
+                        <button class="btn tiny" id="btnCandClear">清空候选</button>
+                      </span>
+                    </div>
+                    <div class="cand-grid" id="candGrid"></div>
+                  </div>
+
+                  <div class="prompt-box shape-box">
+                    <div class="prompt-head">
+                      <span>形状开头词 · <b id="shapeName">—</b></span>
+                      <button class="btn tiny" id="btnCopyShape" title="英文版，粘到国际模型提示词最前面">复制英文</button>
+                    </div>
+                    <pre id="shapePrefix">—</pre>
+                    <div class="prompt-head sub">
+                      <span>中文版 · <b class="muted">喂国内模型更稳</b></span>
+                      <button class="btn tiny" id="btnCopyShapeZh">复制中文</button>
+                    </div>
+                    <pre id="shapePrefixZh">—</pre>
+                    <div class="shape-tip" id="shapeTip">已经自动放在上面生图提示词的最前面；自己用别的工具出图时也可以单独复制。</div>
+                  </div>
           </div>
         </section>
       </div>
@@ -703,32 +707,32 @@ window.addEventListener("unhandledrejection", function (e) {
 <input type="file" id="filePick" accept="image/*" multiple hidden>
 
 <!-- ============================== 面板管理：左栏每块可显示/隐藏/调顺序 ============================== -->
-<div class="keysheet hidden" id="panelSheet">
-  <div class="ks-panel">
-    <div class="ks-head">
-      <b>面板管理</b>
-      <span class="muted small">左栏每一块都能隐藏或调顺序 · 记住</span>
-      <button class="btn tiny" id="btnPanelClose">关闭</button>
-    </div>
-    <div class="ks-body">
+<dialog class="sheet" id="panelSheet" aria-labelledby="panelSheetTitle">
+  <div class="sheet-panel">
+    <header class="sheet-head">
+      <b class="sheet-title" id="panelSheetTitle">面板管理</b>
+      <span class="sheet-sub">左栏每一块都能隐藏或调顺序 · 记住</span>
+      <button class="btn tiny" id="btnPanelClose" type="button" data-close>关闭</button>
+    </header>
+    <div class="sheet-body">
       <label class="switch block"><input type="checkbox" id="chkAi"> 启用 AI 功能（AI 导演 / 生图 / 优化提示词 / API Key）</label>
       <div class="panel-list" id="panelList"></div>
       <div class="row2">
         <button class="btn tiny" id="btnPanelReset">恢复默认</button>
       </div>
-      <p class="muted small" style="margin:6px 0 0">关掉 AI 后，左栏的 AI 面板、每格的生图按钮和候选图会一起收起来；想用随时打开。</p>
+      <p class="muted small sheet-note">关掉 AI 后，左栏的 AI 面板、每格的生图按钮和候选图会一起收起来；想用随时打开。</p>
     </div>
   </div>
-</div>
+</dialog>
 
-<div class="keysheet hidden" id="keySheet">
-  <div class="ks-panel">
-    <div class="ks-head">
-      <b>API Key 管理</b>
-      <span class="muted small">打勾的那个就是当前用的服务商 · 可以存多家随时切</span>
-      <button class="btn tiny" id="btnKeySheetClose">关闭</button>
-    </div>
-    <div class="ks-body">
+<dialog class="sheet" id="keySheet" aria-labelledby="keySheetTitle">
+  <div class="sheet-panel">
+    <header class="sheet-head">
+      <b class="sheet-title" id="keySheetTitle">API Key 管理</b>
+      <span class="sheet-sub">打勾的那个就是当前用的服务商 · 可以存多家随时切</span>
+      <button class="btn tiny" id="btnKeySheetClose" type="button" data-close>关闭</button>
+    </header>
+    <div class="sheet-body">
       <div class="ks-list" id="ksList"></div>
 
       <div class="ks-form">
@@ -803,14 +807,14 @@ window.addEventListener("unhandledrejection", function (e) {
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
-<div class="shortcuts hidden" id="shortcuts">
-  <div class="sc-panel">
-    <div class="sc-head">
-      <b>快捷键</b>
-      <button class="btn tiny" id="btnCloseShortcuts">完成</button>
-    </div>
+<dialog class="sheet shortcuts" id="shortcuts" aria-labelledby="shortcutsTitle">
+  <div class="sheet-panel sc-panel" style="--sheet-w:760px">
+    <header class="sheet-head">
+      <b class="sheet-title" id="shortcutsTitle">快捷键</b>
+      <button class="btn tiny" id="btnCloseShortcuts" type="button" data-close>完成</button>
+    </header>
     <div class="sc-cols">
       <section>
         <h4>编辑</h4>
@@ -856,7 +860,7 @@ window.addEventListener("unhandledrejection", function (e) {
     </div>
     <p class="sc-note">在输入框/文本域里打字时，单键快捷键不生效（避免误触）；带 Ctrl 的组合键仍可用。</p>
   </div>
-</div>
+</dialog>
 
 <div class="toast" id="toast"></div>
 
@@ -889,7 +893,6 @@ window.addEventListener("unhandledrejection", function (e) {
   <p class="paint-hint" id="paintHint">笔迹出不了这一格；iPad 支持压感，笔在画时手指不会误触。</p>
 </div>
 
-<script type="module" src="./app.js?v=0qqy5"></script>
   <!-- 批量生图：右下角悬浮（会花很多钱，所以每次都要二次确认） -->
   <div class="fab-stack" id="fabStack">
     <button class="fab" id="fabGenPage" type="button" title="一键生成该页所有还没图的分镜 · 用每格现有提示词（含你手改过的），不会先做 AI 优化">
@@ -901,23 +904,24 @@ window.addEventListener("unhandledrejection", function (e) {
   </div>
 
   <!-- 危险操作确认：必须勾选「我已知晓」才能继续 -->
-  <div class="keysheet hidden" id="dangerSheet">
-    <div class="ks-panel" style="max-width:520px">
-      <div class="ks-head">
-        <b id="dangerTitle">确认</b>
-        <span class="muted small">这一步会花掉很多 token，而且中途停不下来</span>
-        <button class="btn tiny" type="button" data-cancel>关闭</button>
-      </div>
-      <div class="ks-body">
+  <dialog class="sheet danger-sheet" id="dangerSheet" aria-labelledby="dangerTitle">
+    <div class="sheet-panel" style="--sheet-w:520px">
+      <header class="sheet-head">
+        <b class="sheet-title" id="dangerTitle">确认</b>
+        <span class="sheet-sub">这一步会花掉很多 token，而且中途停不下来</span>
+        <button class="btn tiny" type="button" data-close>关闭</button>
+      </header>
+      <div class="sheet-body">
         <div class="danger-body" id="dangerBody"></div>
         <label class="danger-ack"><input type="checkbox" id="dangerAck"> 我已知晓上面的说明</label>
         <div class="row2">
           <button class="btn danger" id="dangerGo" type="button" disabled>继续</button>
-          <button class="btn tiny" type="button" data-cancel2>取消</button>
+          <button class="btn tiny" type="button" data-close>取消</button>
         </div>
       </div>
     </div>
-  </div>
+  </dialog>
 
+<script type="module" src="./app.js?v=0qqy5"></script>
 </body>
 </html>

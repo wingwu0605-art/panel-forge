@@ -1,12 +1,10 @@
 /**
- * 通用工具：DOM 查询、转义、防抖、超时、Blob 转换、动效开关、性能打点。
- *
- * 从 app.js 里抽出来的第一批：这些函数不碰业务状态（state），
- * 谁都能用、也不需要知道分镜怎么渲染，放独立模块最安全。
+ * 通用工具：DOM 查询、转义、防抖、超时、Blob 转换、性能打点。
+ * 这些函数不碰业务状态（state），谁都能用。动效相关的在 motion.mjs。
  */
 /* ---------- dom ---------- */
-export const $ = (s) => document.querySelector(s);
-export const $$ = (s) => [...document.querySelectorAll(s)];
+export const $ = (s, root = document) => root.querySelector(s);
+export const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 
 /* ---------- perf ---------- */
 export const PERF = new URLSearchParams(location.search).get('perf') === '1';
@@ -62,37 +60,4 @@ export const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&
 export function debounce(fn, ms) {
   let t;
   return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
-}
-
-/* ---------- sysReduce ---------- */
-export const sysReduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-/* ---------- motionOK ---------- */
-export function motionOK() {
-  return !sysReduceMQ.matches && document.documentElement.dataset.motion !== 'reduced';
-}
-
-/* ---------- stagger/replay ---------- */
-/** 列表依次浮现：给每个子元素一个序号 */
-export function stagger(container, sel, cap = 14) {
-  if (!container) return;
-  container.querySelectorAll(sel).forEach((el, i) => el.style.setProperty('--i', Math.min(i, cap)));
-}
-
-/** 重新触发一个 CSS 动画类 */
-export function replay(el, cls) {
-  if (!el || !motionOK()) return;
-  el.classList.remove(cls);
-  void el.offsetWidth;
-  el.classList.add(cls);
-}
-
-export /** 用 View Transitions 包一层；不支持或用户要求减弱动效时直接执行 */
-function withTransition(kind, fn) {
-  if (!document.startViewTransition || !motionOK()) { fn(); return null; }
-  const root = document.documentElement;
-  root.dataset.vt = kind;
-  const t = document.startViewTransition(fn);
-  t.finished.finally(() => { if (root.dataset.vt === kind) delete root.dataset.vt; });
-  return t;
 }

@@ -334,7 +334,6 @@ for (const f of SRC_FILES) {
     if (FOR_OF_DOLLAR.test(line)) dollarBugs.push(f + ":" + (i + 1) + " for-of 用单 $");
   });
 }
-const D1 = String.fromCharCode(36);
 ok("没有把两个 $ 误写成一个 $（否则整站启动失败）", dollarBugs.length === 0, dollarBugs.slice(0, 3).join(" | "));
 
 /* 请求超时与逃生门：挂住的请求会让按钮永远停在「生成中」，看起来就是卡死 */

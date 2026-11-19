@@ -13,7 +13,11 @@
  *   关闭时按记住的父节点/兄弟节点原位放回。
  */
 
-const RAIL_PREFIX = 'pf.rail.';
+import { $, $$ } from './util.mjs';
+import { FRESH } from './env.mjs';
+import { fx, play, settled, withTransition } from './motion.mjs';
+import { store, KEYS } from './storage.mjs';
+
 // 紧凑布局（手机 / 窄窗）走的是单列 + 底部 tabbar，侧栏收起会与「按视图隐藏区块」打架：
 // 结果是左栏只剩一列图标、画布和右栏全被隐藏（真出现过这个 bug）。所以窄屏一律不收起。
 const COMPACT_MQ = (() => { try { return window.matchMedia('(max-width:1024px)'); } catch { return { matches: false, addEventListener() {} }; } })();
@@ -42,21 +46,10 @@ function iconSvg(key) {
     stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key] || ICONS.more}</svg>`;
 }
 
-const $ = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-const FRESH = (() => {
-  try { return new URLSearchParams(location.search).get('fresh') === '1'; } catch { return false; }
-})();
-
-const store = {
-  get(k) {
-    if (FRESH) return null;                 // 自动化测试要干净的初始状态
-    try { return localStorage.getItem(RAIL_PREFIX + k); } catch { return null; }
-  },
-  set(k, v) {
-    if (FRESH) return;
-    try { localStorage.setItem(RAIL_PREFIX + k, v); } catch { /* ignore */ }
-  },
+// 侧栏收起状态（?fresh=1 时不读也不写：自动化测试要干净的初始状态）
+const railStore = {
+  get: (side) => (FRESH ? null : store.get(KEYS.rail(side))),
+  set: (side, v) => { if (!FRESH) store.set(KEYS.rail(side), v); },
 };
 
 /** 一条侧栏的实例 */
@@ -65,7 +58,7 @@ function makeRail(railEl, side, itemsFn) {
   const st = {
     el: railEl,
     side,
-    mini: store.get(side) === 'mini',
+    mini: railStore.get(side) === 'mini',
     openKey: null,
     moved: null,      // { node, parent, next }
     itemsFn,
@@ -118,15 +111,19 @@ function makeRail(railEl, side, itemsFn) {
     st.moved = null;
   };
 
-  const closePop = () => {
-    restore();
-    pop.classList.add('hidden');
+  /** 关掉气泡。animate：用户主动关（点外面 / Esc / ×）时淡出一下；切换功能时立刻关 */
+  const closePop = ({ animate = false } = {}) => {
     $$('.rail-ico', strip).forEach((b) => b.classList.remove('on'));
     st.openKey = null;
+    const done = () => { restore(); pop.classList.add('hidden'); };
+    const out = animate && !pop.classList.contains('hidden') ? fx.fadeOut(pop, 'railPopOut') : null;
+    if (!out) { pop.getAnimations().forEach((a) => a.cancel()); done(); return; }
+    // 淡出期间又打开了别的功能：openPop 会先 closePop()（立刻关），这里的收尾就不再执行
+    settled(out).then((finished) => { if (finished && st.openKey === null) { out.cancel(); done(); } });
   };
 
   const openPop = (key) => {
-    if (st.openKey === key) { closePop(); return; }
+    if (st.openKey === key) { closePop({ animate: true }); return; }
     // 同时只留一个功能气泡：先把其它侧栏的关掉（键盘/脚本触发 click 时也要成立）
     for (const other of RAILS) if (other !== st) other.closePop();
 
@@ -138,15 +135,12 @@ function makeRail(railEl, side, itemsFn) {
     $('.rail-pop-body', pop).appendChild(item.node);
     $('.rail-pop-head b', pop).textContent = item.label;
 
-    // 切换功能：内容换掉后重新播一次"弹入"，并给内容一个从上滑入的小非线性动画
+    // 打开 = 带一点过冲的弹入；切换功能 = 轻一些的淡入，内容再从下面滑上来一点
+    // （Web Animations：以前是摘类 → 读 offsetWidth 强制同步布局 → 再加类，来重放 CSS 动画）
     pop.classList.remove('hidden');
-    pop.classList.remove('swap-in', 'pop-in');
-    void pop.offsetWidth;
-    pop.classList.add(swap ? 'swap-in' : 'pop-in');
-    const bodyEl = $('.rail-pop-body', pop);
-    bodyEl.classList.remove('content-in');
-    void bodyEl.offsetWidth;
-    bodyEl.classList.add('content-in');
+    if (swap) fx.swapIn(pop, 'railPopSwap'); else fx.popIn(pop, 'railPopIn');
+    play($('.rail-pop-body', pop), [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
+      { duration: 300, easing: 'spring-soft', id: 'railContentIn' });
     // 位置：贴着侧栏那一侧
     const r = railEl.getBoundingClientRect();
     const pw = Math.min(360, window.innerWidth * 0.86);
@@ -162,11 +156,9 @@ function makeRail(railEl, side, itemsFn) {
 
   /* ---- 迷你 / 展开 ---- */
   /**
-   * 收起 / 展开。
-   * 性能要点：列宽切换是**布局变更**，一帧内完成即可；绝不能给 grid-template-columns 加过渡，
-   * 否则每帧都要重排卡片里的文字（真实窗口里就是严重卡顿）。
-   * 为了不让那一次布局抖动被看见，先给内容盖一层"挡板"（opacity:0，无过渡），
-   * 下一帧再落布局，再下一帧淡回来 —— 抖动发生在不可见的帧里。
+   * 收起 / 展开。列宽切换是布局变更，必须一帧落定（给 grid-template-columns 加过渡会逐帧重排卡片文字）。
+   * 用 View Transition：浏览器先截一张旧画面，布局一次到位后在合成层上交叉淡变 ——
+   * 以前是「整栏淡出 132ms（setTimeout）→ 落布局 → 淡回」，点了要等一下才有反应。
    */
   const applyMini = (mini, opts = {}) => {
     if (COMPACT_MQ.matches) mini = false;   // 窄屏强制展开
@@ -177,20 +169,11 @@ function makeRail(railEl, side, itemsFn) {
       document.body.classList.toggle(side === 'left' ? 'rail-left-mini' : 'rail-right-mini', mini);
       if (mini) rebuild();
       else closePop();
-      if (!opts.silent) store.set(side, mini ? 'mini' : 'open');
+      if (!opts.silent) railStore.set(side, mini ? 'mini' : 'open');
     };
 
-    // 首次装配（silent）不需要挡板，直接落位
-    if (opts.silent) { commit(); return; }
-
-    // 点击后立刻开始淡出（纯合成层，无重排），在最暗的那一刻落布局，
-    // 再淡回来 —— 反馈是即时的，布局抖动被藏在中段，全程没有逐帧重排。
-    document.body.classList.add('rail-fade');
-    clearTimeout(applyMini._t);
-    applyMini._t = setTimeout(() => {
-      commit();                                  // 布局只在这里发生一次
-      document.body.classList.remove('rail-fade');
-    }, 132);
+    if (opts.silent) { commit(); return; }   // 首次装配：直接落位
+    withTransition('rail', commit);
   };
 
   toggle.addEventListener('click', (ev) => {
@@ -206,14 +189,14 @@ function makeRail(railEl, side, itemsFn) {
   });
 
   pop.addEventListener('click', (ev) => {
-    if (ev.target.closest('.rail-pop-close')) closePop();
+    if (ev.target.closest('.rail-pop-close')) closePop({ animate: true });
   });
   document.addEventListener('pointerdown', (ev) => {
     if (!st.openKey) return;
     if (pop.contains(ev.target) || strip.contains(ev.target) || toggle.contains(ev.target)) return;
-    closePop();
+    closePop({ animate: true });
   }, true);
-  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closePop(); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && st.openKey) closePop({ animate: true }); });
   window.addEventListener('resize', () => { if (st.openKey) closePop(); });
 
   applyMini(st.mini, { silent: true });
