@@ -24,6 +24,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: 静态检查（未定义的函数 / 死代码 / 词典重复键）
+        run: npx --yes eslint@9 .
+
       - name: 单测（纯函数）先过一遍
         run: node scripts/test-units.mjs
 

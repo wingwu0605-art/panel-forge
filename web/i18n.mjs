@@ -62,7 +62,6 @@ const EN = {
   '可选': 'Optional',
   '未配置': 'Not set',
   '未配置 Key': 'No API key',
-  '规则路照常可用，AI 是可选加速': 'Rules always work — AI is optional',
   '输入 Key': 'Enter key',
   '未配置 · 规则路仍然可用': 'Not set · rules still work',
   '规则路照常可用（AI 路需你填 Key，或设 LLM_API_KEY）':
@@ -75,7 +74,6 @@ const EN = {
   '清除配置': 'Clear',
   '角色设定（可选，保证每格同一张脸）': 'Character brief (optional, keeps the same face)',
   'AI 自动决定并排戏': 'Let AI pick and direct',
-  'AI 生成': 'AI image',
   '生图': 'Image',
   '只写提示词': 'Prompt only',
   '生这一格': 'Generate this panel',
@@ -105,7 +103,6 @@ const EN = {
   '画布改成白底（导出不透明 PNG）': 'Canvas set to white (opaque PNG on export)',
   '画布改成透明（导出带透明通道）': 'Canvas set to transparent (PNG with alpha on export)',
   '规则切分': 'Rule split',
-  'AI 生成': 'AI generated',
   '自己写': 'Write my own',
   '带开头词': 'Keep prefix',
   '用规则切分的提示词': 'Using the rule-split prompt',
@@ -343,7 +340,6 @@ const ID = {
   '可选': 'Opsional',
   '未配置': 'Belum diatur',
   '未配置 Key': 'Belum ada API key',
-  '规则路照常可用，AI 是可选加速': 'Aturan selalu bisa dipakai — AI opsional',
   '输入 Key': 'Masukkan key',
   '未配置 · 规则路仍然可用': 'Belum diatur · aturan tetap jalan',
   '规则路照常可用（AI 路需你填 Key，或设 LLM_API_KEY）':
@@ -356,7 +352,6 @@ const ID = {
   '清除配置': 'Hapus',
   '角色设定（可选，保证每格同一张脸）': 'Catatan karakter (opsional, wajah tetap sama)',
   'AI 自动决定并排戏': 'Biarkan AI memilih dan menyusun',
-  'AI 生成': 'Gambar AI',
   '生图': 'Gambar',
   '只写提示词': 'Hanya prompt',
   '生这一格': 'Buat panel ini',
@@ -690,13 +685,13 @@ Object.assign(EN, {
   '在输入框/文本域里打字时，单键快捷键不生效（避免误触）。': 'Single-key shortcuts are disabled while typing in a field (to avoid accidents).',
   // 每格的点子/节拍名（会显示在格子上）
   '摆开架势': 'Opening stance', '近方格': 'Approach panel', '冲击瞬间': 'Impact moment',
-  '受击/反应': 'Hit / reaction', '反击再起': 'Counterattack', '通用镜头': 'Generic shot',
+  '受击/反应': 'Hit / reaction', '反击再起': 'Counterattack',
   '右→左': 'R→L', '左→右': 'L→R', '上→下': 'T→B',
   '日式页漫': 'Japanese manga', '中式漫画': 'Chinese comic', '韩式条漫': 'Korean webtoon',
   // 模板名里的高频词段（名字是「族·变体」结构，逐段翻）
   '웹툰': 'Webtoon', '만화': 'Manhwa', '長条漫': 'Long strip', '长条漫': 'Long strip',
   '少年漫': 'Shonen', '青年漫': 'Seinen', '少女漫': 'Shojo', '竖屏': 'Vertical',
-  '三栏并置': 'Three columns', '国风': 'Chinese style', '对峙': 'Standoff',
+  '三栏并置': 'Three columns',
   '长条漫·竖屏': 'Long strip · vertical',
   // 气泡类型
   '椭圆对话泡': 'Round bubble', '圆角对话泡': 'Rounded bubble', '双线对话泡': 'Double-line bubble',
@@ -855,12 +850,12 @@ Object.assign(ID, {
   '快捷键表': 'Daftar pintasan',
   '在输入框/文本域里打字时，单键快捷键不生效（避免误触）。': 'Pintasan satu tombol nonaktif saat mengetik di kolom input.',
   '摆开架势': 'Sikap pembuka', '近方格': 'Panel mendekat', '冲击瞬间': 'Momen dampak',
-  '受击/反应': 'Terkena / reaksi', '反击再起': 'Serangan balik', '通用镜头': 'Bidikan umum',
+  '受击/反应': 'Terkena / reaksi', '反击再起': 'Serangan balik',
   '右→左': 'K→Kr', '左→右': 'Kr→K', '上→下': 'A→B',
   '日式页漫': 'Manga Jepang', '中式漫画': 'Komik Tiongkok', '韩式条漫': 'Webtoon Korea',
   '웹툰': 'Webtoon', '만화': 'Manhwa', '长条漫': 'Strip panjang',
   '少年漫': 'Shonen', '青年漫': 'Seinen', '少女漫': 'Shojo', '竖屏': 'Vertikal',
-  '三栏并置': 'Tiga kolom', '国风': 'Gaya Tiongkok', '对峙': 'Konfrontasi',
+  '三栏并置': 'Tiga kolom',
   '椭圆对话泡': 'Balon bulat', '圆角对话泡': 'Balon sudut bulat', '双线对话泡': 'Balon dua garis',
   '云朵思考泡': 'Awan pikiran', '虚框内心泡': 'Monolog batin', '尖角喊叫泡': 'Balon teriakan',
   '爆炸冲击泡': 'Balon ledakan', '重描边方泡': 'Kotak tebal', '旁白框': 'Kotak narasi',
@@ -1095,12 +1090,15 @@ export function refitSlotLabels(root = document.body) {
 
 export function getLang() { return current; }
 
+let zhTitle = '';   // 页面原本的（中文）标题：切回中文时要还原，不能停在英文标题上
+
 export function setLang(lang) {
   current = LANGS.some((l) => l.id === lang) ? lang : 'zh';
   const root = document.documentElement;
   root.lang = current === 'id' ? 'id' : (current === 'en' ? 'en' : 'zh-CN');
   root.dataset.lang = current;
-  if (current !== 'zh' && TITLE[current]) document.title = TITLE[current];
+  if (!zhTitle) zhTitle = document.title;
+  document.title = current !== 'zh' && TITLE[current] ? TITLE[current] : zhTitle;
   if (installed) retranslate(document.body);
   return current;
 }

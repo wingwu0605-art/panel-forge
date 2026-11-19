@@ -8,7 +8,8 @@
  * 启动：node server.mjs  （默认 http://127.0.0.1:7311 ，端口用 PORT 环境变量覆盖）
  */
 import http from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -52,6 +53,13 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8',
   '.md': 'text/markdown; charset=utf-8',
+  '.gif': 'image/gif',
+  '.avif': 'image/avif',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.map': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
 
 // 只有显式 API_CORS=* 才发跨域头；否则浏览器只能同源读取（其他网页读不到响应）
@@ -110,14 +118,39 @@ function svgFor(tpl, q = {}) {
 }
 
 /* ------------------------------------------------------------------ *
+ * AI 路由共用：取配置 + 统一的失败返回
+ * ------------------------------------------------------------------ */
+/** 模型配置：请求体里带的优先，其次环境变量 LLM_* */
+const cfgOf = (llm) => readLlmConfig(llm || {});
+/**
+ * AI 路失败的统一形状：没配 Key 是 400（调用方要补配置），其余是 502（上游出错）。
+ * endpoint / model 一起带回去 —— 用户一眼能看出自己填的地址和模型到底有没有生效。
+ */
+const llmFail = (err, cfg, extra = {}) => ({
+  __status: err?.code === 'NO_LLM_KEY' ? 400 : 502,
+  ok: false,
+  error: String(err?.message || err),
+  code: err?.code || 'LLM_ERROR',
+  hint: err?.hint,
+  endpoint: err?.endpoint || undefined,
+  model: err?.model || cfg?.model || undefined,
+  ...extra,
+});
+
+/** 应用版本：唯一真源是仓库根的 VERSION（API 自身的版本号另算，见 API_VERSION） */
+const APP_VERSION = (() => { try { return readFileSync(path.join(__dirname, 'VERSION'), 'utf8').trim(); } catch { return '0.0.0'; } })();
+const API_VERSION = '2.0.0';
+
+/* ------------------------------------------------------------------ *
  * API 路由
  * ------------------------------------------------------------------ */
 const routes = [
-  ['GET', /^\/api\/health$/, async () => ({ ok: true, service: 'panel-forge', templates: TEMPLATES.length, version: '2.0.0', engine: RULES_VERSION, vocab: RULE_STATS.total })],
+  ['GET', /^\/api\/health$/, async () => ({ ok: true, service: 'panel-forge', templates: TEMPLATES.length, version: API_VERSION, appVersion: APP_VERSION, engine: RULES_VERSION, vocab: RULE_STATS.total })],
 
   ['GET', /^\/api\/meta$/, async () => ({
     service: 'PanelForge 分镜坊',
-    version: '2.0.0',
+    version: API_VERSION,
+    appVersion: APP_VERSION,
     engine: { type: 'local-rules', version: RULES_VERSION, ...RULE_STATS },
     templates: TEMPLATES.length,
     cultures: {
@@ -205,7 +238,7 @@ const routes = [
     const pageWidth = clampNum(body.pageWidth, 400, 4000, 1600);
     const a = analyzePlot(plot, {});
     const plan = buildPlan(tpl, a, { pageWidth, llmPanels: body.llmPanels || null, plot });
-    const cfg = readLlmConfig(body.llm || {});
+    const cfg = cfgOf(body.llm);
 
     try {
       const r = await optimizePrompts({
@@ -232,14 +265,7 @@ const routes = [
         llm: r.llm,
       };
     } catch (err) {
-      return {
-        __status: err.code === 'NO_LLM_KEY' ? 400 : 502,
-        ok: false,
-        error: String(err.message),
-        code: err.code || 'LLM_ERROR',
-        hint: err.hint,
-        fallback: { note: '规则版提示词已经在每格里（promptEn / promptShort），可以直接用' },
-      };
+      return llmFail(err, cfg, { fallback: { note: '规则版提示词已经在每格里（promptEn / promptShort），可以直接用' } });
     }
   }],
 
@@ -277,7 +303,7 @@ const routes = [
     const a = analyzePlot(plot, {});
     // 先用规则引擎搭骨架（形状前缀/画幅/负面词都按模板算好），再用 AI 的内容覆盖
     const plan = buildPlan(tpl, a, { pageWidth, plot });
-    const cfg = readLlmConfig(body.llm || {});
+    const cfg = cfgOf(body.llm);
 
     try {
       const r = await aiSplitPanels({
@@ -309,15 +335,7 @@ const routes = [
         llm: r.llm,
       };
     } catch (err) {
-      return {
-        __status: err.code === 'NO_LLM_KEY' ? 400 : 502,
-        ok: false,
-        mode: 'ai-split',
-        error: String(err.message),
-        code: err.code || 'LLM_ERROR',
-        hint: err.hint,
-        fallback: { note: '规则引擎的分格仍然可用：点「按规则匹配」或直接看每格的规则版提示词' },
-      };
+      return llmFail(err, cfg, { mode: 'ai-split', fallback: { note: '规则引擎的分格仍然可用：点「按规则匹配」或直接看每格的规则版提示词' } });
     }
   }],
 
@@ -361,12 +379,12 @@ const routes = [
 
   ['POST', /^\/api\/llm\/test$/, async (req) => {
     const body = await readBody(req);
-    const cfg = readLlmConfig(body.llm || body || {});
+    const cfg = cfgOf(body.llm || body);
     try {
       const r = await testLlm(cfg);
       return { ...r, status: llmStatus(cfg) };
     } catch (err) {
-      return { __status: err.code === 'NO_LLM_KEY' ? 400 : 502, ok: false, error: String(err.message), code: err.code || 'LLM_ERROR', hint: err.hint };
+      return llmFail(err, cfg);
     }
   }],
 
@@ -376,18 +394,12 @@ const routes = [
       return { __status: 403, error: '缺少 x-pf-client 头（仅网页编辑器自用）' };
     }
     const body = await readBody(req);
-    const cfg = readLlmConfig(body.llm || {});
+    const cfg = cfgOf(body.llm);
     try {
       const r = await generateImage({ cfg, prompt: body.prompt, size: body.size, model: body.model || cfg.imgModel });
       return { ...r, ok: true };
     } catch (err) {
-      return {
-        __status: err.code === 'NO_LLM_KEY' ? 400 : 502,
-        ok: false,
-        error: String(err.message),
-        code: err.code || 'IMAGE_ERROR',
-        hint: err.hint,
-      };
+      return llmFail(err, cfg, { code: err?.code || 'IMAGE_ERROR' });
     }
   }],
 
@@ -403,8 +415,8 @@ const routes = [
 
     // ① 规则引擎先给合法候选（模型只在这里面挑，不许发明格位）
     const genre = body.genre || 'all';
-  const m = matchTemplates(plot, { culture, genre, ratio, limit: candidateCount, includeCore: body.includeCore !== false });
-    const cfg = readLlmConfig(body.llm || {});
+    const m = matchTemplates(plot, { culture, genre, ratio, limit: candidateCount, includeCore: body.includeCore !== false });
+    const cfg = cfgOf(body.llm);
 
     // ② AI 导演
     let decision;
@@ -415,19 +427,14 @@ const routes = [
         extraNote: body.note ? String(body.note).slice(0, 500) : undefined,
       });
     } catch (err) {
-      return {
-        __status: err.code === 'NO_LLM_KEY' ? 400 : 502,
-        ok: false,
+      return llmFail(err, cfg, {
         mode: 'llm',
-        error: String(err.message),
-        code: err.code || 'LLM_ERROR',
-        hint: err.hint,
         fallback: {
           note: '规则引擎结果仍然可用：把 mode 换成 rules，或直接在网页里点「按规则匹配」',
           top: m.results.slice(0, 3).map((r) => ({ id: r.id, name: r.name, score: r.score })),
         },
         llm: llmStatus(cfg),
-      };
+      });
     }
 
     // ③ 用选中模板 + AI 排戏结果生成分镜表
@@ -678,30 +685,32 @@ const server = http.createServer(async (req, res) => {
     return send(res, 302, '', { Location: encodeURI(cleaned) + (url.search || '') });
   }
 
-  // 容错 2：不带扩展名的未知路径 → 回落首页（单页应用习惯）
-  let rel = routePath === '/' ? '/web/index.html' : routePath;
-  if (rel === '/app.js') rel = '/web/app.js';
-  if (rel === '/styles.css') rel = '/web/styles.css';
+  // 静态资源：**只**对外提供 web/（页面与前端资源）和 lib/（浏览器复用的同构内核）。
+  // 以前先按仓库根目录找、找不到才回落 web/ —— 于是 /.git/config、/.env、/server.mjs
+  // 都能被直接下载（公网部署时尤其危险：有人会把 LLM_API_KEY 写进 .env）。
+  // 页面以根路径打开：./app.js → /app.js、./klecks/x.png → /klecks/x.png，统一映射到 web/。
+  const rel = routePath === '/' ? '/index.html' : routePath.replace(/^\/web\//, '/');
+  const PUBLIC = { web: path.join(__dirname, 'web') + path.sep, lib: path.join(__dirname, 'lib') + path.sep };
 
-  // 开发服务器也给 ?v= 换成"真内容哈希"。
-  // 以前 index.html 里写死 ?v=0qqy5，CSS/JS 改了浏览器还是吃旧缓存（线上构建有哈希，开发没有）。
+  // 开发服务器也给 ?v= 换成"真内容哈希"（线上构建有哈希，开发没有，CSS/JS 改了会吃旧缓存）
   const devAssetVersion = async () => {
     const { createHash } = await import('node:crypto');
     const h = createHash('sha1');
-    for (const f of ['web/app.js', 'web/styles.css', 'web/api-static.js']) {
-      try { h.update(await readFile(path.join(__dirname, f))); } catch { /* ignore */ }
+    for (const dir of ['web', 'lib']) {
+      try {
+        for (const f of (await readdir(path.join(__dirname, dir))).sort()) {
+          if (/\.(m?js|css)$/.test(f)) h.update(await readFile(path.join(__dirname, dir, f)));
+        }
+      } catch { /* ignore */ }
     }
-    try {
-      for (const f of await readdir(path.join(__dirname, 'web'))) {
-        if (f.endsWith('.mjs')) h.update(await readFile(path.join(__dirname, 'web', f)));
-      }
-    } catch { /* ignore */ }
     return h.digest('hex').slice(0, 8);
   };
 
   const readStatic = async (p) => {
-    const file = path.join(__dirname, path.normalize(p).replace(/^(\.\.[/\\])+/, ''));
-    if (!file.startsWith(__dirname)) return null;
+    const isLib = p.startsWith('/lib/');
+    const base = isLib ? PUBLIC.lib : PUBLIC.web;
+    const file = path.normalize(path.join(base, isLib ? p.slice(5) : p));
+    if (!file.startsWith(base)) return null;
     try {
       const st = await stat(file);
       if (!st.isFile()) return null;
@@ -710,10 +719,8 @@ const server = http.createServer(async (req, res) => {
   };
 
   let hit = await readStatic(rel);
-  // 前端所有资源都在 web/ 下，但页面是以根路径打开的（./app.js → /app.js、./klecks/x.png → /klecks/x.png）。
-  // 这里不能只给 js/css/html 开口子 —— 图片、字体、json 也得回落，否则本地开发时那些资源全 404。
-  if (!hit) hit = await readStatic('/web' + rel);
-  if (!hit && !path.extname(rel)) hit = await readStatic('/web/index.html');
+  // 容错：不带扩展名的未知路径 → 回落首页（单页应用习惯）
+  if (!hit && !path.extname(rel)) hit = await readStatic('/index.html');
   if (!hit) return send(res, 404, `404 Not Found: ${routePath}`, { 'Content-Type': 'text/plain; charset=utf-8' });
 
   const ext = path.extname(hit.file).toLowerCase();

@@ -5,9 +5,9 @@
 import { estimateLayout, splitTextIntoPages, buildAutoSteps, imageQueueForPage, imageQueueAll, estimateCostHint } from './lib/auto.mjs';
 import { $, $$, PERF, perf, perfPush, perfStats, perfNow, perfDone, withTimeout, blobToDataURL, clamp, escapeHtml, debounce, sysReduceMQ, motionOK, stagger, replay , withTransition } from './util.mjs';
 import { state, installHistoryDeps, HIST_MAX, snapshot, restore, commit, undo, redo, resetHistory } from './state.mjs';
-import { imageAsset, rehydrateImages, exportImageMap, urlForBlob } from './assets.mjs';
+import { imageAsset, rehydrateImages, exportImageMap, urlForBlob, loadImgEl } from './assets.mjs';
 import { autoPromptOf, promptParts, effectivePrompt, buildImagePrompt, setPromptEdit, installPromptDeps } from './prompt.mjs';
-import { setView, applyView, initViews, setEditMod, syncEditHead, syncEditZoom, clearEditZoom, stepSlot, enterEdit, exitEdit, installViewDeps } from './mobile.mjs';
+import { setView, initViews, setEditMod, syncEditHead, syncEditZoom, goCanvasOnCompact, installViewDeps } from './mobile.mjs';
 import { installRails } from './rails.mjs';
 import { renderTemplateSVG, imageAttrs } from './lib/svg.mjs';
 import { createCellPainter, localPoly } from './paint.mjs';
@@ -257,10 +257,10 @@ async function init() {
   const want = new URLSearchParams(location.hash.slice(1)).get('tpl')
     || new URLSearchParams(location.search).get('tpl');
   const first = want || 'ref-4band-2col';
-  await selectTemplate(first, { silent: true });
+  await selectTemplate(first);
   // 旧链接 / 打错的 ?tpl=：别停在"没有版式"的空状态，回落默认版式并说明
   if (!state.tpl) {
-    await selectTemplate('ref-4band-2col', { silent: true });
+    await selectTemplate('ref-4band-2col');
     if (want && state.tpl) {
       toast(`没有「${want}」这套模板（可能是旧链接），先给你默认版式`);
       const foot = $('#footMsg');
@@ -303,7 +303,7 @@ async function init() {
       state.pages = draft.pages;
       state.pageIdx = Math.min(draft.pageIdx || 0, draft.pages.length - 1);
       const pg = state.pages[state.pageIdx];
-      if (pg?.tplId) await selectTemplate(pg.tplId, { silent: true });
+      if (pg?.tplId) await selectTemplate(pg.tplId, { keepImages: false });
       // 这一页改过画幅就重排回来（草稿里存的是 {w,h,mode}）
       if (pg?.size) {
         state.tpl = deriveTpl(state.tplBase, pg.size.w, pg.size.h, pg.size.mode || 'stretch');
@@ -517,12 +517,23 @@ async function aiSelfTestBody(ok) {
 /* ================================================================== *
  * 可折叠面板：收起只留标题行，状态记在本机
  * ================================================================== */
-const UI_STORE = 'pf.ui.v1';
+/**
+ * 折叠状态单独一个 key。以前它和「界面风格」共用 `pf.ui.v1`：选了液态玻璃会把折叠记录冲掉，
+ * 收起任意一块又会把界面风格冲回经典（刷新后才看出来）。
+ */
+const FOLD_STORE = 'pf.fold.v1';
 
 function initCollapsibles() {
   let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(UI_STORE) || '{}') || {}; } catch { /* ignore */ }
-  const persist = () => { try { localStorage.setItem(UI_STORE, JSON.stringify(saved)); } catch { /* ignore */ } };
+  try {
+    saved = JSON.parse(localStorage.getItem(FOLD_STORE) || 'null');
+    if (!saved || typeof saved !== 'object') {
+      // 迁移：老版本把折叠状态写在 pf.ui.v1（是 JSON 对象才是折叠记录）
+      const old = JSON.parse(localStorage.getItem('pf.ui.v1') || 'null');
+      saved = old && typeof old === 'object' ? old : {};
+    }
+  } catch { saved = {}; }
+  const persist = () => { try { localStorage.setItem(FOLD_STORE, JSON.stringify(saved)); } catch { /* ignore */ } };
   // ?collapse=ai,browse 可指定初始收起（分享"专注模式"链接用，不影响记住的状态）
   const force = (new URLSearchParams(location.search).get('collapse') || '').split(',').filter(Boolean);
 
@@ -708,13 +719,37 @@ function ratioName(r) {
 /* ================================================================== *
  * 选择模板
  * ================================================================== */
+/**
+ * 模板是只读数据：同一个 id 只取一次（换页、批量出图、导出全部页都会反复要同一套）。
+ * 返回的是缓存里的对象，调用方**不要改它**（改画幅走 deriveTpl，它会深拷一份）。
+ */
+const tplCache = new Map();
+async function fetchTemplate(id) {
+  if (!id) return null;
+  if (!tplCache.has(id)) {
+    tplCache.set(id, Promise.resolve(api.template(id)).then((t) => (t && !t.error ? t : null)).catch(() => null));
+  }
+  const t = await tplCache.get(id);
+  if (!t) tplCache.delete(id);   // 失败不缓存，下次还能重试
+  return t;
+}
+
 async function selectTemplate(id, opts = {}) {
   if (!id) return;
-  const tpl = await api.template(id);
-  if (!tpl || tpl.error) { toast('模板不存在：' + id); return; }
+  // 再点一次当前这套：内容原样保留（以前会清掉气泡、手改的提示词和撤销历史），只按当前剧情刷新分镜表
+  if (state.tpl?.id === id && opts.keepImages !== false) {
+    refreshScript();
+    return;
+  }
+  const tpl = await fetchTemplate(id);
+  if (!tpl) { toast('模板不存在：' + id); return; }
 
-  // 换模板时图片按阅读顺序搬家
-  if (state.tpl && state.tpl.id !== tpl.id && !opts.keepImages === false) {
+  // 换模板时图片按阅读顺序搬家、气泡按页面比例跟过去（换页 / 恢复草稿时传 keepImages:false，
+  // 那两条路径之后会整体换成那一页自己的内容）。
+  // 以前这里写成 `!opts.keepImages === false`，结果恰好反了：模板库里点卡片换模板时图片不搬家，
+  // 旧格子 id 的图留在 state 里（被藏起来、换回去又冒出来），气泡则被直接清空且不可撤销。
+  const moving = !!(state.tpl && state.tpl.id !== tpl.id && opts.keepImages !== false);
+  if (moving) {
     const ordered = state.tpl.slots.map((s) => state.images[s.id]).filter(Boolean);
     const next = {};
     tpl.slots.forEach((s, i) => { if (ordered[i]) next[s.id] = ordered[i]; });
@@ -722,18 +757,22 @@ async function selectTemplate(id, opts = {}) {
     if (ordered.length > tpl.slots.length) {
       toast(`新模板只有 ${tpl.slots.length} 格，超出的 ${ordered.length - tpl.slots.length} 张图未放入`);
     }
+    const from = state.tpl.page;
+    const kx = tpl.page.w / from.w, ky = tpl.page.h / from.h;
+    for (const b of state.bubbles) {
+      b.x = r2(b.x * kx); b.y = r2(b.y * ky);
+    }
   }
   state.tpl = tpl;
   state.tplBase = JSON.parse(JSON.stringify(tpl));   // 画幅重排的基准，之后不再动
   state.pageSize = null;
   state.pageEnter = true;
   if (state.aiPlan && state.aiPlan.template?.id !== tpl.id) { state.aiPlan = null; state.aiDecision = null; }
-  state.bubbles = [];
+  if (!moving) state.bubbles = [];
   state.selBubble = null;
   resetHistory();
   loadLines(tpl.id);
   state.promptEdits = {};
-  attachSuggestions($('#plot').value || '', state.plan?.pages?.[0]?.plan);
   state.selectedId = tpl.slots[0]?.id || null;
   state.plan = null;
   location.hash = 'tpl=' + tpl.id;
@@ -1987,40 +2026,19 @@ function bindUI() {
     queueSave();
   }, { passive: false });
 
-  // 拖拽文件
+  // 拖文件经过画布：只负责「指针下是哪一格」的高亮（落下由 installImageInbox 的 document 级 drop 统一处理。
+  // 以前这里还有一套 drop：一次拖放被两套监听器各处理一遍——同一张图塞两次、多图拖入会被第二套覆盖）
   canvas.addEventListener('dragover', (ev) => {
-    ev.preventDefault();
     if (!state.tpl) return;
-    const slot = slotAt(pagePoint(ev));
+    const id = slotAt(pagePoint(ev))?.id || null;
     canvas.classList.add('dragover');
-    if (slot) { state.hoverId = slot.id; renderStage(); }
+    if (id !== state.hoverId) { state.hoverId = id; renderStage(); }
   });
   canvas.addEventListener('dragleave', () => {
     canvas.classList.remove('dragover');
-    state.hoverId = null; renderStage();
+    if (state.hoverId) { state.hoverId = null; renderStage(); }
   });
-  canvas.addEventListener('drop', async (ev) => {
-    ev.preventDefault();
-    canvas.classList.remove('dragover');
-    const files = [...(ev.dataTransfer?.files || [])].filter((f) => f.type.startsWith('image/'));
-    if (!files.length) return;
-    const slot = slotAt(pagePoint(ev));
-
-    // 支持从浏览器拖入的图片 URL
-    if (!files.length) return;
-    if (files.length === 1 && slot) {
-      await putImage(slot.id, files[0]);
-    } else {
-      const targets = state.tpl.slots.filter((s) => !state.images[s.id]);
-      const list = targets.length ? targets : state.tpl.slots;
-      for (let i = 0; i < Math.min(files.length, list.length); i++) {
-        await putImage(list[i].id, files[i], { render: false });
-      }
-      state.selectedId = list[Math.min(files.length, list.length) - 1]?.id || state.selectedId;
-      renderStage(); renderSlotPanel(); refreshScript();
-      toast(`已填入 ${Math.min(files.length, list.length)} 格`);
-    }
-  });
+  canvas.addEventListener('drop', () => canvas.classList.remove('dragover'));
 
   // 键盘
   window.addEventListener('keydown', (ev) => {
@@ -2091,18 +2109,7 @@ function bindUI() {
       return;
     }
 
-    // ---- 格子导航 ----
-    const idx = state.tpl.slots.findIndex((s) => s.id === state.selectedId);
-    if (k === 'ArrowRight' || k === 'ArrowLeft') {
-      ev.preventDefault();
-      const dir = k === 'ArrowRight' ? 1 : -1;
-      const next = state.tpl.slots[clamp(idx + dir, 0, state.tpl.slots.length - 1)];
-      state.selectedId = next.id; state.selBubble = null;
-      renderStage(); renderSlotPanel();
-      return;
-    }
-
-    // ---- 气泡微调 / 尺寸 ----
+    // ---- 气泡微调（必须排在格子导航前面：选中气泡时 ←→ 是挪气泡，不是换格子）----
     const bub = selectedBubble();
     if (bub && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight')) {
       ev.preventDefault();
@@ -2112,7 +2119,19 @@ function bindUI() {
       if (k === 'ArrowDown') bub.y += step;
       if (k === 'ArrowLeft') bub.x -= step;
       if (k === 'ArrowRight') bub.x += step;
-      renderStage();
+      refreshBubble(bub.id);
+      queueSave();
+      return;
+    }
+
+    // ---- 格子导航 ----
+    const idx = state.tpl.slots.findIndex((s) => s.id === state.selectedId);
+    if (k === 'ArrowRight' || k === 'ArrowLeft') {
+      ev.preventDefault();
+      const dir = k === 'ArrowRight' ? 1 : -1;
+      const next = state.tpl.slots[clamp(idx + dir, 0, state.tpl.slots.length - 1)];
+      state.selectedId = next.id; state.selBubble = null;
+      renderStage(); renderSlotPanel();
       return;
     }
     if (k === '[' || k === ']') {
@@ -2165,27 +2184,6 @@ function bindUI() {
       ev.preventDefault();
       pasteSelection();
     }
-  });
-
-  window.addEventListener('paste', async (ev) => {
-    if (!state.tpl) return;
-    const items = [...(ev.clipboardData?.items || [])];
-    const imgs = items.filter((i) => i.type && i.type.startsWith('image/')).map((i) => i.getAsFile()).filter(Boolean);
-    if (!imgs.length) return;
-    // 和拖放用同一套落点规则：样图区 / 角色卡 / 当前格子
-    if (inboxArea === 'sample' || document.activeElement?.closest?.('#styleFollow')) {
-      ev.preventDefault();
-      await addSamples(imgs);
-      return;
-    }
-    if (inboxArea === 'char' || document.activeElement?.closest?.('.chars')) {
-      ev.preventDefault();
-      await addCharCard(imgs);
-      return;
-    }
-    if (!state.selectedId) return;
-    ev.preventDefault();
-    await putImage(state.selectedId, imgs[0]);
   });
 
   // 顶栏 / 左栏
@@ -2574,7 +2572,7 @@ function bindUI() {
   $('#btnAddPage')?.addEventListener('click', addPage);
   $('#btnExportAll')?.addEventListener('click', exportAllPages);
   $('#charSheet').addEventListener('input', debounce(saveLlm, 400));
-  $('#btnAiPrompts').addEventListener('click', runAiPrompts);
+  $('#btnAiPrompts').addEventListener('click', () => runAiPrompts());
   $('#btnAiSplit')?.addEventListener('click', runAiSplit);
 
 /* ================================================================== *
@@ -2718,7 +2716,7 @@ async function genAllImages() {
   const pagesOfPanels = [];
   for (let i = 0; i < state.pages.length; i++) {
     if (i === state.pageIdx) { pagesOfPanels.push(pagePlan()?.panels || []); continue; }
-    const tpl = await api.template(state.pages[i].tplId).catch(() => null);
+    const tpl = await fetchTemplate(state.pages[i].tplId);
     pagesOfPanels.push((tpl?.slots || []).map((sl) => ({ id: sl.id })));
   }
   const imagesByPage = state.pages.map((pg, i) => (i === state.pageIdx ? (state.images || {}) : (pg.images || {})));
@@ -2765,10 +2763,10 @@ async function runImageQueue(queue, scopeLabel = '') {
     if (item.page !== state.pageIdx) await switchPage(item.page);
     const before = !!state.images[item.slotId];
     autoLog('· 第 ' + (item.page + 1) + ' 页 · ' + item.slotId + '：请求中…');
-    try { await generateSlotImage(item.slotId); } catch { /* 内部已提示 */ }
+    try { await generateSlotImage(item.slotId, { askChars: false }); } catch { /* 内部已提示 */ }
     if (!before && state.images[item.slotId]) { done++; autoLog('✓ ' + item.slotId + ' 完成（' + done + '/' + queue.length + '）', 'ok'); continue; }
     autoLog('… ' + item.slotId + ' 失败，重试 1 次');
-    try { await generateSlotImage(item.slotId); } catch { /* ignore */ }
+    try { await generateSlotImage(item.slotId, { askChars: false }); } catch { /* ignore */ }
     if (state.images[item.slotId]) { done++; autoLog('✓ ' + item.slotId + ' 重试成功（' + done + '/' + queue.length + '）', 'ok'); }
     else { failed++; autoLog('✗ ' + item.slotId + ' 仍然失败', 'bad'); }
   }
@@ -2928,7 +2926,7 @@ async function autoRun() {
           });
           const top = res?.results?.[0];
           if (top?.id) {
-            await selectTemplate(top.id, { keepImages: true });
+            await selectTemplate(top.id);
             autoLog('   · 选到「' + top.name + '」（' + top.panels + ' 格）', 'ok');
             decided = true;
           }
@@ -2967,7 +2965,7 @@ async function autoRun() {
       if (mode === 'full') {
         if (state.autoStop) break;
         autoLog('⑤ 第 ' + (i + 1) + ' 页：写台词/旁白并挂气泡…');
-        try { await aiWriteLines('page'); autoLog('   · 台词与气泡布置完成', 'ok'); }
+        try { await aiWriteLines('page', { silent: true }); autoLog('   · 台词与气泡布置完成', 'ok'); }
         catch (e) { autoLog('   · 台词失败：' + String(e.message).slice(0, 40), 'bad'); }
         if (state.autoStop) break;
         autoLog('⑥ 第 ' + (i + 1) + ' 页：逐格生成图片…');
@@ -3081,17 +3079,29 @@ async function acceptImages(files, { zone, ev } = {}) {
     toast(`已加入 ${imgs.length} 张角色参考图`);
     return true;
   }
-  // 画布：优先「指针下那一格」，否则当前选中的格子
+  if (!state.tpl) { toast('先选一套版式'); return false; }
+  // 多张图：按阅读顺序填进空格子（没有空格就从第一格开始覆盖）
+  if (imgs.length > 1) {
+    const empty = state.tpl.slots.filter((s) => !state.images[s.id]);
+    const list = empty.length ? empty : state.tpl.slots;
+    const n = Math.min(imgs.length, list.length);
+    commit();
+    for (let i = 0; i < n; i++) await putImage(list[i].id, imgs[i], { render: false, noCommit: true });
+    state.selectedId = list[n - 1]?.id || state.selectedId;
+    renderStage(); renderSlotPanel(); refreshScript();
+    toast(`已按阅读顺序填入 ${n} 格${imgs.length > n ? `（还剩 ${imgs.length - n} 张没地方放）` : ''}`);
+    return true;
+  }
+  // 一张图：优先「指针下那一格」，否则当前选中的格子
   let slotId = state.selectedId;
   if (ev && zone === 'canvas') {
-    const pt = pagePoint(ev);
-    const s = slotAt(pt);
+    const s = slotAt(pagePoint(ev));
     if (s) slotId = s.id;
   }
   if (!slotId) { toast('先点一个格子，再拖图进来'); return false; }
   await putImage(slotId, imgs[0]);
-  const slot = state.tpl?.slots?.find((s) => s.id === slotId);
-  toast(`已填入第 ${slot?.order ?? '?'} 格${imgs.length > 1 ? `（只用了第一张，共 ${imgs.length} 张）` : ''}`);
+  const slot = state.tpl.slots.find((s) => s.id === slotId);
+  toast(`已填入第 ${slot?.order ?? '?'} 格`);
   return true;
 }
 
@@ -3392,16 +3402,17 @@ function installImageInbox() {
     await acceptImages(files, { zone, ev });
   });
 
-  // Ctrl+V 粘贴图片
+  // Ctrl+V 粘贴图片（全站唯一的粘贴入口）：落点 = 最近一次交互的区域（样图 / 角色卡 / 画布）
   document.addEventListener('paste', async (ev) => {
     const files = firstImageFromDataTransfer(ev.clipboardData);
     if (!files.length) return;   // 文本粘贴不拦
     const inField = ev.target.closest?.('input, textarea');
-    // 输入框里粘图片没意义（会变成字），但用户常常是在输入框聚焦时按的 Ctrl+V
-    const zone = inboxArea === 'char' ? 'char' : 'canvas';
+    const focus = document.activeElement;
+    const zone = inboxArea === 'sample' || focus?.closest?.('#styleFollow') ? 'sample'
+      : inboxArea === 'char' || focus?.closest?.('.chars') ? 'char' : 'canvas';
     ev.preventDefault();
-    await acceptImages(files, { zone });
-    if (inField) toast('已把剪贴板里的图片放进去了');
+    // 输入框里粘图片没意义（会变成字），但用户常常是在输入框聚焦时按的 Ctrl+V
+    if (await acceptImages(files, { zone }) && inField && zone === 'canvas') toast('已把剪贴板里的图片放进当前格子');
   });
 }
 
@@ -3655,9 +3666,9 @@ function buildContextMenu(ev) {
     return {
       title: '气泡',
       items: [
-        ctxItem('换样式', () => { state.selBubble = id; renderBubbles(); $('#bubbleLib')?.scrollIntoView({ block: 'nearest' }); }),
-        ctxItem('编辑文字', () => { state.selBubble = id; renderBubbles(); $('#bubText')?.focus(); }),
-        ctxItem('复制一个', () => duplicateBubble()),
+        ctxItem('换样式', () => { state.selBubble = id; renderStage(); renderBubbles(); $('#bubbleDock')?.scrollIntoView({ block: 'nearest' }); }),
+        ctxItem('编辑文字', () => { state.selBubble = id; renderStage(); renderBubbles(); $('#bubText')?.focus(); }),
+        ctxItem('复制一个', () => { state.selBubble = id; duplicateBubble(); }),
         { sep: true },
         ctxItem('删除', () => { state.selBubble = id; deleteBubble(); }, { danger: true }),
       ],
@@ -3671,7 +3682,7 @@ function buildContextMenu(ev) {
       ctxItem('AI 生成这一格', () => generateSlotImage(state.selectedId)),
       ctxItem('绘制这一格', () => openPaint(state.selectedId)),
       { sep: true },
-      ctxItem('导出这一页 PNG', () => $('#btnExportPng')?.click()),
+      ctxItem('导出这一页 PNG', () => exportPNG()),
       ctxItem('快捷键表', () => toggleShortcuts(true), { hint: '?' }),
     ],
   };
@@ -4449,7 +4460,7 @@ async function runAiDecide() {
     state.aiDecision = res.decision;
     state.analysis = res.analysis;
     renderIntentChips(res.analysis);
-    await selectTemplate(res.decision.pick, { keepImages: true });
+    await selectTemplate(res.decision.pick);
     // selectTemplate 只在模板不一致时清空 AI 结果，这里再兜一次
     state.aiPlan = res.plan;
     state.aiDecision = res.decision;
@@ -4506,7 +4517,7 @@ async function runMatch() {
     renderIntentChips(res.analysis);
     renderMatchResults(res.results);
     if (res.results[0]) {
-      await selectTemplate(res.results[0].id, { keepImages: true });
+      await selectTemplate(res.results[0].id);
       toast(`已载入最匹配的分镜：${res.results[0].name}`);
     }
   } catch (e) {
@@ -4544,7 +4555,7 @@ function renderMatchResults(results) {
     </div>`).join('');
   stagger(box, '.res');
   box.querySelectorAll('.res').forEach((el) => {
-    el.addEventListener('click', () => { selectTemplate(el.dataset.id, { keepImages: true }); goCanvasOnCompact(); });
+    el.addEventListener('click', () => { selectTemplate(el.dataset.id); goCanvasOnCompact(); });
   });
 }
 
@@ -5273,6 +5284,9 @@ function currentPageSnapshot() {
     bubbles: state.bubbles.map((b) => ({ ...b })),
     lines: { ...state.lines },
     promptEdits: { ...state.promptEdits },
+    // 提示词来源（规则 / AI / 自己写）和开头词开关也是本页内容：以前没存，换页、刷新就回到默认
+    promptSrc: { ...state.promptSrc },
+    promptPrefix: { ...state.promptPrefix },
     cands: state.cands,
     activeChars: [...state.activeChars],
     slotCollapsed: state.slotCollapsed,
@@ -5309,7 +5323,7 @@ async function switchPage(i) {
   savePage();
   state.pageIdx = i;
   const pg = state.pages[i];
-  await selectTemplate(pg.tplId, { silent: true });
+  await selectTemplate(pg.tplId, { keepImages: false });
   // 这一页可能改过画幅：selectTemplate 已把 base 换成原模板，这里重排回来
   if (pg.size) {
     const sz = pg.size;
@@ -5344,6 +5358,11 @@ async function addPage() {
   queueSave();
 }
 
+/**
+ * 导出全部页：每一页在内存里按它自己的模板 / 画幅 / 图片 / 气泡拼成 SVG 再栅格化，
+ * **不切换**界面上正在看的那一页（以前是逐页 switchPage + 固定 sleep 等它画完，
+ * 一边闪一边慢，导完还把人留在最后一页）。
+ */
 async function exportAllPages() {
   if (!state.pages.length) { toast('还没有页'); return; }
   savePage();
@@ -5354,30 +5373,19 @@ async function exportAllPages() {
   try {
     for (let i = 0; i < state.pages.length; i++) {
       btn.textContent = `导出中 ${i + 1}/${state.pages.length}…`;
-      await switchPage(i);
-      await new Promise((r) => setTimeout(r, 420));
-      const svg = stageSVG({ images: await exportImageMap() });
-      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const img = await new Promise((res, rej) => {
-        const im = new Image();
-        im.onload = () => res(im);
-        im.onerror = () => rej(new Error('栅格化失败'));
-        im.src = url;
-      });
+      const pg = state.pages[i];
+      const base = i === state.pageIdx ? state.tplBase : await fetchTemplate(pg.tplId);
+      if (!base) continue;
+      const tpl = i === state.pageIdx ? state.tpl
+        : (pg.size ? deriveTpl(base, pg.size.w, pg.size.h, pg.size.mode || 'stretch') : base);
+      const images = await exportImageMap(i === state.pageIdx ? state.images : rehydrateImages(pg.images || {}));
+      const bubbles = i === state.pageIdx ? state.bubbles : (pg.bubbles || []);
       const w = state.exportWidth;
-      const h = Math.round((w * state.tpl.page.h) / state.tpl.page.w);
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(url);
-      const png = await new Promise((res) => canvas.toBlob(res, 'image/png'));
-      const safe = String(pageLabel(state.pages[i], i)).replace(/[\\/:*?"<>|]/g, '_');
+      const h = Math.round((w * tpl.page.h) / tpl.page.w);
+      const png = await rasterizeSVG(stageSVG({ tpl, images, bubbles }), w, h);
+      const safe = String(pageLabel(pg, i)).replace(/[\\/:*?"<>|]/g, '_');
       await exportBlob(png, `${String(i + 1).padStart(2, '0')}-${safe}.png`);
       n++;
-      await new Promise((r) => setTimeout(r, 260));
     }
     toast(`已导出 ${n} 页`);
   } catch (e) {
@@ -5433,34 +5441,36 @@ async function generateSlotPromptOnly(targetId = state.selectedId) {
   }
 }
 
-/** 用用户自己的生图模型，直接生成当前这一格 */
 /**
  * AI 写台词/旁白。
  *   mode='one'   只写当前这一格
  *   mode='page'  写这一页所有还没有句子的格子（已有内容的跳过）
  *   mode='again' 换一句：连同刚才那句一起发给模型，让它别重复
- * 写好的句子会落进 state.lines（和手打完全同一条路径），并顺手给一个气泡建议。
+ * 写好的句子会落进 state.lines（和手打完全同一条路径）；台词 / 内心独白顺手挂一个气泡
+ * （按文字内容挑样式，不额外烧 token）。之前这一步写成了 `state.bubbles[id] = type`——
+ * 往气泡**数组**上挂字符串属性，结果一个气泡也没出现。
+ * @param {{silent?: boolean}} opts silent=true（全自动调用）：失败直接抛出，不弹错误面板挡住流程
  */
-async function aiWriteLines(mode = 'one') {
-  if (!state.tpl) { toast('先选一套版式'); return; }
+async function aiWriteLines(mode = 'one', { silent = false } = {}) {
+  const fail = (msg) => { if (silent) throw new Error(msg); toast(msg); };
+  if (!state.tpl) return fail('先选一套版式');
   const page = pagePlan();
   const panels = page?.panels || [];
-  if (!panels.length) { toast('还没有分镜计划：先按规则匹配或让 AI 排戏'); return; }
+  if (!panels.length) return fail('还没有分镜计划：先按规则匹配或让 AI 排戏');
 
   const sel = state.selectedId;
   let ids = [];
   if (mode === 'page') {
     ids = panels.filter((p) => !String(state.lines?.[p.id] || '').trim()).map((p) => p.id);
-    if (!ids.length) { toast('这一页每一格都有句子了'); return; }
+    if (!ids.length) { if (!silent) toast('这一页每一格都有句子了'); return; }
   } else {
-    if (!sel) { toast('先点一个格子'); return; }
+    if (!sel) return fail('先点一个格子');
     ids = [sel];
   }
 
-  const btn = $('#btnAiLine');
   const btns = ['#btnAiLine', '#btnAiLineReroll', '#btnAiLinesPage'].map((x) => $(x)).filter(Boolean);
   const labels = btns.map((b) => b.textContent);
-  btns.forEach((b, i) => { b.disabled = true; b.textContent = i === 0 ? 'AI 正在写…' : b.textContent; });
+  btns.forEach((b, i) => { b.disabled = true; if (i === 0) b.textContent = 'AI 正在写…'; });
   saveLlm();
   try {
     const avoid = mode === 'again'
@@ -5475,31 +5485,39 @@ async function aiWriteLines(mode = 'one') {
       avoid,
       llm: state.llm,
     });
-    if (!res?.ok) throw new Error((res?.code ? res.code + '：' : '') + (res?.error || 'AI 没返回'));
+    if (!res?.ok) throw Object.assign(new Error((res?.code ? res.code + '：' : '') + (res?.error || 'AI 没返回')), { code: res?.code, hint: res?.hint });
 
     const lines = res.lines || {};
-    const got = Object.keys(lines);
+    const got = Object.keys(lines).filter((id) => lines[id]?.text);
     if (!got.length) throw new Error('模型这次没写出可用的句子');
 
     commit();
-    let filled = 0;
+    let bubbled = 0;
     for (const id of got) {
       const item = lines[id];
-      if (!item || !item.text) continue;
       state.lines[id] = item.text;
-      filled++;
-      // 顺手给气泡建议：用已有的按文本选样式逻辑，不额外烧 token
       const slot = state.tpl.slots.find((x) => x.id === id);
       const panel = panels.find((x) => x.id === id);
       const pick = pickBubbleForText(item.text, { role: slot?.role, beat: panel?.beat });
       if (id === state.selectedId && pick?.type) {
         state._lineBubbleHint = { type: pick.type, why: pick.why, kind: item.kind };
       }
-      if (!String(state.bubbles?.[id] || '') && pick?.type && (item.kind === '台词' || item.kind === '内心')) {
-        // 该有气泡的格子直接挂上（台词/内心），旁白不挂
-        state.bubbles[id] = pick.type;
+      // 台词 / 内心挂气泡；旁白不挂（交给人决定放不放旁白框）。
+      // 这一格已经有 AI 挂过的气泡就只换文字，「换一句」不会越堆越多
+      if (slot && pick?.type && (item.kind === '台词' || item.kind === '内心')) {
+        const mine = state.bubbles.find((b) => b.slot === id && b.auto);
+        if (mine) { mine.text = item.text; continue; }
+        const b = makeBubble(pick.type, {
+          page: state.tpl.page,
+          at: { x: slot.x + slot.w * 0.5, y: slot.y + Math.max(30, slot.h * 0.22) },
+          text: item.text,
+        });
+        Object.assign(b, { baseW: b.w, baseH: b.h, slot: id, auto: true });
+        state.bubbles.push(b);
+        bubbled++;
       }
     }
+    saveLines();
     renderSlotPanel(); renderStage(); renderScript();
 
     // 把「为什么这样写」显示在思路行里
@@ -5509,19 +5527,30 @@ async function aiWriteLines(mode = 'one') {
       const ta = $('#slotLine');
       if (ta) ta.value = state.lines[ids[0]] || '';
     }
-    toast(mode === 'page'
-      ? `已给 ${filled} 格写好台词（空着的才写）`
-      : `已写好：${String(state.lines[ids[0]] || '').slice(0, 16)}`);
+    if (!silent) {
+      const tail = bubbled ? `，挂了 ${bubbled} 个气泡` : '';
+      toast(mode === 'page'
+        ? `已给 ${got.length} 格写好台词（空着的才写）${tail}`
+        : `已写好：${String(state.lines[ids[0]] || '').slice(0, 16)}${tail}`);
+    }
+    return { filled: got.length, bubbled };
   } catch (e) {
-    const code = e?.code ? `（${e.code}）` : '';
-    toast(`写台词失败${code}`);
+    if (silent) throw e;
+    toast(`写台词失败${e?.code ? `（${e.code}）` : ''}`);
     showErrorDetail('写台词失败', e);
+    return null;
   } finally {
     btns.forEach((b, i) => { b.disabled = false; b.textContent = labels[i]; });
   }
 }
 
-async function generateSlotImage(targetId = state.selectedId) {
+/**
+ * 用用户自己的生图模型，直接生成某一格。
+ * @param {string} targetId 生成哪一格（发起时锁定，期间切格子不会串格）
+ * @param {{askChars?: boolean}} opts askChars=false：批量队列里不再逐张弹「没有角色参考图」确认
+ *   （批量开始前的危险确认里已经说明过，一次跑 20 张就弹 20 次是灾难）
+ */
+async function generateSlotImage(targetId = state.selectedId, { askChars = true } = {}) {
   if (!state.tpl || !targetId) { toast('先点一个格子'); return; }
   // 锁定格子：生成期间你点别的格子，结果也只回到这一格（以前是回到「点击时选中的那格」→ 会串格）
   const sid = targetId;
@@ -5536,10 +5565,10 @@ async function generateSlotImage(targetId = state.selectedId) {
   try {
     const built = buildImagePrompt(sid);
     const charPayload = built.chars;
-    if (!charPayload.block) {
-      const ok = confirm('还没启用角色参考图，生成的图可能每格长得不一样。\n\n建议先去左边「角色参考图」加一张。\n\n仍然继续生图吗？');
-      if (!ok) { btn.disabled = false; btn.textContent = old; return; }
-    }
+    // 取消时直接 return：finally 会清掉作业标记、复原按钮（以前这里引用了不存在的 btn/old，
+    // 一取消就抛 ReferenceError，被下面的 catch 当成「生图失败」弹出错误面板）
+    if (askChars && !charPayload.block
+      && !confirm('还没启用角色参考图，生成的图可能每格长得不一样。\n\n建议先去左边「角色参考图」加一张。\n\n仍然继续生图吗？')) return;
     const res = await withTimeout(api.imageGenerate({
       prompt: built.full,
       refs: charPayload.refs,
@@ -5609,16 +5638,17 @@ async function runAiSplit() {
       templateId: state.tpl.id,
       pageWidth: state.exportWidth,
       characterSheet: state.charSheet,
-      note: $('#charSheet')?.value?.trim() ? '' : undefined,
+      llm: state.llm,
     });
     if (!res.ok) {
       $('#scriptHint').textContent = `${res.error || '切分失败'}${res.hint ? ' · ' + res.hint : ''}`;
       toast(`切分失败：${res.code || res.error}`);
       return;
     }
-    // AI 的切分结果作为这一页的分镜（不再走规则引擎的节拍表）
-    state.aiPlan = { template: { id: state.tpl.id, name: state.tpl.name }, plan: res.plan, mode: 'ai-split' };
-    state.plan = { pages: [{ pageIndex: 1, segment: plot, analysis: state.analysis, templateScore: null, plan: res.plan }] };
+    // AI 的切分结果就是这一页的分镜。注意 aiPlan 必须是 plan 本身（带 template / panels）：
+    // 以前包了一层 {template, plan}，pagePlan() 拿到的是没有 panels 的外壳 → 分镜表和小框都是空的
+    state.aiPlan = res.plan;
+    state.aiDecision = null;
     renderScript();
     renderSlotPanel();
     const miss = res.quality?.missing?.length || 0;
@@ -5635,8 +5665,13 @@ async function runAiSplit() {
   }
 }
 
-async function runAiPrompts() {
-  if (!state.tpl) { toast('先选一套版式'); return; }
+/**
+ * AI 优化逐格提示词。
+ * @param {{silent?: boolean}} opts silent=true（全自动调用）：不弹提示，失败直接抛出，
+ *   让调用方的日志写「失败」而不是一律写「已优化」（以前内部吞掉错误，日志永远报成功）
+ */
+async function runAiPrompts({ silent = false } = {}) {
+  if (!state.tpl) { if (silent) throw new Error('还没有版式'); toast('先选一套版式'); return null; }
   const plot = $('#plot').value.trim();
   saveLlm();
   const btn = $('#btnAiPrompts');
@@ -5654,20 +5689,24 @@ async function runAiPrompts() {
       pageWidth: state.exportWidth,
       characterSheet: state.charSheet,
       llmPanels,
+      llm: state.llm,
     });
     if (!res.ok) {
-      toast(`优化失败：${res.code || res.error}`);
-      if (res.hint) $('#scriptHint').textContent = `${res.error || ''} · ${res.hint}`;
-      return;
+      const err = Object.assign(new Error(res.error || res.code || '优化失败'), { code: res.code, hint: res.hint });
+      throw err;
     }
     if (state.aiPlan && state.aiPlan.template?.id === state.tpl.id) state.aiPlan = res.plan;
     else state.plan = { pages: [{ pageIndex: 1, segment: plot, analysis: null, templateScore: null, plan: res.plan }] };
     renderScript();
     renderSlotPanel();
     $('#scriptHint').textContent = `${state.tpl.name} · ${res.applied}/${res.total} 格已 AI 优化${res.globalNotes ? ' · ' + res.globalNotes : ''}`;
-    toast(`AI 优化完成：${res.applied}/${res.total} 格`);
+    if (!silent) toast(`AI 优化完成：${res.applied}/${res.total} 格`);
+    return res;
   } catch (e) {
-    toast('优化失败：' + e.message);
+    if (silent) throw e;
+    toast(`优化失败：${e.code || e.message}`);
+    if (e.hint) $('#scriptHint').textContent = `${e.message} · ${e.hint}`;
+    return null;
   } finally {
     btn.disabled = false;
     btn.textContent = old;
@@ -5714,11 +5753,11 @@ function scriptMarkdown() {
  * 导出
  * ================================================================== */
 /** 导出用的整页 SVG（图片传进来的必须是 data URL，SVG 当 <img> 加载时读不到 blob:） */
-function stageSVG({ withImages = true, numbers = false, images = null } = {}) {
-  return renderTemplateSVG(state.tpl, {
+function stageSVG({ withImages = true, numbers = false, images = null, tpl = state.tpl, bubbles = state.bubbles } = {}) {
+  return renderTemplateSVG(tpl, {
     width: state.exportWidth,
     images: withImages ? (images || state.images) : {},
-    overlays: state.bubbles,
+    overlays: bubbles,
     showNumbers: numbers,
     showRoles: false,
     slotOutline: state.outlineExport,
@@ -5728,31 +5767,33 @@ function stageSVG({ withImages = true, numbers = false, images = null } = {}) {
   });
 }
 
-async function exportPNG() {
-  if (!state.tpl) return;
+/** SVG 字符串 → PNG Blob（白底；图片必须已经是 data URL，见 exportImageMap） */
+async function rasterizeSVG(svg, w, h) {
+  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
   try {
-    const svg = stageSVG({ images: await exportImageMap() });
-    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const img = await new Promise((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i);
-      i.onerror = () => rej(new Error('SVG 栅格化失败（图片可能跨域）'));
-      i.src = url;
-    });
-    const w = state.exportWidth;
-    const h = Math.round((w * state.tpl.page.h) / state.tpl.page.w);
+    const img = await loadImgEl(url).catch(() => { throw new Error('SVG 栅格化失败（图片可能跨域）'); });
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
+    const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+    if (!blob) throw new Error('浏览器没能生成 PNG（尺寸太大？）');
+    return blob;
+  } finally {
     URL.revokeObjectURL(url);
-    canvas.toBlob(async (b) => {
-      await exportBlob(b, `${state.tpl.id}-${w}px.png`);
-      toast(`已导出 PNG ${w}×${h}`);
-    }, 'image/png');
+  }
+}
+
+async function exportPNG() {
+  if (!state.tpl) return;
+  try {
+    const w = state.exportWidth;
+    const h = Math.round((w * state.tpl.page.h) / state.tpl.page.w);
+    const png = await rasterizeSVG(stageSVG({ images: await exportImageMap() }), w, h);
+    await exportBlob(png, `${state.tpl.id}-${w}px.png`);
+    toast(`已导出 PNG ${w}×${h}`);
   } catch (e) {
     toast('导出失败：' + e.message);
   }

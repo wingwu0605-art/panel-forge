@@ -73,6 +73,8 @@ export function snapshot() {
     bubbles: state.bubbles.map((b) => ({ ...b })),
     lines: { ...state.lines },
     promptEdits: JSON.parse(JSON.stringify(state.promptEdits || {})),
+    promptSrc: { ...state.promptSrc },
+    promptPrefix: { ...state.promptPrefix },
     selectedId: state.selectedId,
     selBubble: state.selBubble,
   };
@@ -83,6 +85,8 @@ export function restore(snap) {
   state.bubbles = snap.bubbles.map((b) => ({ ...b }));
   state.lines = { ...snap.lines };
   state.promptEdits = JSON.parse(JSON.stringify(snap.promptEdits || {}));
+  state.promptSrc = { ...(snap.promptSrc || {}) };
+  state.promptPrefix = { ...(snap.promptPrefix || {}) };
   state.selectedId = snap.selectedId;
   state.selBubble = snap.selBubble;
   ui.renderStage();

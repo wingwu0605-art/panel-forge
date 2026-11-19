@@ -13,7 +13,7 @@
  * 为什么要有它：折叠 / 面板消失这类问题靠读代码判断不了，必须真的渲染一次看几何。
  * 它只读页面状态、不写业务数据（不点删除、不点保存），所以随便重复跑。
  */
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -180,11 +180,18 @@ class Page {
     return file;
   }
 
-  /** 页面里的脚本错误 */
+  /**
+   * 页面里的脚本错误：console.error 之外，**未捕获的异常**也要算。
+   * 以前只听 Log.entryAdded，于是 `goCanvasOnCompact is not defined` 这种
+   * 点击回调里抛出的 ReferenceError 一直没被这套检查看见。
+   */
   errors() {
     return this.events
-      .filter((e) => e.method === 'Log.entryAdded' && e.params.entry.level === 'error')
-      .map((e) => e.params.entry.text);
+      .filter((e) => (e.method === 'Log.entryAdded' && e.params.entry.level === 'error')
+        || e.method === 'Runtime.exceptionThrown')
+      .map((e) => (e.method === 'Runtime.exceptionThrown'
+        ? 'uncaught: ' + String(e.params.exceptionDetails?.exception?.description || e.params.exceptionDetails?.text || '').split('\n')[0]
+        : e.params.entry.text));
   }
 
   close() { try { this.ws.close(); } catch { /* ignore */ } }
@@ -758,7 +765,9 @@ const scenarios = [
         g.fillStyle = '#2f6bff'; g.fillRect(0, 0, 1200, 1600);
         const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92));
         const canvas = document.querySelector('#canvas');
-        const r = canvas.getBoundingClientRect();
+        // 落在 p1 的中心：p6 下面要单独画一笔，底图基准必须是另一格
+        // （以前落在画布中心 = p6，是靠「一次拖放被处理两遍、第二遍塞进了别的格子」这个 bug 才凑巧通过）
+        const r = window.__pfSlotRect('p1');
         const dt = new DataTransfer();
         dt.items.add(new File([blob], 'base.jpg', { type: 'image/jpeg' }));
         canvas.dispatchEvent(new DragEvent('drop', {
@@ -2261,7 +2270,11 @@ const scenarios = [
         out.popAnim.open === 'railPopIn' && out.popAnim.swap === 'railPopSwap', `${out.popAnim.open} / ${out.popAnim.swap}`);
 
       // 静态产物自检：app.js 里 import 的每个相对模块，site/ 下必须真的存在
+      // （site/ 不入库：没构建过就先构建一次，否则这一条永远是假红）
       {
+        if (!existsSync(join(ROOT, 'site', 'index.html'))) {
+          execFileSync(process.execPath, [join(ROOT, 'scripts', 'build-static.mjs')], { cwd: ROOT, stdio: 'ignore' });
+        }
         const appSrc = readFileSync(join(ROOT, 'web', 'app.js'), 'utf8');
         const mods = [...appSrc.matchAll(/from '\.\/([^']+\.mjs)'/g)].map((m) => m[1]);
         const missing = [];
@@ -2743,25 +2756,28 @@ const scenarios = [
         const btns = ['#btnAiLine', '#btnAiLineReroll', '#btnAiLinesPage'].map((x) => {
           const b = document.querySelector(x); return b ? b.textContent.trim() : null;
         });
+        const bubbleCount = () => document.querySelectorAll('#canvas svg g[data-bubble]').length;
         document.querySelector('#btnAiLine').click();
         await wait(400);
         const one = {
           textarea: (document.querySelector('#slotLine') || {}).value || '',
           why: (document.querySelector('#suggestText') || {}).textContent || '',
           fromAi: ((document.querySelector('#suggestFrom') || {}).textContent || '').includes('AI'),
+          bubbles: bubbleCount(),
         };
         // 换一句：应把刚才那句作为 avoid 发出去
         document.querySelector('#btnAiLineReroll').click();
         await wait(400);
         const rerollAvoid = calls.length > 1 ? calls[1].avoid : null;
+        const rerollBubbles = bubbleCount();
         // 整页：只写空着的格子
         document.querySelector('#btnAiLinesPage').click();
         await wait(500);
         const pageCall = calls[calls.length - 1];
         return {
-          btns, one, rerollAvoid,
+          btns, one, rerollAvoid, rerollBubbles,
           pageIdsCount: pageCall ? pageCall.ids.length : 0,
-          bubbles: Object.keys(window.__pfState ? window.__pfState().bubbles : {}).length,
+          bubbles: bubbleCount(),
         };
       })()`);
 
@@ -2773,6 +2789,10 @@ const scenarios = [
       check('换一句：把上一句作为 avoid 发出去（不许重复）',
         !!out.rerollAvoid && Object.values(out.rerollAvoid).some((v) => String(v).includes('屋顶到头了')));
       check('整页：只写还没有句子的格子', out.pageIdsCount > 0 && out.pageIdsCount <= 6, String(out.pageIdsCount));
+      // 以前这一步往气泡数组上挂字符串属性，画面上一个气泡都没有
+      check('台词自动挂上气泡（单格 1 个）', out.one.bubbles === 1, `${out.one.bubbles} 个`);
+      check('「换一句」只换气泡里的字，不会越堆越多', out.rerollBubbles === 1, `${out.rerollBubbles} 个`);
+      check('整页写完每格都有气泡', out.bubbles === 6, `${out.bubbles} 个`);
       await shot('ai-lines');
     },
   },
