@@ -9,6 +9,7 @@ import { state } from './state.mjs';
 import { imageAsset } from './assets.mjs';
 import { store, KEYS, idbGet, idbSet, idbGetWithin } from './storage.mjs';
 import { toast } from './ui.mjs';
+import { ask } from './dialogs.mjs';
 import { downloadText } from './share.mjs';
 import { app } from './ctx.mjs';
 
@@ -37,7 +38,7 @@ export function renderChars() {
     return `<div class="char-item${on ? ' on' : ''}" data-id="${c.id}">
       <div class="char-thumbs">${(c.images || []).slice(0, 3).map((h) => `<img src="${escapeHtml(h)}" alt="">`).join('')}</div>
       <div class="char-meta">
-        <b>${escapeHtml(c.name || '未命名')}</b>
+        ${c.name ? `<b translate="no">${escapeHtml(c.name)}</b>` : '<b>未命名</b>'}
         <span>${escapeHtml(c.note || '')}</span>
       </div>
       <div class="char-acts">
@@ -342,7 +343,7 @@ export function bindRefs() {
     }
   });
   $('#btnCharClearAll')?.addEventListener('click', async () => {
-    if (!confirm('清空所有角色卡？参考图会一起删掉。')) return;
+    if (!(await ask('清空所有角色卡？参考图会一起删掉。', { ok: '清空', danger: true }))) return;
     state.chars = []; state.activeChars = [];
     await saveChars(); renderChars(); app.queueSave();
   });

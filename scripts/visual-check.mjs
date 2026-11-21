@@ -72,6 +72,44 @@ function freePort() {
 }
 
 /* ------------------------------------------------------------------ CDP 最小客户端 */
+/* ------------------------------------------------------------------ 翻译覆盖率收集（PF_LANG=…） */
+const I18N_LANG = process.env.PF_LANG || '';
+const I18N_MISSING = new Map();
+/**
+ * 两路收集：
+ *   1. 翻译引擎自己记的「翻不了的原文」（window.__pfI18nMiss，i18n.mjs 里的钩子）—— 一闪而过的 toast 也逃不掉
+ *   2. 每 300ms 扫一遍 DOM：还带中文的文本节点和 title / placeholder / aria-label
+ *      （英文 / 印尼语才扫；日文本身就有汉字和假名，靠第 1 路）
+ */
+const I18N_COLLECTOR = `(() => {
+  window.__pfI18nMiss = new Set();
+  window.__pfI18nLang = ${JSON.stringify(I18N_LANG)};   // 用例里临时切到别的语言时，那段不算
+  if (${JSON.stringify(I18N_LANG)} === 'ja') return;
+  const CJK = /[\\u3040-\\u30ff\\u3400-\\u9fff]/;   // 只认假名和汉字：单独的全角符号（「＋」）不算没翻
+  const skip = (el) => !el || !!el.closest('textarea, pre, code, script, style, [contenteditable="true"], [translate="no"], .notranslate');
+  const scan = () => {
+    if (!document.body || document.documentElement.dataset.lang !== window.__pfI18nLang) return;
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while (w.nextNode()) {
+      const n = w.currentNode;
+      const t = (n.nodeValue || '').trim();
+      if (t && CJK.test(t) && !skip(n.parentElement)) window.__pfI18nMiss.add(t);
+    }
+    for (const el of document.querySelectorAll('[title],[placeholder],[aria-label]')) {
+      if (skip(el)) continue;
+      for (const a of ['title', 'placeholder', 'aria-label']) {
+        const v = (el.getAttribute(a) || '').trim();
+        if (v && CJK.test(v)) window.__pfI18nMiss.add(v);
+      }
+    }
+  };
+  setInterval(scan, 300);
+})();`;
+async function harvestMissing(page) {
+  const got = await page.evaluate('window.__pfI18nMiss ? [...window.__pfI18nMiss] : []').catch(() => []);
+  for (const t of got || []) I18N_MISSING.set(t, (I18N_MISSING.get(t) || 0) + 1);
+}
+
 class Page {
   constructor(ws) {
     this.ws = ws;
@@ -149,7 +187,12 @@ class Page {
   }
 
   async goto(path) {
-    const url = path.startsWith('http') ? path : BASE + path;
+    let url = path.startsWith('http') ? path : BASE + path;
+    // 翻译覆盖率模式（PF_LANG=en|ja|id）：每次跳转前先把上一页收集到的漏翻收好，再带上 lang 参数打开
+    if (I18N_LANG) {
+      await harvestMissing(this);
+      if (!/[?&]lang=/.test(url)) url += (url.includes('?') ? '&' : '?') + 'lang=' + I18N_LANG;
+    }
     await this.send('Page.navigate', { url });
     await this.waitFor("document.readyState === 'complete'", { timeout: 15000, label: '页面加载' });
   }
@@ -1312,7 +1355,7 @@ const scenarios = [
 
   {
     name: 'i18n',
-    title: '⑭ 语言切换：English / Bahasa Indonesia（术语表也翻）',
+    title: '⑭ 语言切换：English / 日本語 / Bahasa Indonesia（印尼语收在「其他语言」里，术语表也翻）',
     async run(page, shot, { check }) {
       await page.viewport(1200, 900);
       await page.goto('/?fresh=1&tpl=ref-4band-2col&slot=p1');
@@ -1350,8 +1393,26 @@ const scenarios = [
         `卡片「${en.cardMeta}」· chip「${en.chips.join('/')}」`);
       await shot('i18n-en');
 
-      // 印尼语
-      await page.evaluate(`document.querySelector('#langSeg button[data-lang="id"]').click()`);
+      // 日本語（和中文、English 并列直接可选）
+      await page.evaluate(`document.querySelector('#langSeg button[data-lang="ja"]').click()`);
+      await sleep(1100);
+      const ja = await page.evaluate(sample);
+      check('日本語：按钮 / 标题 / 主行动都翻了',
+        ja.btn === '日本語' && ja.lang === 'ja' && /ルールでマッチ/.test(ja.match) && /コマ割り/.test(ja.title),
+        `${ja.btn} · ${ja.match} · ${ja.title}`);
+      check('日本語：术语表也翻了（コマ / ジャンル）',
+        /コマ/.test(ja.cardMeta) && ja.chips.some((c) => /コマ|会話/.test(c)),
+        `卡片「${ja.cardMeta}」· chip「${ja.chips.join('/')}」`);
+      await shot('i18n-ja');
+
+      // 印尼语：不在第一排，收在「其他语言」里
+      const where = await page.evaluate(`({
+        inSeg: !!document.querySelector('#langSeg [data-lang="id"]'),
+        inMore: !!document.querySelector('#langMore [data-lang="id"]'),
+        moreLabel: (document.querySelector('#langMore summary')?.textContent || '').trim(),
+      })`);
+      check('印尼语收在「其他语言」里（第一排只有 中文 / English / 日本語）', !where.inSeg && where.inMore && /その他の言語/.test(where.moreLabel), JSON.stringify(where));
+      await page.evaluate(`(() => { const d = document.querySelector('#langMore'); d.open = true; d.querySelector('[data-lang="id"]').click(); })()`);
       await sleep(1100);
       const id = await page.evaluate(sample);
       check('Bahasa Indonesia：按钮 / 主行动翻了',
@@ -1399,6 +1460,76 @@ const scenarios = [
       const back = await page.evaluate(sample);
       check('切回中文能干净恢复', back.lang === 'zh-CN' && /按规则匹配/.test(back.match) && back.btn === '中文',
         `${back.lang} · ${back.match}`);
+    },
+  },
+
+  {
+    name: 'i18n-coverage',
+    title: '⑭b 英文 / 日文 / 印尼语界面里没有漏翻的中文（含确认框、Key 管理、快捷键、全自动、导出）',
+    async run(page, shot, { check }) {
+      await page.viewport(1440, 900);
+      for (const lang of ['en', 'ja', 'id']) {
+        await page.goto(`/?fresh=1&tpl=jp-shonen-3tier&slot=p1&lang=${lang}&keys=1`);
+        await page.ready();
+        await sleep(500);
+        // 打开收集（翻译引擎把翻不了的原文记进 __pfI18nMiss），再切一次语言让整页重新过一遍
+        const relang = `(async () => {
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          document.querySelector('#langSeg [data-lang="zh"]').click();
+          await wait(250);
+          const more = document.querySelector('#langMore');
+          if (more) more.open = true;
+          document.querySelector('#appearancePop [data-lang="${lang}"]').click();
+          await wait(700);
+        })()`;
+        await page.evaluate(`window.__pfI18nMiss = new Set(); window.__pfAutoConfirm = false;`);
+        await page.evaluate(relang);
+        // 把常用的弹窗 / 面板都打开一遍
+        await page.evaluate(`(async () => {
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+          const click = (sel) => document.querySelector(sel)?.click();
+          document.querySelector('#keySheet')?.close?.();
+          await wait(200);
+          click('#btnShortcuts'); await wait(350);
+          document.querySelector('dialog[open]')?.close?.(); await wait(200);
+          click('#btnLang'); await wait(350); document.body.click(); await wait(200);
+          for (const t of ['script', 'export', 'slot']) { click('#tabs [data-tab="' + t + '"]'); await wait(300); }
+          click('#btnResetDraft'); await wait(450);
+          click('#askSheet [data-close="cancel"]'); await wait(300);
+          click('#autoSeg [data-auto="full"]'); await wait(400);
+          click('#btnAutoEstimate'); await wait(300);
+          const box = document.querySelector('#autoText');
+          if (box) { box.value = '第一章。'.repeat(400); box.dispatchEvent(new Event('input', { bubbles: true })); }
+          click('#btnAutoEstimate'); await wait(400);
+          click('#autoSeg [data-auto="off"]'); await wait(300);
+        })()`);
+        await page.evaluate(relang);
+        const res = await page.evaluate(`(() => {
+          const lang = ${JSON.stringify(lang)};
+          const WORD = /[\\u3040-\\u30ff\\u3400-\\u9fff]/;
+          const out = new Set(window.__pfI18nMiss || []);
+          if (lang !== 'ja') {
+            const skip = (el) => !el || !!el.closest('textarea, pre, code, script, style, [translate="no"], .notranslate');
+            const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+            while (w.nextNode()) {
+              const t = (w.currentNode.nodeValue || '').trim();
+              if (t && WORD.test(t) && !skip(w.currentNode.parentElement)) out.add(t);
+            }
+            for (const el of document.querySelectorAll('[title],[placeholder],[aria-label]')) {
+              if (skip(el)) continue;
+              for (const a of ['title', 'placeholder', 'aria-label']) {
+                const v = (el.getAttribute(a) || '').trim();
+                if (v && WORD.test(v)) out.add(v);
+              }
+            }
+          }
+          // 测试自己塞进去的原文（第一章……）不算界面文字
+          return [...out].filter((t) => !/第一章/.test(t));
+        })()`);
+        await shot('i18n-coverage-' + lang);
+        check(`${lang}：界面上没有漏翻的中文`, res.length === 0, res.length ? res.slice(0, 8).join(' / ') : '0 条');
+      }
+      await page.evaluate("localStorage.removeItem('pf.lang.v1')");
     },
   },
 
@@ -1779,7 +1910,7 @@ const scenarios = [
       // 桩掉 imageGenerate：慢 900ms 返回一张 1x1 PNG，模拟真实生图耗时
       const out = await page.evaluate(`(async () => {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-        window.confirm = () => true;
+        window.confirm = () => true; window.__pfAutoConfirm = true;
         const api = window.__pfApi();
         const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
         let askedFor = null;
@@ -1835,7 +1966,7 @@ const scenarios = [
 
       const out = await page.evaluate(`(async () => {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-        window.confirm = () => true;
+        window.confirm = () => true; window.__pfAutoConfirm = true;
         const api = window.__pfApi();
         const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
         const calls = { optimize: 0, images: 0 };
@@ -2748,7 +2879,7 @@ const scenarios = [
 
       const out = await page.evaluate(`(async () => {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-        window.confirm = () => true;
+        window.confirm = () => true; window.__pfAutoConfirm = true;
         const api = window.__pfApi();
         const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
         let imgCalls = 0;
@@ -3051,6 +3182,7 @@ async function main() {
     session = await launch();
     const page = session.page;
 
+    if (I18N_LANG) await page.send('Page.addScriptToEvaluateOnNewDocument', { source: I18N_COLLECTOR });
     for (const sc of picked) {
       const r = reporter(sc);
       try {
@@ -3059,6 +3191,7 @@ async function main() {
         r.check('场景跑完没报错', false, e.message);
       }
       report.push(r);
+      if (I18N_LANG) await harvestMissing(page);
       // 场景之间清掉 localStorage，免得上一个场景记的折叠状态影响下一个
       await page.evaluate('localStorage.clear()').catch(() => {});
     }
@@ -3071,6 +3204,12 @@ async function main() {
   } catch (e) {
     fatal = e;
   } finally {
+    if (I18N_LANG && session) {
+      await harvestMissing(session.page);
+      const file = join(OUT_DIR, `i18n-missing-${I18N_LANG}${SHARD ? '-' + SHARD.index : ''}.json`);
+      await writeFile(file, JSON.stringify([...I18N_MISSING.keys()].sort(), null, 1));
+      console.log(`\n[翻译覆盖率] ${I18N_LANG}：还有 ${I18N_MISSING.size} 条中文没翻 → ${file}`);
+    }
     session?.close();
   }
 

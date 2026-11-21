@@ -225,6 +225,8 @@ GET  /api/templates/{id}/shapes                      # 这套模板里每格是�
 3. **调图**：格内拖动改位置、`Alt+滚轮`缩放、填满/完整切换、复位。
 4. **拿提示词**：右栏「分镜表」逐格给出景别、节拍、画幅比、建议出图尺寸、英文提示词，可整页复制或下载 `.md`。
 5. **导出**：PNG（浏览器本地栅格化，图片按原始分辨率嵌入）、SVG、JSON、空模板镂空 SVG。
+6. **界面语言**：中文 / English / 日本語，其他语言里有 Bahasa Indonesia（右上角语言按钮；`?lang=en` 链接可直接分享）。
+   AI 写的台词和画面描述也跟着界面语言。
 
 ##### AI 导演（静态版也能用）
 
@@ -490,6 +492,9 @@ node scripts/test-llm-mock.mjs   # 14 项 AI 导演链路（本地假模型，�
 - 加戏路：`lib/taxonomy.mjs` 的 `INTENTS` 里加一条意图 + 关键词 + 节拍，匹配引擎立刻支持。
 - 加画风：`STYLE_PACKS` 加一套提示词包（描线、上色、负面词）。
 - 换渲染/排版后端：`lib/svg.mjs` 只依赖 `poly` 与 `clipPath`，换成 canvas / PSD / Figma 插件都很轻。
+- 加界面文字 / 加语言：词库是 `i18n/strings.tsv`（一行一条：中文、English、Bahasa Indonesia、日本語），
+  改完跑 `node scripts/i18n-build.mjs`；`--check` 会拦下没翻完的语言。
+  `PF_LANG=en node scripts/visual-check.mjs` 会在英文界面下跑全套用例并列出页面上还剩的中文。
 
 ---
 

@@ -32,7 +32,7 @@ for (const f of await readdir(path.join(root, 'web'))) {
 // 目录整体拷贝（新增文件不用每次改白名单）：
 //   vendor/  perfect-freehand（轻量笔用）
 //   klecks/  外部绘画引擎的预构建产物（iframe 里跑）
-for (const d of ['vendor', 'klecks']) {
+for (const d of ['vendor', 'klecks', 'i18n']) {
   await cp(path.join(root, 'web', d), path.join(site, d), { recursive: true });
 }
 for (const f of await readdir(path.join(root, 'lib'))) {
@@ -44,6 +44,7 @@ if (!html.includes('PF_STATIC')) {
   html = html.replace('</head>', '<script>window.PF_STATIC = true;</script>\n</head>');
 }
 // 按内容哈希给 CSS / JS 加版本号：内容一变链接就变，浏览器不会吃旧缓存（不用再手动改 ?v=）
+let BUILD_V = '';
 {
   const { createHash } = await import('node:crypto');
   const h = createHash('sha1');
@@ -53,7 +54,10 @@ if (!html.includes('PF_STATIC')) {
   }
 }
   for (const f of await readdir(path.join(site, 'lib'))) h.update(await readFile(path.join(site, 'lib', f)));
+  // 语言包也算进去：只改了译文时版本号也要变，不然浏览器还用缓存里的旧词典
+  for (const f of await readdir(path.join(site, 'i18n'))) h.update(await readFile(path.join(site, 'i18n', f)));
   const v = h.digest('hex').slice(0, 8);
+  BUILD_V = v;
   html = html.replace(/(\.\/(?:styles\.css|app\.js))(\?v=[\w-]*)?(?=")/g, `$1?v=${v}`);
 
   // 模块之间的 import 也要带同一个版本号。
@@ -73,7 +77,7 @@ if (!html.includes('PF_STATIC')) {
   // 自检：还有没带版本号的相对 import 就直接构建失败（CI 里会挡住发布）
   const LEFT = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"](\.{1,2}\/[^'"?]+\.m?js)['"]/g;
   const missed = [];
-  for (const dir of ['', 'lib', 'vendor']) {
+  for (const dir of ['', 'lib', 'vendor', 'i18n']) {
     for (const f of await readdir(path.join(site, dir))) {
       if (!/\.m?js$/.test(f)) continue;
       const src = await readFile(path.join(site, dir, f), 'utf8');
@@ -159,10 +163,17 @@ const sheetHtml = `<!doctype html>
 </header>
 <nav>${Object.entries(GROUPS).map(([k, v]) => {
   const n = TEMPLATES.filter((t) => t.culture === k).length;
-  return n ? `<a href="#${k}">${v} ${n}</a>` : '';
+  return n ? `<a href="#${k}"><span>${v}</span> ${n}</a>` : '';
 }).join('')}</nav>
 ${Object.keys(GROUPS).map(section).join('\n')}
 <footer>这是静态版的一览页（服务器版有同样的页面，路径 <code>/api/sheet</code>）。点开任意一套即可在编辑器里使用。</footer>
+<script type="module">
+  // 跟编辑器同一个语言设置（同源 localStorage）；?lang= 也认
+  import { installI18n } from './i18n.mjs?v=${BUILD_V}';
+  let lang = new URLSearchParams(location.search).get('lang');
+  try { lang = lang || localStorage.getItem('pf.lang.v1'); } catch { /* 隐私模式 */ }
+  if (lang && lang !== 'zh') installI18n(lang);
+</script>
 <script>
   document.querySelectorAll('figure').forEach((f) => {
     f.style.cursor = 'pointer';

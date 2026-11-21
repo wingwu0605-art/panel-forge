@@ -9,6 +9,7 @@ import { escapeHtml } from './util.mjs';
 import { SHELL } from './env.mjs';
 import { toast } from './ui.mjs';
 import { sheet } from './dialogs.mjs';
+import { t as tr } from './i18n.mjs';
 
 const cap = () => window.Capacitor;
 const isNative = () => !!cap()?.isNativePlatform?.();
@@ -17,7 +18,7 @@ const isNative = () => !!cap()?.isNativePlatform?.();
 export function downloadBlob(blob, name) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = name;
+  a.download = tr(name);   // 文件名跟着界面语言（「…-第3格.png」→「…-panel3.png」）
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
@@ -52,7 +53,8 @@ async function writeCache(blob) {
  * 有原生「存相册」插件就走它（Android WebView 不支持 <a download>，网页那套会静默失败）。
  * 返回 true = 已存进相册；false = 交给调用方退回下载。
  */
-export async function saveToGallery(blob, name) {
+export async function saveToGallery(blob, rawName) {
+  const name = tr(rawName);
   const plugin = cap()?.Plugins?.SaveImage;
   if (!plugin?.save) return false;
   try {
@@ -105,7 +107,9 @@ async function shareToPackage(pkg, blob) {
 }
 
 /** 系统分享：原生壳 → Capacitor Share；浏览器 → Web Share Level 2；都没有 → 存相册 / 下载 */
-export async function shareOrDownload(blob, name, title = 'PanelForge 分镜') {
+export async function shareOrDownload(blob, rawName, rawTitle = 'PanelForge 分镜') {
+  const name = tr(rawName);
+  const title = tr(rawTitle);
   const native = isNative();
   if (native && cap().Plugins?.Filesystem && cap().Plugins?.Share) {
     try {

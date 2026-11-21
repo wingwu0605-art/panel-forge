@@ -18,7 +18,7 @@ import { $, $$ } from './util.mjs';
 import { params, VERSION } from './env.mjs';
 import { store, KEYS } from './storage.mjs';
 import { withTransition } from './motion.mjs';
-import { setLang as setI18nLang, getLang } from './i18n.mjs';
+import { setLang as setI18nLang, getLang, ensureLang, LANGS } from './i18n.mjs';
 import { app } from './ctx.mjs';
 
 export const STYLES = [
@@ -48,7 +48,7 @@ const THEME_ICONS = {
   light: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8v2.1M10 16.1v2.1M1.8 10h2.1M16.1 10h2.1M4.2 4.2l1.5 1.5M14.3 14.3l1.5 1.5M4.2 15.8l1.5-1.5M14.3 5.7l1.5-1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
   dark: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.4 12.6A7 7 0 0 1 7.4 3.6a7 7 0 1 0 9 9Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
 };
-const LANG_LABEL = { zh: '中文', en: 'English', id: 'Bahasa Indonesia' };
+const LANG_LABEL = Object.fromEntries(LANGS.map((l) => [l.id, l.label]));
 
 const root = document.documentElement;
 const sysDark = window.matchMedia('(prefers-color-scheme: dark)');
@@ -182,19 +182,29 @@ export function initAppearance() {
     if (b.dataset.style !== style) withTransition('style', () => applyStyle(b.dataset.style));
   }));
 
-  // 语言：中文（源语言）/ English / Bahasa Indonesia
+  // 语言：中文（源语言）/ English / 日本語 直接可选，其余收在「其他语言」里
   const rebuildAll = () => app.rebuildLocalized?.();
   const syncLang = () => {
     const id = getLang();
     $('#langName').textContent = LANG_LABEL[id] || id;
     const tb = $('#btnLang');
     if (tb) {
-      tb.textContent = LANG_LABEL[id] || id;   // 按钮上就是当前语言本身（不是地球图标 / 国旗）
+      // 按钮上就是当前语言本身（不是地球图标 / 国旗）；放进 translate="no" 的 span，按钮的提示文字照常翻
+      let lab = tb.querySelector('[translate="no"]');
+      if (!lab) { lab = document.createElement('span'); lab.setAttribute('translate', 'no'); tb.replaceChildren(lab); }
+      lab.textContent = LANG_LABEL[id] || id;
       tb.setAttribute('aria-expanded', pop.classList.contains('open') ? 'true' : 'false');
     }
-    $$('#langSeg button').forEach((b) => b.classList.toggle('on', b.dataset.lang === id));
+    $$('#appearancePop [data-lang]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.lang === id);
+      b.setAttribute('aria-pressed', b.dataset.lang === id ? 'true' : 'false');
+    });
+    const more = $('#langMore');
+    if (more && LANGS.find((l) => l.id === id)?.more) more.open = true;
   };
-  const switchLang = (lang) => {
+  const switchLang = async (lang) => {
+    // 先把词典下载好，后面的切换就是同步的一步（不会出现半中半外的中间态）
+    try { await ensureLang(lang); } catch { /* 下载失败：setLang 会退回能用的状态 */ }
     // 动态块（模板库 / 右栏 / 气泡 / 页签）用中文原文重建一遍，i18n 的观察器会把新节点翻掉
     setI18nLang('zh');
     rebuildAll();
@@ -203,7 +213,7 @@ export function initAppearance() {
     store.set(KEYS.lang, id === 'zh' ? null : id);
     syncLang();
   };
-  $$('#langSeg button').forEach((b) => b.addEventListener('click', () => {
+  $$('#appearancePop [data-lang]').forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.lang !== getLang()) switchLang(b.dataset.lang);
   }));
   // 另一个标签页改了语言：跟着变（storage 事件只在「别的」标签页触发）

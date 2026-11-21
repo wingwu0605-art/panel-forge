@@ -72,3 +72,60 @@ export function sheet({ id, title, sub = '', body = '', width = 560, className =
   openModal(dlg);
   return { el: dlg, body: bodyEl, close: (v = '') => closeModal(dlg, v), closed };
 }
+
+/**
+ * 确认框（代替浏览器自带的 confirm()）：文案跟着界面语言走、样子和其它弹窗一致。
+ * 浏览器自带的确认 / 输入框是系统画的，不是页面元素，翻译不到 —— 外国用户点下去会弹出一个看不懂的中文框。
+ * @returns {Promise<boolean>}
+ */
+export function ask(message, { title = '请确认', ok = '确定', cancel = '取消', danger = false } = {}) {
+  if (window.__pfAutoConfirm) return Promise.resolve(true);   // 自动化测试钩子
+  const s = sheet({
+    id: 'askSheet',
+    title,
+    width: 440,
+    className: 'ask-sheet',
+    closeLabel: cancel,
+    body: `<p class="ask-msg"></p>
+      <div class="row2">
+        <button type="button" class="btn" data-close="cancel">${escapeHtml(cancel)}</button>
+        <button type="button" class="btn ${danger ? 'danger-fill' : 'primary'}" data-close="ok">${escapeHtml(ok)}</button>
+      </div>`,
+  });
+  const p = s.body.querySelector('.ask-msg');
+  String(message).split('\n').forEach((line, i) => {
+    if (i) p.append(document.createElement('br'));
+    p.append(line);
+  });
+  s.body.querySelector('[data-close="ok"]').focus();
+  return s.closed.then((v) => v === 'ok');
+}
+
+/**
+ * 输入框（代替浏览器自带的 prompt()）。取消返回 null。
+ * @returns {Promise<string|null>}
+ */
+export function askText(message, { title = '请输入', value = '', placeholder = '', ok = '确定', cancel = '取消' } = {}) {
+  const s = sheet({
+    id: 'askTextSheet',
+    title,
+    width: 460,
+    className: 'ask-sheet',
+    closeLabel: cancel,
+    body: `<form method="dialog" class="ask-form">
+        <label class="ask-msg"></label>
+        <input type="text" class="ask-input" autocomplete="off">
+        <div class="row2">
+          <button type="button" class="btn" data-close="cancel">${escapeHtml(cancel)}</button>
+          <button type="submit" class="btn primary" value="ok">${escapeHtml(ok)}</button>
+        </div>
+      </form>`,
+  });
+  s.body.querySelector('.ask-msg').textContent = message;
+  const input = s.body.querySelector('.ask-input');
+  input.value = value;
+  input.placeholder = placeholder;
+  input.focus();
+  input.select();
+  return s.closed.then((v) => (v === 'ok' ? input.value : null));
+}

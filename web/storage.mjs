@@ -10,7 +10,7 @@ export const KEYS = {
   accent: 'pf.accent',          // 强调色 id（跟随风格不存）
   style: 'pf.style',            // 风格：classic | glass | minimal | cute（经典不存）
   motion: 'pf.motion',          // reduced（正常不存）
-  lang: 'pf.lang.v1',           // zh | en | id（中文不存）
+  lang: 'pf.lang.v1',           // zh | en | ja | id（中文不存）
   fold: 'pf.fold.v1',           // 卡片 / 气泡库的折叠记录 {key: open}
   slotSec: 'pf.slotsec',        // 右栏分段的折叠记录
   layout: 'pf.layout.v2',       // 面板管理：{main|artist: {order, hidden, ai}}

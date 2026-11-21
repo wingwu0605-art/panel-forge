@@ -11,7 +11,7 @@ import { state, commit } from './state.mjs';
 import { imageAsset, loadImgEl } from './assets.mjs';
 import { store, KEYS } from './storage.mjs';
 import { play } from './motion.mjs';
-import { toast, setBusy } from './ui.mjs';
+import { toast, setBusy, busyLabel } from './ui.mjs';
 import { exportBlob, sharePickOrSheet, nativeShareTargets, openSharePicker } from './share.mjs';
 import { createCellPainter, localPoly } from './paint.mjs';
 import { createKlecksHost } from './paint-host.mjs';
@@ -285,8 +285,8 @@ export async function finishPaint() {
   if (paintEngine === 'klecks' && paintHost) {
     const host = paintHost;
     const btn = $('#paintDone');
-    const old = btn?.textContent;
-    if (btn) { setBusy(btn, true); btn.textContent = '取图…'; }
+    const restore = busyLabel(btn, '取图…');
+    if (btn) setBusy(btn, true);
     try {
       const raw = await host.exportPNG();
       const workSide = Math.max(host.width, host.height);
@@ -302,7 +302,7 @@ export async function finishPaint() {
       console.error('[paint] 取图失败', e);
       toast('取图失败：' + e.message);
     } finally {
-      if (btn) { setBusy(btn, false); btn.textContent = old || '完成'; }
+      if (btn) { setBusy(btn, false); restore(); }
     }
     return;
   }

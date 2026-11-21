@@ -355,6 +355,33 @@ ok('存在 withTimeout 工具', /function withTimeout\(/.test(appSrc2));
 ok('生图请求套了超时', /withTimeout\(api\.imageGenerate\(/.test(appSrc2));
 ok('有 IMG_TIMEOUT_MS 常量', /IMG_TIMEOUT_MS\s*=/.test(appSrc2));
 ok('有卡住时的逃生门 __pfUnstick', /__pfUnstick/.test(appSrc2));
+console.log('\n翻译引擎（英 / 日 / 印尼）');
+{
+  const { ensureLang, translate } = await import('../web/i18n.mjs');
+  await Promise.all(['en', 'ja', 'id'].map(ensureLang));
+  const tr = (s, l = 'en') => translate(s, l);
+  eq('整句词典', tr('按规则匹配'), 'Match by rules');
+  eq('带数字的句式', tr('已按阅读顺序填入 3 格'), 'Filled 3 panels in reading order');
+  eq('英文单数（1 panel，不是 1 panels）', tr('已按阅读顺序填入 1 格'), 'Filled 1 panel in reading order');
+  eq('具体句式优先（不被「{0}生图」抢走）', tr('第 3 格已生成，但 2 张参考图被忽略：当前模型不支持图生图'),
+    'Panel 3 generated, but 2 reference images were ignored: this model doesn’t support image-to-image');
+  eq('名字里的「·」不被切开', tr('· 选到「만화·动作页」（6 格）'), '· Picked “만화 · Action page” (6 panels)');
+  eq('信息行逐段翻', tr('1:2 (0.40) · 建议出图 576x1152 · 占页 6%'), '1:2 (0.40) · Suggested size 576x1152 · 6% of the page');
+  eq('分号句 + 顿号列表', tr('戏路匹配「战斗动作」；画面气质命中：动作、斜切、大格 · 6格 A4'),
+    'Genre match: “Combat”; Visual traits matched: Action, Diagonal, Large panel · 6 panels A4');
+  eq('句首「：」换成半角', tr('：每格的人可能长得不一样，建议先在左边「角色参考图」加一张').slice(0, 30), ': characters may look differen');
+  eq('句尾占位可以是空的', tr('导入 2 张角色卡'), 'Imported 2 character cards');
+  eq('日文：同形词也算认得（顿号列表照翻）', tr('少年、斜切、动势、大格', 'ja'), '少年、斜めゴマ、動き、大ゴマ');
+  eq('印尼语', tr('按规则匹配', 'id'), 'Cocokkan dengan aturan');
+  eq('中文原样返回', translate('按规则匹配', 'zh'), '按规则匹配');
+  eq('没收录的原样返回（不乱翻）', tr('这是一句没有收录的话'), '这是一句没有收录的话');
+  const core = await import('../lib/llm-core.mjs');
+  eq('AI 输出语言跟界面走：配置里带 lang', core.normalizeCfg({ lang: 'ja' }).lang, 'ja');
+  eq('不认识的语言回落中文', core.normalizeCfg({ lang: 'xx' }).lang, 'zh');
+  ok('英文界面：系统提示词末尾要求用 English 写', /English/.test(core.langNote('en')) && /kind/.test(core.langNote('en')));
+  eq('中文界面：不加语言要求', core.langNote('zh'), '');
+}
+
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 
 

@@ -77,7 +77,8 @@ node scripts/perf-bench.mjs     # 拖动性能赛跑：灌 N 张图 → 合成�
 | `web/ctx.mjs` | 模块间共享能力的 `app` 对象（`app.renderStage()` 等，app.js 启动前填好）—— 功能模块别 `import` app.js |
 | `web/theme.mjs` | 外观：明暗 × 风格 × 强调色 + 语言 + 减弱动效（`<html>` 上的 `data-scheme/style/accent`）|
 | `web/motion.mjs` | 动效：Web Animations 预设 `fx`、`staggerIn`、`withTransition`（View Transition）、`setFold` |
-| `web/dialogs.mjs` | 原生 `<dialog>`：`openModal` / `closeModal` / `sheet()`（动态弹窗都用它）|
+| `web/dialogs.mjs` | 原生 `<dialog>`：`openModal` / `closeModal` / `sheet()`（动态弹窗都用它）· `ask()` / `askText()` 代替浏览器的 confirm / prompt |
+| `web/i18n.mjs` · `i18n/strings.tsv` | 界面翻译：DOM 文本映射引擎（句式、分段、单复数、反查）· 词库一张表（中 / 英 / 印尼 / 日）。**加文案就在 TSV 加一行**，跑 `node scripts/i18n-build.mjs` 生成 `web/i18n/*.mjs`；作品内容（台词、气泡、角色名）标 `translate="no"` |
 | `web/drafts.mjs` · `storage.mjs` | 草稿（IndexedDB，图片按页分开存 Blob）· localStorage 键名总表 `KEYS` |
 | `web/keys.mjs` · `refs.mjs` · `inbox.mjs` · `auto-mode.mjs` · `paint-ui.mjs` | Key 管理 · 角色参考 · 拖放粘贴收件箱 · 全自动 · 绘画入口 |
 | `web/paint.mjs` | 兜底轻量笔（笔刷/撤销/多边形裁剪）；外部引擎起不来时用它 |

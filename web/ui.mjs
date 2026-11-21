@@ -23,6 +23,18 @@ export function setBusy(btn, on) {
   if (on) btn.setAttribute('aria-busy', 'true'); else btn.removeAttribute('aria-busy');
 }
 
+/**
+ * 按钮忙碌时临时换字：把原来的子节点整个收起来、结束时原样放回。
+ * 不用 `old = btn.textContent … btn.textContent = old`：那样会丢掉按钮里的 <kbd> / 图标，
+ * 而且放回去的是**当时的译文**，之后切语言它就不跟着变了。
+ */
+export function busyLabel(btn, text) {
+  if (!btn) return () => {};
+  const kept = [...btn.childNodes];
+  if (text != null) btn.textContent = text;
+  return () => btn.replaceChildren(...kept);
+}
+
 export function toast(msg) {
   const el = $('#toast');
   if (!el) return;

@@ -128,8 +128,7 @@ async function genPageImages() {
     title: '生成这一页的 ' + queue.length + ' 张图',
     body: '<ul class="danger-list">'
       + '<li><b>一键生成该页</b>：把这一页每个还没图的分镜依次生成</li>'
-      + '<li>用的就是<b>每格现在的提示词</b> —— 你手改过的、规则生成的，都按原样发出去，'
-      + '<b>不会</b>先做 AI 优化（要 AI 优化请用顶栏「全自动」）</li>'
+      + '<li><b>用的就是每格现在的提示词</b>：你手改过的、规则生成的，都按原样发出去，不会先做 AI 优化（要 AI 优化请用顶栏「全自动」）</li>'
       + '<li>点了就会一路做完，中途不会停（关掉页面会中断，但已发出的请求照样扣费）</li>'
       + '<li>每张图都会进候选，不满意的可以单独换</li>'
       + charsWarning()
@@ -157,9 +156,9 @@ async function genAllImages() {
   const first = await confirmDanger({
     title: '生成全部 ' + queue.length + ' 张图（跨 ' + pagesTouched + ' 页）',
     body: '<ul class="danger-list">'
-      + '<li><b>一键生成全部分镜</b>：共 <b>' + state.pages.length + ' 页</b>，其中 <b>' + pagesTouched + ' 页</b>缺图，共 <b>' + queue.length + ' 张</b></li>'
-      + '<li>用的是<b>每格现有提示词</b>（含你手改过的），<b>不会</b>先做 AI 优化</li>'
-      + '<li><b>开始后不会停</b>，直到这 ' + queue.length + ' 张全部跑完</li>'
+      + '<li><b>一键生成全部分镜</b>：共 ' + state.pages.length + ' 页，其中 ' + pagesTouched + ' 页缺图，共 ' + queue.length + ' 张</li>'
+      + '<li><b>用的是每格现有提示词</b>：含你手改过的，不会先做 AI 优化</li>'
+      + '<li><b>开始后不会停</b>：直到这 ' + queue.length + ' 张全部跑完</li>'
       + '<li>会花掉大量 token / 额度，这是本项目里最贵的一个按钮</li>'
       + charsWarning()
       + '</ul>',
@@ -243,7 +242,7 @@ function confirmCharacters({ pages = 1, panels = 0 } = {}) {
       const refs = (c.images || []).length;
       const warn = on && !refs;
       return `<div class="list-item cc-row${on ? ' on' : ''}${warn ? ' warn' : ''}">`
-        + `<span class="cc-dot">${on ? '●' : '○'}</span><b>${escapeHtml(c.name || '未命名')}</b>`
+        + `<span class="cc-dot">${on ? '●' : '○'}</span>${c.name ? `<b translate="no">${escapeHtml(c.name)}</b>` : '<b>未命名</b>'}`
         + (c.note ? `<span class="cc-note">${escapeHtml(c.note)}</span>` : '')
         + `<span class="cc-refs">${refs ? '参考图 ' + refs + ' 张' : '没有参考图'}</span>`
         + (on ? '' : '<span class="cc-off">未启用</span>')
@@ -299,11 +298,9 @@ async function autoRun() {
   const ok = await confirmDanger({
     title: mode === 'full' ? '真正全自动：全部交给 AI' : '分镜全自动：只做分镜与提示词',
     body: '<ul class="danger-list">'
-      + '<li>分 <b>' + est.pages + ' 页</b>，约 <b>' + est.panels + ' 个分镜</b>'
       + (mode === 'full'
-        ? '，约 <b>' + est.panels + ' 张图</b>、约 <b>' + est.panels + ' 句台词</b>（台词/旁白/内心由 AI 决定，气泡也由它布置）'
-        : '；台词与出图不自动做（之后可用右下角悬浮按钮单独触发）')
-      + '</li>'
+        ? '<li><b>分 ' + est.pages + ' 页 · 约 ' + est.panels + ' 个分镜 · 约 ' + est.panels + ' 张图 · 约 ' + est.panels + ' 句台词</b>：台词/旁白/内心由 AI 决定，气泡也由它布置</li>'
+        : '<li><b>分 ' + est.pages + ' 页 · 约 ' + est.panels + ' 个分镜</b>：台词与出图不自动做（之后可用右下角悬浮按钮单独触发）</li>')
       + '<li>共 ' + steps.length + ' 个步骤，每一步都打进下面的日志，你能看见内容是怎么一步步出来的</li>'
       + '<li><b>可以随时点「停止」</b>（已发出的请求会跑完，之后的不再发）</li>'
       + (mode === 'full' ? '<li>提示词用 AI 优化过的版本，不是规则模板</li>' : '')
@@ -368,7 +365,7 @@ async function autoRun() {
         if (cut?.ok && cut.plan) { adoptAutoPlan(cut.plan, pageText); autoLog('   · AI 切分完成', 'ok'); }
         else throw new Error(cut?.error || '切分失败');
       } catch (e) {
-        autoLog('   · AI 切分没成（' + String(e.message).slice(0, 40) + '），改用规则切分');
+        autoLog('   · AI 切分没成（' + String(e.message).slice(0, 160) + '），改用规则切分');
         try {
           const rp = await app.api.plan({ plot: pageText || text, templateId: state.tpl.id, pageWidth: state.exportWidth });
           if (rp?.plan) adoptAutoPlan(rp.plan, pageText);
@@ -380,14 +377,14 @@ async function autoRun() {
         await app.runAiPrompts({ silent: true });
         autoLog('   · 提示词已用 AI 优化过', 'ok');
       } catch (e) {
-        autoLog('   · 提示词优化失败（保留规则版）：' + String(e.message).slice(0, 40), 'bad');
+        autoLog('   · 提示词优化失败（保留规则版）：' + String(e.message).slice(0, 160), 'bad');
       }
 
       if (mode === 'full') {
         if (state.autoStop) break;
         autoLog('⑤ 第 ' + (i + 1) + ' 页：写台词/旁白并挂气泡…');
         try { await app.aiWriteLines('page', { silent: true }); autoLog('   · 台词与气泡布置完成', 'ok'); }
-        catch (e) { autoLog('   · 台词失败：' + String(e.message).slice(0, 40), 'bad'); }
+        catch (e) { autoLog('   · 台词失败：' + String(e.message).slice(0, 160), 'bad'); }
         if (state.autoStop) break;
         autoLog('⑥ 第 ' + (i + 1) + ' 页：逐格生成图片…');
         const panels = await currentPagePanels();

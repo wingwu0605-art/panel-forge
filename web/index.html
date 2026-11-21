@@ -40,6 +40,12 @@ window.addEventListener("unhandledrejection", function (e) {
     var a = g('pf.accent');
     if (a && a !== 'default' && a !== 'blue') d.dataset.accent = a;
     if (g('pf.motion') === 'reduced') d.dataset.motion = 'reduced';
+    // 非中文：词典下载好、整页翻完之前先不显示（不然会先闪一屏中文）；2.5 秒兜底
+    var lang = q.get('lang') || g('pf.lang.v1');
+    if (lang && lang !== 'zh') {
+      d.dataset.i18nPending = '1';
+      setTimeout(function () { delete d.dataset.i18nPending; }, 2500);
+    }
   })();
 </script>
 <title>PanelForge 分镜坊 · 中·日·韩 漫画分镜模板库</title>
@@ -66,12 +72,18 @@ window.addEventListener("unhandledrejection", function (e) {
   </div>
   <div class="pop-label"><span>强调色</span><b id="accentName">跟随风格</b></div>
   <div class="swatches" id="swatches"></div>
-  <div class="pop-label"><span>语言</span><b id="langName">中文</b></div>
+  <div class="pop-label"><span>语言</span><b id="langName" translate="no">中文</b></div>
   <div class="seg lang-seg" id="langSeg">
-    <button type="button" data-lang="zh">中文</button>
-    <button type="button" data-lang="en">English</button>
-    <button type="button" data-lang="id">Bahasa Indonesia</button>
+    <button type="button" data-lang="zh" translate="no">中文</button>
+    <button type="button" data-lang="en" translate="no">English</button>
+    <button type="button" data-lang="ja" translate="no">日本語</button>
   </div>
+  <details class="lang-more" id="langMore">
+    <summary>其他语言</summary>
+    <div class="lang-more-list">
+      <button type="button" data-lang="id" translate="no">Bahasa Indonesia</button>
+    </div>
+  </details>
   <div class="pop-row">
     <label class="switch"><input type="checkbox" id="chkReduceMotion"> 减弱动态效果</label>
   </div>
@@ -86,13 +98,13 @@ window.addEventListener("unhandledrejection", function (e) {
       <rect x="10.8" y="10.4" width="7.2" height="7.6" rx="1.8" fill="currentColor" fill-opacity=".7"/>
     </svg>
     <span class="name">PanelForge</span>
-    <span class="sub">分镜坊</span>
+    <span class="sub" translate="no">分镜坊</span>
   </div>
       <!-- 全自动模式：关闭 / 分镜全自动 / 真正全自动 -->
     <div class="auto-switch">
       <span class="auto-switch-label">自动</span>
       <div class="seg auto-seg" id="autoSeg" role="tablist" aria-label="全自动模式">
-        <button type="button" data-auto="off" class="on">关闭</button>
+        <button type="button" data-auto="off" class="on">关</button>
         <button type="button" data-auto="story">分镜自动</button>
         <button type="button" data-auto="full">全自动</button>
       </div>
@@ -109,7 +121,7 @@ window.addEventListener("unhandledrejection", function (e) {
     <a class="btn ghost sm" id="lnkTools" href="/api/ai-tools.json" target="_blank" rel="noreferrer">AI 工具定义</a>
   </nav>
   <!-- 语言：常驻但低调（显示当前语言本身，点开外观面板里的完整列表） -->
-  <button class="lang-btn" id="btnLang" type="button" title="界面语言" aria-haspopup="dialog" aria-expanded="false">中文</button>
+  <button class="lang-btn" id="btnLang" type="button" title="界面语言" aria-haspopup="dialog" aria-expanded="false"><span translate="no">中文</span></button>
   <button class="icon-btn" id="btnTheme" type="button" title="外观与配色" aria-label="外观与配色" aria-haspopup="dialog" aria-expanded="false"></button>
   <button class="icon-btn" id="btnMore" type="button" title="更多" aria-label="更多" aria-expanded="false">
     <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="10" r="1.6" fill="currentColor"/><circle cx="10" cy="10" r="1.6" fill="currentColor"/><circle cx="15.5" cy="10" r="1.6" fill="currentColor"/></svg>

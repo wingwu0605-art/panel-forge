@@ -11,6 +11,8 @@
  * 这个文件只负责「把引擎放进舞台 + 把结果取回来」。格子形状的裁剪由调用方做
  * （见 app.js 的 clipToSlot），所以换引擎时这里改，裁剪与回填都不用动。
  */
+import { getLang, t } from './i18n.mjs';
+
 export const PAINT_ENGINE_WORK_SIDE = 2048;
 
 /**
@@ -50,7 +52,7 @@ export function createKlecksHost({ slot, baseUrl = '', workSide = PAINT_ENGINE_W
       frame.className = 'paint-frame';
       frame.title = '绘制';
       frame.setAttribute('allow', 'clipboard-write');
-      frame.src = './klecks/embed.html';
+      frame.src = './klecks/embed.html?lang=' + getLang();   // Klecks 界面跟着主界面语言走
       stageEl.appendChild(frame);
 
       await new Promise((res, rej) => {
@@ -64,7 +66,7 @@ export function createKlecksHost({ slot, baseUrl = '', workSide = PAINT_ENGINE_W
       if (!w.__pfKlecksReady) throw new Error('embed.html 不是预期版本（缺 __pfKlecksReady）');
       await w.__pfKlecksReady;
       w.__pfOnSubmit = () => { try { onSubmit?.(); } catch { /* ignore */ } };
-      await w.__pfKlecksBoot({ width, height, baseUrl, guide });
+      await w.__pfKlecksBoot({ width, height, baseUrl, guide, names: { paper: t('纸'), base: t('底稿'), ink: t('绘制') } });
       // 记住用户选的白底/透明，挂载后应用一次
       if (paperOn === false) w.__pfKlecksPaper?.(false);
       return true;

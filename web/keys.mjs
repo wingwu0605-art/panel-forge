@@ -7,8 +7,8 @@
 import { $, escapeHtml, debounce } from './util.mjs';
 import { state } from './state.mjs';
 import { store, KEYS } from './storage.mjs';
-import { toast, setBusy } from './ui.mjs';
-import { openModal, closeModal } from './dialogs.mjs';
+import { toast, setBusy, busyLabel } from './ui.mjs';
+import { openModal, closeModal, ask } from './dialogs.mjs';
 import { app } from './ctx.mjs';
 
 /* ================================================================== *
@@ -100,8 +100,8 @@ export async function syncLlmStatus() {
 
 async function testLlm() {
   const btn = $('#btnLlmTest');
-  const old = btn.textContent;
-  setBusy(btn, true); btn.textContent = '测试中…';
+  const restore = busyLabel(btn, '测试中…');
+  setBusy(btn, true);
   saveLlm();
   try {
     const r = await app.api.llmTest({ llm: state.llm });
@@ -117,7 +117,7 @@ async function testLlm() {
   } catch (e) {
     toast('连接失败：' + e.message);
   } finally {
-    setBusy(btn, false); btn.textContent = old;
+    setBusy(btn, false); restore();
   }
 }
 
@@ -345,7 +345,7 @@ export function bindKeys() {
     $('#ksModel')?.classList.add('needs-check');
     setTimeout(() => $('#ksModel')?.classList.remove('needs-check'), 1600);
   });
-  $('#ksList')?.addEventListener('click', (ev) => {
+  $('#ksList')?.addEventListener('click', async (ev) => {
     const item = ev.target.closest('.ks-item');
     if (!item) return;
     const id = item.dataset.id;
@@ -360,7 +360,7 @@ export function bindKeys() {
       fillKeyForm(entry);
       $('#ksMsg').textContent = '正在编辑「' + entry.name + '」，改完点保存';
     } else if (act === 'del') {
-      if (!confirm('删掉「' + entry.name + '」的 Key？')) return;
+      if (!(await ask(`删掉「${entry.name}」的 Key？`, { ok: '删掉', danger: true }))) return;
       state.keys.entries = state.keys.entries.filter((e) => e.id !== id);
       if (state.keys.activeId === id) state.keys.activeId = state.keys.entries[0]?.id || null;
       saveKeyStore();
@@ -370,8 +370,8 @@ export function bindKeys() {
     }
   });
   $('#ksTest')?.addEventListener('click', async () => {
-    const btn = $('#ksTest'); const old = btn.textContent;
-    setBusy(btn, true); btn.textContent = '测试中…';
+    const btn = $('#ksTest'); const restore = busyLabel(btn, '测试中…');
+    setBusy(btn, true);
     $('#ksMsg').textContent = '正在请求对话模型…';
     try {
       const r = await app.api.llmTest({ llm: formEntry() });
@@ -387,7 +387,7 @@ export function bindKeys() {
     } catch (e) {
       $('#ksMsg').textContent = '❌ 对话模型失败：' + e.message;
       state._lastTestOk = false;
-    } finally { setBusy(btn, false); btn.textContent = old; }
+    } finally { setBusy(btn, false); restore(); }
   });
 
   /**
@@ -397,9 +397,9 @@ export function bindKeys() {
   $('#ksTestImg')?.addEventListener('click', async () => {
     const entry = formEntry();
     const model = entry.imgModel || '(未填生图模型)';
-    if (!confirm(`会用生图模型 ${model} 真实生成一张小图（约 0.02 元），继续吗？`)) return;
-    const btn = $('#ksTestImg'); const old = btn.textContent;
-    setBusy(btn, true); btn.textContent = '生成中…';
+    if (!(await ask(`会用生图模型 ${model} 真实生成一张小图（约 0.02 元），继续吗？`, { ok: '继续' }))) return;
+    const btn = $('#ksTestImg'); const restore = busyLabel(btn, '生成中…');
+    setBusy(btn, true);
     $('#ksMsg').textContent = '正在调用生图接口…';
     const t0 = Date.now();
     try {
@@ -422,7 +422,7 @@ export function bindKeys() {
     } catch (e) {
       $('#ksMsg').textContent = '❌ 生图失败：' + e.message;
       state._lastImgTestOk = false;
-    } finally { setBusy(btn, false); btn.textContent = old; syncImgReady(); }
+    } finally { setBusy(btn, false); restore(); syncImgReady(); }
   });
   // 生图这些字段一变就刷新「生图就绪」提示（它和对话模型是两条独立链路）
   ['ksImgProvider', 'ksImgModel', 'ksImgBase', 'ksImgKey', 'ksBase', 'ksKey'].forEach((id) => {

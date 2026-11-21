@@ -36,6 +36,9 @@ jobs:
       - name: 配色对比度（WCAG AA）
         run: node scripts/check-contrast.mjs
 
+      - name: 翻译词库（English / 日本語 / Bahasa Indonesia 都齐、生成物没过期）
+        run: node scripts/i18n-build.mjs --check
+
       - name: 构建静态站点
         run: node scripts/build-static.mjs
 

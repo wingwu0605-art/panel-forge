@@ -1,0 +1,1781 @@
+zh	en	id	ja
+分镜坊	Storyboard Forge	Studio Papan Cerita	コマ割り工房
+载入中…	Loading…	Memuat…	読み込み中…
+面板管理	Panels	Panel	パネル管理
+API 文档	API docs	Dokumentasi API	API ドキュメント
+全部模板接触表	Template sheet	Daftar template	全テンプレート一覧表
+AI 工具定义	AI tools	Alat AI	AI ツール定義
+静态态插件	Static	Plugin statis	静的プラグイン
+外观	Appearance	Tampilan	外観
+自动	Auto	Otomatis	自動
+浅色	Light	Terang	ライト
+深色	Dark	Gelap	ダーク
+强调色	Accent	Warna aksen	アクセントカラー
+蓝色	Blue	Biru	ブルー
+界面风格	Style	Gaya antarmuka	スタイル
+经典	Classic	Klasik	クラシック
+液态玻璃	Liquid Glass	Kaca cair	リキッドグラス
+减弱动态效果	Reduce motion	Kurangi animasi	視差効果を減らす
+语言	Language	Bahasa	言語
+剧情 → 分镜	Plot → storyboard	Alur cerita → papan cerita	あらすじ → コマ割り
+本地规则引擎	Local rule engine	Mesin aturan lokal	ローカルルールエンジン
+画风体系	Art style	Gaya gambar	画風の系統
+自动判断	Auto-detect	Deteksi otomatis	自動判定
+日式页漫（右→左）	Japanese manga (RTL)	Manga Jepang (kanan→kiri)	日本式ページ漫画（右→左）
+中式漫画（条漫/国风）	Chinese comic (webtoon)	Komik Tiongkok (webtoon)	中国式漫画（縦読み / 国風）
+韩式条漫（竖屏 webtoon）	Korean webtoon	Webtoon Korea	韓国式縦読み（縦画面 webtoon）
+画幅	Format	Format	画面比
+页漫（A4/B5）	Page (A4/B5)	Halaman (A4/B5)	ページ漫画（A4/B5）
+条漫（竖屏滚动）	Vertical scroll	Gulir vertikal	縦読み（縦スクロール）
+横版 / 跨页	Landscape / spread	Lanskap / dua halaman	横長 / 見開き
+方形	Square	Persegi	正方形
+按规则匹配	Match by rules	Cocokkan dengan aturan	ルールでマッチ
+让 AI 排戏	Let AI direct	Biarkan AI menyusun	AI に演出させる
+本地规则引擎：—	Local rule engine: —	Mesin aturan lokal: —	ローカルルールエンジン：—
+AI 导演	AI director	Sutradara AI	AI 監督
+可选	Optional	Opsional	任意
+未配置	Not set	Belum diatur	未設定
+未配置 Key	No API key	Belum ada API key	キー未設定
+输入 Key	Enter key	Masukkan key	キーを入力
+未配置 · 规则路仍然可用	Not set · rules still work	Belum diatur · aturan tetap jalan	未設定 · ルールはそのまま使えます
+规则路照常可用（AI 路需你填 Key，或设 LLM_API_KEY）	rules always work (AI needs a key, or set LLM_API_KEY)	aturan selalu jalan (AI perlu key, atau set LLM_API_KEY)	ルールはいつでも使えます（AI を使うにはキーを入力するか LLM_API_KEY を設定）
+规则路照常可用，AI 是可选加速	rules always work, AI is an optional speed-up	Aturan selalu bisa dipakai — AI opsional	ルールはいつでも使えます。AI は任意の時短機能です
+OpenAI 兼容	OpenAI-compatible	Kompatibel OpenAI	OpenAI 互換
+硅基流动	SiliconFlow	SiliconFlow	SiliconFlow
+仅本次会话	This session only	Hanya sesi ini	このセッションだけ
+测试连接	Test connection	Uji koneksi	接続テスト
+清除配置	Clear	Hapus	設定を消去
+角色设定（可选，保证每格同一张脸）	Character brief (optional, keeps the same face)	Catatan karakter (opsional, wajah tetap sama)	キャラ設定（任意、どのコマでも同じ顔に）
+AI 自动决定并排戏	Let AI pick and direct	Biarkan AI memilih dan menyusun	AI が自動で選んで演出
+生图	Image	Gambar	画像生成
+只写提示词	Prompt only	Hanya prompt	プロンプトだけ書く
+生这一格	Generate this panel	Buat panel ini	このコマを生成
+这一格的候选图	Candidates	Kandidat panel ini	このコマの候補
+换一张	Another	Ganti	別の画像
+清空候选	Clear candidates	Kosongkan kandidat	候補を消す
+生图提示词 ·	Image prompt ·	Prompt gambar ·	画像プロンプト ·
+测试对话	Test chat	Uji chat	チャットをテスト
+测试生图	Test image	Uji gambar	画像生成をテスト
+对话模型失败（不影响生图）：	Chat model failed (image generation is unaffected): 	Model chat gagal (pembuatan gambar tidak terpengaruh):	チャットモデルに失敗（画像生成には影響なし）：
+生图还没配好：缺生图模型	Image not configured: missing image model	Gambar belum diatur: model gambar belum ada	画像生成の設定が未完了：画像モデルがありません
+生图还没配好：缺 Key（生图 Key 或上面的 API Key 都行）	Image not configured: missing key (an image key or the API key above both work)	Gambar belum diatur: kunci belum ada (kunci gambar atau kunci API di atas sama-sama bisa)	画像生成の設定が未完了：キーがありません（画像用キーでも上の API キーでも可）
+已保存生图配置（可直接用「生这一格」）	Image config saved — you can use Generate this panel	Pengaturan gambar tersimpan — “Buat panel ini” bisa langsung dipakai	画像生成の設定を保存しました（「このコマを生成」がすぐ使えます）
+分享	Share	Bagikan	共有
+用其他 App 画	Draw in another app	Gambar di aplikasi lain	別のアプリで描く
+用哪一个 App 打开	Open with which app	Buka dengan aplikasi mana	どのアプリで開きますか
+只有能接收图片的 App 才会出现在这里	Only apps that accept images appear here	Hanya aplikasi yang bisa menerima gambar yang muncul di sini	画像を受け取れるアプリだけがここに表示されます
+用系统分享面板（更多 App）	System share sheet (more apps)	Panel berbagi sistem (aplikasi lain)	システムの共有メニュー（ほかのアプリ）
+已导出底图（含形状参考）：用别的 App 打开它，画完分享回 PanelForge 即可	Base image exported (with shape guide). Open it in another app, then share it back to PanelForge.	Gambar dasar diekspor (dengan panduan bentuk). Buka di aplikasi lain, lalu bagikan kembali ke PanelForge setelah selesai.	下絵（形のガイド付き）を書き出しました。別のアプリで開き、描き終えたら PanelForge に共有し戻してください
+导出底图失败：	Failed to export base image: 	Gagal mengekspor gambar dasar:	下絵を書き出せませんでした：
+已打开系统分享面板	Opened the system share sheet	Menu berbagi sistem dibuka	システムの共有メニューを開きました
+已下载（这个环境不支持直接分享）	Downloaded (sharing is not available here)	Diunduh (berbagi langsung tidak tersedia di sini)	ダウンロードしました（この環境では直接共有できません）
+收到分享的图，已填入第	Received a shared image, filled panel	Gambar yang dibagikan diterima, dimasukkan ke panel	共有された画像を受け取り、次のコマに入れました：
+白底	White paper	Kertas putih	白背景
+透明	Transparent	Transparan	透明
+画布改成白底（导出不透明 PNG）	Canvas set to white (opaque PNG on export)	Kanvas jadi putih (PNG tanpa transparansi)	キャンバスを白背景にしました（不透明 PNG で書き出し）
+画布改成透明（导出带透明通道）	Canvas set to transparent (PNG with alpha on export)	Kanvas jadi transparan (PNG dengan alpha)	キャンバスを透明にしました（透過付きで書き出し）
+规则切分	Rule split	Pecahan aturan	ルール割り
+自己写	Write my own	Tulis sendiri	自分で書く
+带开头词	Keep prefix	Pakai awalan	プレフィックス付き
+用规则切分的提示词	Using the rule-split prompt	Memakai prompt hasil aturan	ルール割りのプロンプトを使用
+用 AI 生成的提示词	Using the AI prompt	Memakai prompt AI	AI のプロンプトを使用
+自己写这一格的提示词	Writing this panel prompt yourself	Menulis sendiri prompt panel ini	このコマのプロンプトを自分で書く
+这一格还没有 AI 版提示词：先点「AI 切原文」或「AI 优化提示词」	No AI prompt for this panel yet — run "AI split text" or "AI-optimize prompts" first	Belum ada prompt AI untuk panel ini — jalankan "AI potong teks" dulu	このコマにはまだ AI 版のプロンプトがありません。先に「AI で原文を割り振る」か「AI でプロンプト最適化」を押してください
+自己写这一格的画面描述；开头词会自动保留在最前面（可在上面关掉）	Write this panel yourself; the prefix stays in front (toggle it above)	Tulis sendiri deskripsi panel ini; awalan tetap di depan (bisa dimatikan di atas)	このコマの画面説明を自分で書きます。プレフィックスは先頭に自動で残ります（上でオフにできます）
+这是自动生成的提示词，只读；想改就切到「自己写」	Auto-generated prompt (read-only). Switch to "Write my own" to edit.	Prompt otomatis (hanya baca). Beralih ke “Tulis sendiri” untuk mengubahnya.	自動生成のプロンプト（読み取り専用）です。直すなら「自分で書く」に切り替えてください
+AI 生成	AI generated	Dibuat AI	AI 生成
+恢复自动	Reset to auto	Kembali otomatis	自動に戻す
+避免出现	Avoid	Hindari	避けるもの
+实际发给生图模型的完整内容	What is actually sent to the model	Isi lengkap yang dikirim ke model	実際に画像モデルへ送る全文
+角色参考图	Character references	Referensi karakter	キャラ参考画像
+让同一个人每格都长一样	Same face in every panel	Wajah sama di setiap panel	同じ人物がどのコマでも同じ見た目に
+选参考图（1–3 张）	Pick references (1–3)	Pilih referensi (1–3)	参考画像を選ぶ（1〜3 枚）
+清空角色	Clear characters	Hapus karakter	キャラを消す
+还没有角色卡。加一张参考图，以后每次生图都会自动带上。	No characters yet. Add a reference and it is applied to every generation.	Belum ada karakter. Tambahkan referensi dan akan dipakai setiap kali.	まだキャラカードがありません。参考画像を 1 枚追加すると、以後の生成すべてに自動で付きます。
+导出角色卡	Export characters	Ekspor karakter	キャラカードを書き出す
+导入角色卡	Import characters	Impor karakter	キャラカードを読み込む
+分镜模板库	Template library	Perpustakaan template	コマ割りテンプレート集
+全部	All	Semua	すべて
+日	JP	JP	日
+中	CN	CN	中
+韩	KR	KR	韓
+通	Core	Umum	汎
+格数	Panels	Jumlah panel	コマ数
+题材	Genre	Genre	ジャンル
+标签	Tags	Tag	タグ
+清除筛选	Clear filters	Hapus filter	絞り込みを解除
+搜索：斜切 / 少女 / 九格 / 四格 / 战斗 / 留白	Search: diagonal / girl / 9-panel / 4-panel / action / whitespace	Cari: diagonal / gadis / 9 panel / 4 panel / aksi / ruang kosong	検索：斜め / 少女 / 9 コマ / 4 コマ / バトル / 余白
+选择一套分镜	Pick a layout	Pilih tata letak	コマ割りを選ぶ
+按顺序填充	Fill in order	Isi berurutan	順番に入れる
+示例	Demo	Contoh	サンプル
+清空图片	Clear images	Hapus gambar	画像を消す
+镂空	Outline	Kerangka	枠線のみ
+格号	Numbers	Nomor	番号
+快捷键	Shortcuts	Pintasan	ショートカット
+交接关系	Context	Konteks	つながり
+交代关系	Context	Konteks	状況説明
+拖图片进画布即可填充（自动裁切到格子形状，斜切格也不会变形）	Drop images on the canvas to fill panels — they’re clipped to the panel shape, even diagonal ones keep their proportions	Seret gambar ke kanvas — otomatis dipotong sesuai bentuk panel	画像をキャンバスにドラッグすると入ります（コマの形に自動で切り抜き、斜めゴマでも歪みません）
+页	Page	Halaman	ページ
+加一页	Add page	Tambah halaman	ページを追加
+导出全部页	Export all pages	Ekspor semua halaman	全ページを書き出す
+清空草稿	Clear draft	Hapus draf	下書きを消す
+格子	Panel	Panel	コマ
+导出	Export	Ekspor	書き出し
+还没有选中格子。	No panel selected.	Belum ada panel dipilih.	コマが選ばれていません。
+点画布里的任意一格开始；也可以直接在画布上拖入图片。	Click any panel to start, or drop images straight on the canvas.	Klik panel mana pun untuk mulai, atau seret gambar ke kanvas.	キャンバスのどれかのコマをクリックして始めましょう。画像を直接ドラッグすることもできます。
+绘制	Draw	Gambar	作画
+这一格说什么	Panel text	Teks panel ini	このコマのセリフ
+本格句子 ·	Line ·	Kalimat ·	このコマのセリフ ·
+放进气泡	To bubble	Jadikan balon	フキダシに入れる
+思路	Idea	Saran	アイデア
+填进去	Use	Isi	入れる
+这一格的分镜	Panel detail	Detail panel ini	このコマの割り
+空格子	Empty panel	Panel kosong	空のコマ
+空格子 · 点击下方按钮或拖入图片	Empty panel · pick an image below or drop one here	Panel kosong · pilih gambar di bawah atau seret ke sini	空のコマ · 下のボタンを押すか画像をドラッグ
+选图片填入此格	Pick an image	Pilih gambar	画像を選んでこのコマに入れる
+绘制这一格	Draw this panel	Gambar panel ini	このコマを描く
+用图片链接	From URL	Dari tautan	画像のリンクから
+移除图片	Remove image	Hapus gambar	画像を外す
+导出这一格的图	Export this panel	Ekspor panel ini	このコマの画像を書き出す
+缩放	Zoom	Perbesar	拡大縮小
+填满 / 完整	Cover / contain	Penuh / utuh	埋める / 全体
+复位位置	Reset	Reset	位置をリセット
+复制	Copy	Salin	コピー
+复制英文	Copy EN	Salin EN	英語をコピー
+复制中文	Copy ZH	Salin ZH	中国語をコピー
+中文版 ·	Chinese ·	Versi Mandarin ·	中国語版 ·
+喂国内模型更稳	better for CN models	lebih stabil untuk model CN	中国のモデルにはこちらが安定
+形状开头词 ·	Shape prefix ·	Awalan bentuk ·	形状プレフィックス ·
+景别	Shot	Ukuran bidikan	ショット
+节拍	beats	ketukan	ビート
+画面	Content	Isi gambar	画面
+台词	Dialogue	Dialog	セリフ
+构图	Composition	Komposisi	構図
+英文提示词	English prompt	Prompt Inggris	英語プロンプト
+中文提示词	Chinese prompt	Prompt Mandarin	中国語プロンプト
+逐格分镜表	Panel-by-panel sheet	Lembar per panel	コマごとの割り表
+分镜表	Sheet	Lembar	コマ割り表
+AI 优化提示词	AI-optimize prompts	Optimalkan prompt dengan AI	AI でプロンプト最適化
+AI 切原文	AI split text	AI potong teks	AI で原文を割り振る
+切分中…	Splitting…	Memotong…	割り振り中…
+AI 正在把源文本切成每格…	AI is splitting the source text into panels…	AI sedang memotong teks sumber per panel…	AI が元の文章を各コマに割り振っています…
+先在左栏粘贴源文本	Paste the source text in the left column first	Tempel teks sumber di kolom kiri dulu	先に左の欄に元の文章を貼り付けてください
+切分失败	Split failed	Gagal memotong	割り振りに失敗しました
+切分出错	Split error	Kesalahan memotong	割り振りでエラー
+复制全部	Copy all	Salin semua	すべてコピー
+下载分镜表 .md	Download sheet .md	Unduh lembar .md	コマ割り表 .md をダウンロード
+重新生成	Regenerate	Buat ulang	作り直す
+导出宽度	Export width	Lebar ekspor	書き出し幅
+无框模板保留虚线轮廓	Keep dashed outline for borderless	Pertahankan garis putus-putus	枠なしテンプレートは点線の輪郭を残す
+导出 PNG（整页）	Export PNG (page)	Ekspor PNG (halaman)	PNG で書き出す（ページ全体）
+导出 SVG（矢量）	Export SVG (vector)	Ekspor SVG (vektor)	SVG で書き出す（ベクター）
+导出 JSON（模板＋图位）	Export JSON (layout + slots)	Ekspor JSON (tata letak + slot)	JSON で書き出す（テンプレート＋画像の位置）
+导出空模板（镂空 SVG）	Export blank template (SVG)	Ekspor template kosong (SVG)	空のテンプレートを書き出す（枠線 SVG）
+气泡	Bubbles	Balon	フキダシ
+样式	Style	Gaya	スタイル
+点下面的气泡就能换样式	Click a bubble below to restyle it	Klik balon di bawah untuk mengganti gaya	下のフキダシを押すとスタイルを変えられます
+配这段字	fits this line	cocok untuk teks ini	このセリフに合う
+已经是这个样式了	Already this style	Sudah gaya ini	すでにこのスタイルです
+样式换成	Style changed to	Gaya diganti ke	スタイルを変更：
+推荐	Suggested	Saran	おすすめ
+常用	Frequent	Sering	よく使う
+清空	Clear	Kosongkan	消去
+透明度	Opacity	Transparansi	不透明度
+大小	Size	Ukuran	サイズ
+文字	Text	Teks	文字
+旋转	Rotate	Putar	回転
+删除	Delete	Hapus	削除
+模板库	Library	Perpustakaan	テンプレート集
+剧情	Plot	Alur	あらすじ
+画布	Canvas	Kanvas	キャンバス
+编辑	Edit	Edit	編集
+分镜与导出	Sheet & export	Lembar & ekspor	コマ割りと書き出し
+完成	Done	Selesai	完了
+说什么	Text	Teks	セリフ
+图片	Image	Gambar	画像
+分镜	Detail	Detail	割り
+编辑这一格	Edit panel	Edit panel	このコマを編集
+左栏每一块都能隐藏或调顺序 · 记住	Hide or reorder any block · remembered	Sembunyikan atau ubah urutan blok · diingat	左の各ブロックは非表示・並べ替えができます · 記憶されます
+关闭	Close	Tutup	閉じる
+启用 AI 功能（AI 导演 / 生图 / 优化提示词 / API Key）	Enable AI (director / images / prompts / API key)	Aktifkan AI (sutradara / gambar / prompt / API key)	AI 機能を有効にする（AI 監督 / 画像生成 / プロンプト最適化 / API キー）
+恢复默认	Reset to default	Kembalikan default	既定に戻す
+隐藏	Hide	Sembunyikan	隠す
+显示	Show	Tampilkan	表示
+怎么用	How to use	Cara pakai	使い方
+API Key 管理	API keys	Kelola API key	API キー管理
+打勾的那个就是当前用的服务商 · 可以存多家随时切	The checked one is active · switch anytime	Yang dicentang sedang dipakai · bisa disimpan banyak	チェックの付いたものが使用中のサービスです · 複数保存していつでも切り替えられます
+添加 / 编辑	Add / edit	Tambah / ubah	追加 / 編集
+服务商	Provider	Penyedia	サービス
+自定义 / 中转	Custom / proxy	Kustom / proksi	カスタム / 中継
+协议	Protocol	Protokol	プロトコル
+对话模型	Chat model	Model percakapan	チャットモデル
+只存在你浏览器	stored in your browser	hanya di browser Anda	ブラウザにだけ保存
+生图服务商	Image provider	Penyedia gambar	画像サービス
+生图模型	Image model	Model gambar	画像モデル
+保存并使用	Save and use	Simpan dan pakai	保存して使う
+取消	Cancel	Batal	キャンセル
+笔	Pen	Pena	ペン
+橡皮	Eraser	Penghapus	消しゴム
+撤销	Undo	Urungkan	元に戻す
+重做	Redo	Ulangi	やり直す
+笔迹出不了这一格；iPad 支持压感，笔在画时手指不会误触。	Strokes cannot leave this panel; Apple Pencil pressure is supported.	Goresan tidak bisa keluar dari panel ini; tekanan Apple Pencil didukung.	線はこのコマからはみ出しません。iPad は筆圧に対応し、ペンで描いている間は指が触れても反応しません。
+已复制	Copied	Disalin	コピーしました
+已保存	Saved	Disimpan	保存しました
+已导出	Exported	Diekspor	書き出しました
+已载入	Loaded	Dimuat	読み込みました
+未命名	Untitled	Tanpa nama	無題
+上一格 / 下一格	Previous / next panel	Panel sebelumnya / berikutnya	前のコマ / 次のコマ
+跳到第 N 格	Jump to panel N	Lompat ke panel N	N コマ目へ移動
+跳到下一个空格	Next empty panel	Ke panel kosong berikutnya	次の空きコマへ
+按规则匹配剧情	Match plot by rules	Cocokkan alur dengan aturan	あらすじをルールでマッチ
+填满 ↔ 完整	Cover ↔ contain	Isi ↔ utuh	埋める ↔ 全体
+复位（位置+缩放）	Reset position and zoom	Atur ulang (posisi + zoom)	リセット（位置＋拡大率）
+格内拖动平移	Drag to pan	Seret untuk menggeser di panel	コマ内でドラッグして移動
+拖拽	Drag	Seret	ドラッグ
+格内缩放	Zoom in panel	Zoom di panel	コマ内で拡大縮小
+滚轮	Wheel	Roda gulir	ホイール
+导出 PNG / SVG	Export PNG / SVG	Ekspor PNG / SVG	PNG / SVG で書き出す
+选中 / 拖动	Select / drag	Pilih / seret	選択 / ドラッグ
+点击	Click	Klik	クリック
+微调位置（Shift 加速）	Nudge (Shift = faster)	Geser halus (Shift = lebih cepat)	位置の微調整（Shift で速く）
+缩小 / 放大	Shrink / grow	Perkecil / perbesar	縮小 / 拡大
+复制气泡	Duplicate bubble	Duplikat balon	フキダシを複製
+删除选中（图/气泡）	Delete selection	Hapus pilihan (gambar / balon)	選択中を削除（画像 / フキダシ）
+取消选择	Deselect	Batalkan pilihan	選択を解除
+剪切	Cut	Potong	切り取り
+粘贴	Paste	Tempel	貼り付け
+战斗动作	Combat	Aksi tempur	バトルアクション
+爆发必杀	Finisher	Jurusan pamungkas	必殺の一撃
+追逐逃跑	Chase	Pengejaran	追跡・逃走
+情绪爆发	Outburst	Ledakan emosi	感情の爆発
+对话交流	Dialogue	Dialog	会話
+反转揭示	Reveal	Plot twist	どんでん返し
+悬疑紧张	Suspense	Ketegangan	サスペンス
+恐怖惊悚	Horror	Horor	ホラー
+恋爱心动	Romance	Romansa	恋愛・ときめき
+搞笑吐槽	Gag	Komedi	ギャグ・ツッコミ
+回忆内心	Flashback	Kilas balik	回想・心の内
+时间蒙太奇	Time montage	Montase waktu	時間のモンタージュ
+静默留白	Silence	Keheningan	沈黙・余白
+日常校园	Slice of life	Kehidupan sehari-hari	日常・学園
+对峙高潮	Standoff	Konfrontasi	対峙・クライマックス
+场景风光	Scenery	Pemandangan	風景
+竞技比赛	Sports	Olahraga	スポーツ・試合
+美食料理	Food	Kuliner	グルメ・料理
+战争群战	War	Perang	戦争・集団戦
+审讯辩论	Interrogation	Interogasi	取り調べ・論戦
+职场商战	Corporate	Dunia kerja	職場・ビジネス
+医疗急救	Medical	Medis	医療・救急
+法术异能	Supernatural	Kekuatan supranatural	魔法・異能
+灾难末日	Disaster	Bencana	災害・終末
+调查推理	Investigation	Investigasi	捜査・推理
+旅途探索	Journey	Perjalanan	旅・探索
+场景建立	Establishing	Pembuka lokasi	状況説明
+横长全景	Wide panorama	Panorama lebar	横長パノラマ
+全景	Wide shot	Bidikan lebar	ロングショット
+全身	Full body	Seluruh tubuh	全身
+群像	Group	Kelompok	群像
+中景	Medium shot	Bidikan sedang	ミディアムショット
+双人	Two-shot	Dua orang	ツーショット
+近景	Close shot	Bidikan dekat	バストショット
+面部特写	Face close-up	Close-up wajah	顔のアップ
+眼部大特写	Eye extreme close-up	Close-up mata	目の大アップ
+手部特写	Hand close-up	Close-up tangan	手のアップ
+物件特写	Object close-up	Close-up benda	物のアップ
+动作格	Action panel	Panel aksi	アクションゴマ
+冲击大格	Impact panel	Panel dampak	衝撃の大ゴマ
+反应小格	Reaction panel	Panel reaksi	リアクションの小ゴマ
+内心空镜	Inner empty shot	Bidikan batin	心象の空ショット
+俯视	High angle	Dari atas	俯瞰
+仰视	Low angle	Dari bawah	あおり
+背影	Back view	Dari belakang	後ろ姿
+剪影	Silhouette	Siluet	シルエット
+插入格	Insert panel	Panel sisipan	差し込みゴマ
+多格	Many panels	Banyak panel	多コマ
+双栏	Two columns	Dua kolom	2 列
+三段落	Three tiers	Tiga bagian	3 段
+对称	Symmetric	Simetris	対称
+页漫	Page manga	Manga halaman	ページ漫画
+通用	Universal	Umum	汎用
+对话	Dialogue	Dialog	会話
+四格	Yonkoma	Yonkoma	4 コマ
+网格	Grid	Kisi	グリッド
+小格	Small panels	Panel kecil	小ゴマ
+蒙太奇	Montage	Montase	モンタージュ
+密恐	Dense	Padat	過密
+大格	Large panel	Panel besar	大ゴマ
+越界	Bleed	Keluar batas	はみ出し
+留白	Whitespace	Ruang kosong	余白
+插图	Illustration	Ilustrasi	挿絵
+斜切	Diagonal	Diagonal	斜めゴマ
+二格	Two panels	Dua panel	2 コマ
+动势	Motion	Gerakan	動き
+竖切	Vertical cut	Potongan vertikal	縦割り
+叠盖	Overlap	Tumpang tindih	重ね
+特写	Close-up	Close-up	アップ
+横向	Horizontal	Horizontal	横向き
+条漫	Webtoon	Webtoon	縦読み
+竖向	Vertical	Vertikal	縦向き
+节奏	Pacing	Ritme	テンポ
+速写	Sketch	Sketsa	スケッチ
+对峙	Standoff	Konfrontasi	対峙
+三格	Three panels	Tiga panel	3 コマ
+不对称	Asymmetric	Asimetris	非対称
+并置	Juxtapose	Bersebelahan	並置
+电影感	Cinematic	Sinematik	映画的
+日常	Daily	Harian	日常
+变形	Distorted	Terdistorsi	変形ゴマ
+搞笑	Comedy	Lucu	ギャグ
+少年	Shonen	Shonen	少年
+冲击	Impact	Dampak	衝撃
+速度线	Speed lines	Garis kecepatan	スピード線
+跨页	Spread	Dua halaman	見開き
+少女	Shojo	Shojo	少女
+柔和	Soft	Lembut	柔らかい
+无框	Borderless	Tanpa bingkai	枠なし
+回忆	Flashback	Kilas balik	回想
+青年	Seinen	Seinen	青年
+堆叠	Stacked	Bertumpuk	積み重ね
+恐怖	Horror	Horor	ホラー
+暗部	Shadow	Bayangan	暗部
+悬疑	Mystery	Misteri	サスペンス
+反应格	Reaction	Reaksi	リアクションゴマ
+节奏快	Fast pacing	Ritme cepat	テンポが速い
+剪辑	Cut	Potongan	カット割り
+推镜	Push-in	Zoom masuk	寄り
+打击	Hit	Pukulan	打撃
+静默	Silent	Senyap	沈黙
+动作	Action	Aksi	アクション
+快节奏	Quick pace	Tempo cepat	ハイテンポ
+悬念	Suspense	Ketegangan	引き
+长条	Strip	Gulir panjang	縦長
+叙事完整	Full narrative	Cerita lengkap	物語が完結
+长镜头	Long take	Bidikan panjang	長回し
+恋爱	Romance	Romansa	恋愛
+反转	Twist	Balikan	どんでん返し
+国风	Chinese style	Gaya Tiongkok	国風
+武侠	Wuxia	Wuxia	武侠
+仙侠	Xianxia	Xianxia	仙侠
+宫斗	Palace drama	Drama istana	宮廷劇
+都市	Urban	Perkotaan	都会
+玄幻	Fantasy	Fantasi	ファンタジー
+彩漫	Full color	Berwarna	カラー漫画
+大片感	Epic	Epik	大作感
+氛围	Mood	Suasana	雰囲気
+情绪	Emotion	Emosi	感情
+惊悚	Thriller	Thriller	スリラー
+截断	Cropped	Terpotong	途切れ
+连载	Serialized	Berseri	連載
+转场	Transition	Transisi	場面転換
+复制提示词	Copy prompt	Salin prompt	プロンプトをコピー
+复制中文提示词	Copy ZH prompt	Salin prompt ZH	中国語プロンプトをコピー
+复制形状词	Copy shape	Salin bentuk	形状プレフィックスをコピー
+复制中文形状词	Copy ZH shape	Salin bentuk ZH	中国語の形状プレフィックスをコピー
+填入选中格	Fill selected panel	Isi panel terpilih	選択中のコマに入れる
+还没写	empty	kosong	未入力
+通用镜头	Generic shot	Bidikan umum	汎用ショット
+斜切格	Diagonal panel	Panel diagonal	斜めゴマ
+竖长格	Tall panel	Panel tinggi	縦長ゴマ
+常规格	Regular panel	Panel biasa	通常のコマ
+横幅格	Banner panel	Panel spanduk	横長ゴマ
+戏路	genres	genre	ジャンル
+关键词	keywords	kata kunci	キーワード
+场景族	scene families	keluarga adegan	場面の系統
+基调	tones	nada	トーン
+戏路 ·	genres ·	genre ·	ジャンル ·
+关键词 ·	keywords ·	kata kunci ·	キーワード ·
+节拍 ·	beats ·	ketukan ·	ビート ·
+场景族 ·	scenes ·	adegan ·	場面の系統 ·
+基调 ·	tones ·	nada ·	トーン ·
+静态态	Static	Statis	静的版
+离线可用	Offline ready	Bisa offline	オフライン対応
+AI 接入说明	AI setup	Panduan AI	AI 接続ガイド
+全部模板一览	Template overview	Ikhtisar templat	全テンプレート一覧
+阅读顺序	Reading order	Urutan baca	読む順
+填你自己的模型 API：AI 会在规则筛出的合法版式里	Plug in your own model API: from the layouts the rules allow, AI will	Pakai API model Anda: dari tata letak yang lolos aturan, AI akan	自分のモデル API を入れると、AI はルールで絞り込んだ有効なレイアウトの中から
+自己挑一套并逐格排戏	pick one and direct panel by panel	memilih satu dan menyusun per panel	1 つ選んでコマごとに演出します
+（画面内容＋台词）。Key 只存在本机浏览器与本地服务之间，不写盘、不外传。	 (visual content + dialogue). Your key never leaves this browser and your local service — never written to disk, never shared.	 (isi gambar + dialog). API key hanya tersimpan di browser ini dan layanan lokal — tidak ditulis ke disk, tidak dikirim keluar.	（画面の内容＋セリフ）。キーはこのブラウザとローカルのサービスの間だけに置かれ、ディスクにも書かず外にも出しません。
+例：18岁剑客，黑短发，左眉有疤，深色高领外套，银色长刀	e.g. 18-year-old swordsman, short black hair, scar over the left eyebrow, dark high-collar coat, silver longsword	contoh: pendekar 18 tahun, rambut hitam pendek, bekas luka di alis kiri, mantel kerah tinggi gelap, pedang panjang perak	例：18 歳の剣士、黒髪ショート、左眉に傷、濃い色のハイネックのコート、銀の長刀
+（AI 路需你填 Key，或设 LLM_API_KEY）	 (AI needs a key, or set LLM_API_KEY)	 (AI perlu key, atau set LLM_API_KEY)	（AI を使うにはキーを入力するか LLM_API_KEY を設定）
+就绪	Ready	Siap	準備完了
+待填 Key	Key needed	Perlu key	キー未入力
+规则路照常可用	rules always work	aturan selalu jalan	ルールはいつでも使えます
+规则路仍然可用	rules still work	aturan tetap jalan	ルールはそのまま使えます
+默认模型	default model	model bawaan	既定のモデル
+浏览器直连	Browser direct	Langsung dari browser	ブラウザから直接接続
+Key 只在你这台机器上	key stays on this machine	key tetap di mesin ini	キーはこの端末にだけあります
+静态版也能用 AI：在上面填自己的 Key（只在浏览器里，不上传）。规则路不用 Key，随时可用	AI works in the static build too: enter your own key above (kept in this browser, never uploaded). Rules need no key and always work.	AI juga berfungsi di versi statis: isi key Anda di atas (hanya di browser, tidak diunggah). Aturan tidak perlu key dan selalu jalan.	静的版でも AI を使えます：上に自分のキーを入れてください（ブラウザ内だけで、アップロードしません）。ルールはキー不要でいつでも使えます
+怎么用（30 秒）	How to use (30 seconds)	Cara pakai (30 detik)	使い方（30 秒）
+在「分镜模板库」选一套版式（或先写剧情，让引擎替你挑）。	Pick a layout in the template library — or write the plot first and let the engine choose.	Pilih tata letak di perpustakaan template — atau tulis alurnya dulu dan biarkan mesin memilih.	「コマ割りテンプレート集」でレイアウトを選びます（先にあらすじを書いてエンジンに選ばせても OK）。
+点格子 → 选图；或把一批图	Click a panel → pick an image; or drop a batch of images	Klik panel → pilih gambar; atau seret beberapa gambar	コマをクリック → 画像を選ぶ。または画像をまとめて
+直接拖进画布	straight onto the canvas	langsung ke kanvas	キャンバスに直接ドラッグ
+，按阅读顺序自动填。	 and they fill in reading order.	 dan terisi sesuai urutan baca.	すると、読む順に自動で入ります。
+拖图可调位置，Alt+滚轮缩放；Ctrl+V 粘贴到选中格。	Drag an image to reposition it, Alt+wheel to zoom, Ctrl+V pastes into the selected panel.	Seret gambar untuk memindahkan, Alt+scroll untuk memperbesar, Ctrl+V menempel ke panel terpilih.	画像はドラッグで位置調整、Alt＋ホイールで拡大縮小。Ctrl+V で選択中のコマに貼り付けます。
+「分镜表」拿每格景别＋生图提示词；「导出」出 PNG/SVG。	The sheet gives you each panel's shot size and image prompt; Export writes PNG/SVG.	Lembar panel memberi ukuran bidikan dan prompt tiap panel; Ekspor menghasilkan PNG/SVG.	「コマ割り表」で各コマのショット＋画像プロンプトを取得、「書き出し」で PNG / SVG に。
+换模板时图片会按阅读顺序跟着搬家，方便横向对比版式。	Images follow the reading order when you switch templates, so layouts are easy to compare.	Saat berganti template, gambar ikut urutan baca sehingga mudah membandingkan tata letak.	テンプレートを替えても画像は読む順についてくるので、レイアウトを見比べやすくなっています。
+隐私：	Privacy: 	Privasi: 	プライバシー：
+图片全程在你浏览器里处理（FileReader → SVG → canvas），	images are processed entirely in your browser (FileReader → SVG → canvas), 	gambar diproses sepenuhnya di browser Anda (FileReader → SVG → canvas), 	画像はすべてブラウザ内で処理され（FileReader → SVG → canvas）、
+不上传、不落盘	never uploaded, never written to disk	tidak diunggah, tidak ditulis ke disk	アップロードもディスク保存もしません
+；关掉标签页就清空。只有剧情文字会发给你自己配置的模型。	; closing the tab clears everything. Only your plot text goes to the model you configured.	; menutup tab menghapus semuanya. Hanya teks alur yang dikirim ke model Anda.	。タブを閉じれば消えます。自分で設定したモデルに送られるのはあらすじの文字だけです。
+启用的角色会自动进提示词，参考图也会发给支持参考的模型。导出的 JSON 里带着参考图，队友导入就能用同一批人。	Enabled characters are added to prompts automatically and references are sent to models that support them. The exported JSON carries the references, so teammates import and get the same cast.	Karakter yang aktif otomatis masuk ke prompt dan referensinya dikirim ke model yang mendukung. JSON hasil ekspor membawa referensi, jadi rekan tim bisa memakai karakter yang sama.	有効にしたキャラは自動でプロンプトに入り、参考画像も対応するモデルに送られます。書き出した JSON に参考画像が入っているので、チームの人が読み込めば同じキャラを使えます。
+静态版	Static build	Versi statis	静的版
+先在「分镜模板库」选一套版式，或做一次	First pick a layout in the template library, or run a	Pilih tata letak di perpustakaan template, atau jalankan	先に「コマ割りテンプレート集」でレイアウトを選ぶか、一度
+剧情匹配	plot match	pencocokan alur	あらすじのマッチ
+点击格子选图 · 拖图到格子 · 批量拖入自动按顺序填充 · Ctrl+V 粘贴	Click a panel to pick an image · drag images onto panels · drop a batch to fill in order · Ctrl+V pastes	Klik panel untuk memilih gambar · seret gambar ke panel · seret banyak gambar untuk mengisi berurutan · Ctrl+V menempel	コマをクリックして画像を選ぶ · 画像をコマにドラッグ · まとめてドラッグすると順番に入る · Ctrl+V で貼り付け
+（未填，写剧情或让 AI 排戏）	(empty — write the plot or let AI direct)	(kosong — tulis alurnya atau biarkan AI menyusun)	（未入力。あらすじを書くか AI に演出させてください）
+（无）	(none)	(tidak ada)	（なし）
+空	Empty	Kosong	空
+双方位置与距离	Positions and distance	Posisi dan jarak	双方の位置と距離
+避免	Avoid	Hindari	避ける
+已自动放在生图提示词	already placed at the start of the image prompt	sudah diletakkan di awal prompt gambar	画像プロンプトの
+最前面	start	awal	先頭に自動で入っています
+；用别的工具出图时也可单独复制。常规格：按景别正常构图	; you can also copy it separately when using other tools. Regular panel: compose by shot size	; bisa juga disalin saat memakai alat lain. Panel biasa: komposisi sesuai ukuran bidikan	。別のツールで生成するときは単独でコピーもできます。通常のコマ：ショットに合わせてふつうに構図を取ります
+画幅比	Aspect ratio	Rasio aspek	画面比
+页面画幅	Page format	Format halaman	ページの画面比
+跟随模板	Follow template	Ikuti template	テンプレートに合わせる
+A4 竖 · 1:1.41	A4 portrait · 1:1.41	A4 tegak · 1:1.41	A4 縦 · 1:1.41
+9:16 条漫	9:16 webtoon	9:16 webtoon	9:16 縦読み
+16:9 横版	16:9 landscape	16:9 lanskap	16:9 横長
+1:1 方形	1:1 square	1:1 persegi	1:1 正方形
+1:2 竖长	1:2 tall	1:2 tinggi	1:2 縦長
+自定义…	Custom…	Kustom…	カスタム…
+页宽 px	Width px	Lebar px	ページ幅 px
+页高 px	Height px	Tinggi px	ページ高さ px
+等比留白（不拉伸格子）	Fit with margins (no stretch)	Sesuai skala dengan margin (tanpa tarik)	等比の余白（コマを引き伸ばさない）
+应用到这一页	Apply to this page	Pakai di halaman ini	このページに適用
+恢复模板画幅	Reset to template format	Kembali ke format template	テンプレートの画面比に戻す
+页面尺寸	Page size	Ukuran halaman	ページサイズ
+宽高比	Aspect	Rasio	縦横比
+导出后	Exported	Setelah ekspor	書き出し後
+长边	Long edge	Sisi panjang	長辺
+（模板坐标）	(template units)	(satuan template)	（テンプレート座標）
+拉伸铺满	Stretch to fill	Tarik penuh	引き伸ばして埋める
+模板原样	Template default	Bawaan template	テンプレートのまま
+点「应用到这一页」生效	Press "Apply to this page" to apply	Tekan "Pakai di halaman ini" untuk menerapkan	「このページに適用」を押すと反映されます
+还没载入模板	No template loaded yet	Template belum dimuat	テンプレートがまだ読み込まれていません
+16:9 横版 / 跨页	16:9 landscape / spread	16:9 lanskap / dua halaman	16:9 横長 / 見開き
+长条滚动	Long scroll	Gulir panjang	縦長スクロール
+整页占比	Share of page	Porsi halaman	ページに占める割合
+导出像素	Export pixels	Piksel ekspor	書き出しピクセル
+建议出图	Suggested size	Ukuran saran	推奨サイズ
+输出尺寸	Output size	Ukuran keluaran	出力サイズ
+格数 / 已填	Panels / filled	Panel / terisi	コマ数 / 入力済み
+画风	Art style	Gaya gambar	画風
+PNG 由浏览器本地栅格化，图片以原始分辨率嵌入；导出前建议把「镂空」关掉。	PNG is rasterized locally by the browser with images at full resolution — turn off “Outline” before exporting.	PNG dirasterisasi lokal oleh browser dengan gambar beresolusi penuh — matikan “Kerangka” sebelum mengekspor.	PNG はブラウザ内でラスタライズされ、画像は元の解像度で埋め込まれます。書き出す前に「枠線のみ」をオフにしてください。
+关掉 AI 后，左栏的 AI 面板、每格的生图按钮和候选图会一起收起来；想用随时打开。	With AI off, the AI panel, per-panel generate buttons and candidate strip are hidden together; turn it back on anytime.	Dengan AI nonaktif, panel AI, tombol buat gambar, dan kandidat ikut disembunyikan; bisa diaktifkan lagi kapan saja.	AI をオフにすると、左の AI パネル、各コマの生成ボタン、候補画像がまとめてしまわれます。いつでも戻せます。
+硅基流动 SiliconFlow	SiliconFlow	SiliconFlow	SiliconFlow
+删除气泡	Delete bubble	Hapus balon	フキダシを削除
+当前：填满裁切	Now: cover (cropped)	Sekarang: penuh (dipotong)	現在：埋めて切り抜き
+当前：完整显示	Now: contain (whole image)	Sekarang: utuh	現在：全体を表示
+视图	View	Tampilan	表示
+格号开关	Panel numbers	Nomor panel	コマ番号の表示切替
+镂空预览	Outline preview	Pratinjau kerangka	枠線のみのプレビュー
+快捷键表	Shortcut list	Daftar pintasan	ショートカット一覧
+在输入框/文本域里打字时，单键快捷键不生效（避免误触）。	Single-key shortcuts are disabled while typing in a field (to avoid accidents).	Pintasan satu tombol nonaktif saat mengetik di kolom input.	入力欄で文字を打っている間は、1 キーのショートカットは無効です（誤操作防止）。
+摆开架势	Opening stance	Sikap pembuka	構える
+近方格	Near-square panel	Panel hampir persegi	正方形に近いコマ
+冲击瞬间	Impact moment	Momen dampak	衝撃の瞬間
+受击/反应	Hit / reaction	Terkena / reaksi	被弾 / リアクション
+反击再起	Counterattack	Serangan balik	反撃して再起
+右→左	R→L	K→Kr	右→左
+左→右	L→R	Kr→K	左→右
+上→下	T→B	A→B	上→下
+日式页漫	Japanese manga	Manga Jepang	日本式ページ漫画
+中式漫画	Chinese comic	Komik Tiongkok	中国式漫画
+韩式条漫	Korean webtoon	Webtoon Korea	韓国式縦読み
+웹툰	Webtoon	Webtoon	ウェブトゥーン
+만화	Manhwa	Manhwa	マンファ
+長条漫	Long strip	Strip panjang	長尺縦読み
+长条漫	Long strip	Strip panjang	長尺縦読み
+少年漫	Shonen	Shonen	少年漫画
+青年漫	Seinen	Seinen	青年漫画
+少女漫	Shojo	Shojo	少女漫画
+竖屏	Vertical	Vertikal	縦画面
+三栏并置	Three side-by-side columns	Tiga kolom berdampingan	3 列並置
+长条漫·竖屏	Long strip · vertical	Strip panjang · vertikal	長尺縦読み · 縦画面
+椭圆对话泡	Round bubble	Balon bulat	楕円フキダシ
+圆角对话泡	Rounded bubble	Balon sudut bulat	角丸フキダシ
+双线对话泡	Double-line bubble	Balon dua garis	二重線フキダシ
+云朵思考泡	Thought cloud	Awan pikiran	雲形の思考フキダシ
+虚框内心泡	Inner monologue	Monolog batin	点線の心の声フキダシ
+尖角喊叫泡	Shout balloon	Balon teriakan	トゲの叫びフキダシ
+爆炸冲击泡	Burst balloon	Balon ledakan	爆発の衝撃フキダシ
+重描边方泡	Heavy box	Kotak tebal	太枠の四角フキダシ
+旁白框	Narration box	Kotak narasi	ナレーション枠
+旁白标签	Narration tag	Label narasi	ナレーションラベル
+反白字幕条	Caption bar	Bilah teks	白抜き字幕帯
+耳语波纹泡	Whisper wavy	Balon bisikan	ささやきの波線フキダシ
+小旁注	Side note	Catatan samping	小さな注釈
+箭头指示泡	Arrow callout	Balon panah	矢印付きフキダシ
+「绘制」会把上面这张图当底稿放进画布 —— 可以在上面描线、擦、覆盖；画完自动裁成格子形状贴回来。AI 生成的图、你自己拖进来的照片都是同一套流程。	Draw puts this image into the canvas as a base layer — trace over it, erase it, paint on it; the result is clipped to the panel shape. AI images and your own photos follow the same flow.	Tombol Gambar menaruh foto ini di kanvas sebagai lapisan dasar — bisa ditimpa, dihapus, atau dicat; hasilnya dipotong sesuai bentuk panel. Gambar AI dan foto Anda memakai alur yang sama.	「作画」は上の画像を下絵としてキャンバスに置きます。上からなぞる・消す・塗りつぶすことができ、描き終えるとコマの形に切り抜いて戻ります。AI が生成した画像も自分で入れた写真も同じ流れです。
+生成中…	Generating…	Membuat…	生成中…
+生图中…	Generating image…	Membuat gambar…	画像を生成中…
+已复制到剪贴板	Copied to clipboard	Disalin ke papan klip	クリップボードにコピーしました
+台词 / 旁白 / 内心独白（自动存到本机）	Dialogue / narration / inner voice (saved locally)	Dialog / narasi / suara hati (disimpan lokal)	セリフ / ナレーション / モノローグ（この端末に自動保存）
+粘贴一段剧情，越具体越准。例如：雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋，两人在积水里僵持。	Paste your plot — the more specific the better. e.g. On a rainy rooftop he slowly draws his blade; an enemy strikes from behind, he spins and cuts the blade in half; they face off in the puddles.	Tempel alur cerita — makin detail makin akurat. Contoh: Di atap saat hujan malam, ia perlahan mencabut pedangnya; musuh menyerang dari belakang, ia berputar dan memotong pedang itu; keduanya berhadapan di genangan air.	あらすじを貼り付けてください。具体的なほど正確になります。例：雨の夜の屋上で、彼はゆっくりと刀を抜く。背後から敵が襲いかかり、彼は振り向きざまに相手の刃を断ち切る。二人は水たまりの中でにらみ合う。
+{#0} 套模板 · {#1} 种格型	{0} templates · {1} panel types	{0} template · {1} jenis panel	テンプレート {0} 種 · コマの形 {1} 種
+{#0} 套	{0} templates	{0} template	{0} 種
+{#0}套	{0} templates	{0} template	{0} 種
+{#0} 格	{0} panels	{0} panel	{0} コマ
+{#0}格	{0} panels	{0} panel	{0} コマ
+{#0} 张候选	{0} candidates	{0} kandidat	候補 {0} 枚
+第 {#0} 页	Page {0}	Halaman {0}	{0} ページ目
+导出中 {#0}/{#1}…	Exporting {0}/{1}…	Mengekspor {0}/{1}…	書き出し中 {0}/{1}…
+绘制第 {#0} 格	Draw panel {0}	Gambar panel {0}	{0} コマ目を描く
+第 {#0} 格	Panel {0}	Panel {0}	{0} コマ目
+已填入 {#0} 格	Filled {0} panels	{0} panel terisi	{0} コマに入れました
+已恢复上次的 {#0} 页草稿	Restored {0} draft pages	Draf {0} halaman dipulihkan	前回の下書き {0} ページを復元しました
+已存这一格（{#0} 笔）	Saved this panel ({0} strokes)	Panel disimpan ({0} goresan)	このコマを保存しました（{0} 画）
+{0} ｜ {1}	{0} | {1}	{0} | {1}	{0} ｜ {1}
+{#0}格 · {1} · 左→右 · 上→下	{0} panels · {1} · L→R · T→B	{0} panel · {1} · K→Kr · A→B	{0} コマ · {1} · 左→右 · 上→下
+{#0}格 · {1} · 右→左 · 上→下	{0} panels · {1} · R→L · T→B	{0} panel · {1} · Kr→K · A→B	{0} コマ · {1} · 右→左 · 上→下
+{#0}×{#1} {#2}格	{0}×{1} · {2} panels	{0}×{1} · {2} panel	{0}×{1} · {2} コマ
+编辑第 {#0} 格	Edit panel {0}	Edit panel {0}	{0} コマ目を編集
+浏览器直连 · {0} · {1}（Key 只在你这台机器上）	Browser direct · {0} · {1} (key stays on this machine)	Langsung dari browser · {0} · {1} (key tetap di mesin ini)	ブラウザから直接接続 · {0} · {1}（キーはこの端末にだけあります）
+__title__	PanelForge · Manga storyboard template library	PanelForge · Perpustakaan template papan cerita	PanelForge · 漫画コマ割りテンプレート集
+本地规则引擎 v{0}：{1}	Local rule engine v{0}: {1}	Mesin aturan lokal v{0}: {1}	ローカルルールエンジン v{0}：{1}
+{0}（{#1} 格）	{0} ({1} panels)	{0} ({1} panel)	{0}（{1} コマ）
+{0}（{#1}格）	{0} ({1} panels)	{0} ({1} panel)	{0}（{1} コマ）
+风格	Style	Gaya	スタイル
+高级简约	Minimal	Minimalis	ミニマル
+灵动可爱	Playful	Ceria	ポップ
+跟随风格	Follow style	Ikuti gaya	スタイルに合わせる
+中文	中文	中文	中文
+日本語	日本語	日本語	日本語
+其他语言	More languages	Bahasa lain	その他の言語
+分镜自动	Auto storyboard	Papan cerita otomatis	コマ割り自動
+全自动	Full auto	Otomatis penuh	全自動
+分镜全自动	Full-auto storyboard	Papan cerita otomatis penuh	コマ割り全自動
+决定画几页、每页怎么切；你只改提示词和男女主形象	Decides how many pages and how to split each one; you only edit the prompts and the leads' looks	Menentukan jumlah halaman dan cara membagi tiap halaman; Anda cukup mengubah prompt dan tampilan tokoh utama	何ページ描くか、各ページをどう割るかを決めます。あなたはプロンプトと主人公2人の見た目を直すだけ
+上传文件	Upload file	Unggah berkas	ファイルをアップロード
+估算页数	Estimate pages	Perkirakan halaman	ページ数を見積もる
+男主形象	Male lead look	Tampilan tokoh pria	男性主人公の見た目
+女主形象	Female lead look	Tampilan tokoh wanita	女性主人公の見た目
+粘贴全文后点「估算页数」看看要画几页	Paste the full text, then click “Estimate pages” to see how many pages it needs	Tempel teks lengkap, lalu klik “Perkirakan halaman” untuk melihat jumlah halaman	全文を貼り付けて「ページ数を見積もる」を押すと、何ページ必要か分かります
+开始	Start	Mulai	開始
+停止	Stop	Berhenti	停止
+排戏范围	Staging scope	Cakupan penyusunan	演出の範囲
+不限	Any	Bebas	指定なし
+少年（热血 / 战斗）	Shonen (hot-blooded / action)	Shonen (semangat / aksi)	少年（熱血 / バトル）
+少女（情感 / 细腻）	Shojo (emotional / delicate)	Shojo (emosional / halus)	少女（感情 / 繊細）
+青年（黑暗 / 写实）	Seinen (dark / realistic)	Seinen (gelap / realistis)	青年（ダーク / 写実）
+火山方舟 Seedream	Volcengine Ark Seedream	Volcengine Ark Seedream	火山方舟 Seedream
+风格跟随	Style follows	Gaya mengikuti	スタイルの参照
+AI 生图时参考谁	What the AI follows when generating images	Acuan AI saat membuat gambar	AI が画像生成で参考にするもの
+跟人设图	Character sheet	Lembar karakter	キャラ設定画
+跟样图	Style samples	Contoh gaya	見本画像
+都参考	Both	Keduanya	両方
+都不跟	Neither	Tidak ada	どちらも使わない
+样图 · 可多张（拖进来或 Ctrl+V 粘贴）	Style samples · several allowed (drag in or paste with Ctrl+V)	Contoh gaya · boleh beberapa (seret ke sini atau tempel dengan Ctrl+V)	見本画像 · 複数可（ドラッグか Ctrl+V で貼り付け）
+选样图	Choose samples	Pilih contoh	見本を選ぶ
+按参考图的画风、线宽、上色方式画；有样图时不跟人设图（除非选「都参考」）。	Draws in the reference images’ art style, line weight and coloring. With style samples present the character sheet is ignored (unless you pick “Both”).	Menggambar mengikuti gaya, ketebalan garis, dan pewarnaan gambar referensi. Jika ada contoh gaya, lembar karakter diabaikan (kecuali Anda memilih “Keduanya”).	参考画像の画風・線の太さ・塗り方に合わせて描きます。見本画像があるときはキャラ設定画を使いません（「両方」を選んだ場合を除く）。
+放入图片	Add images	Tambah gambar	画像を入れる
+AI 写这一格	AI writes this panel	AI tulis panel ini	AI でこのコマを書く
+换一句	Another line	Kalimat lain	別のセリフ
+AI 写整页	AI writes the page	AI tulis satu halaman	AI でページ全体を書く
+已经自动放在上面生图提示词的最前面；自己用别的工具出图时也可以单独复制。	Already placed at the very start of the image prompt above; you can also copy it on its own when using another tool.	Sudah otomatis diletakkan di awal prompt gambar di atas; bisa juga disalin sendiri saat memakai alat lain.	上の画像プロンプトの先頭に自動で入っています。別のツールで生成するときは単独でコピーもできます。
+载入模板后自动生成；写一段剧情再匹配，景别与提示词会更贴合。	Generated automatically once a template loads; write a plot and match it to get better-fitting shots and prompts.	Dibuat otomatis setelah templat dimuat; tulis alur cerita lalu cocokkan agar bidikan dan prompt lebih pas.	テンプレートを読み込むと自動生成されます。あらすじを書いてマッチさせると、ショットとプロンプトがより合います。
+火山方舟（豆包）	Volcengine Ark (Doubao)	Volcengine Ark (Doubao)	火山方舟（Doubao）
+通义百炼	Alibaba Bailian (Qwen)	Alibaba Bailian (Qwen)	通義百煉（Qwen）
+OpenAI 兼容（GPT / 中转）	OpenAI-compatible (GPT / relay)	Kompatibel OpenAI (GPT / relay)	OpenAI 互換（GPT / 中継）
+火山方舟 Seedream（豆包）	Volcengine Ark Seedream (Doubao)	Volcengine Ark Seedream (Doubao)	火山方舟 Seedream（Doubao）
+「测试连接」只测对话模型；只填生图模型也能直接用格子里的「生这一格」。模型 ID 从控制台复制（带日期后缀）。	“Test connection” only checks the chat model; with just an image model filled in you can still use “Generate this panel”. Copy the model ID from your console (including the date suffix).	“Uji koneksi” hanya menguji model chat; dengan model gambar saja Anda tetap bisa memakai “Buat panel ini”. Salin ID model dari konsol (termasuk akhiran tanggal).	「接続テスト」はチャットモデルだけを確認します。画像モデルだけでもコマの「このコマを生成」は使えます。モデル ID はコンソールからコピーしてください（日付の接尾辞付き）。
+生图用另一把 Key / 另一个服务商（可选）	Use a different key / provider for images (optional)	Kunci / penyedia lain untuk gambar (opsional)	画像生成に別のキー / 別のサービスを使う（任意）
+生图 Base URL（留空 = 用上面的）	Image Base URL (empty = use the one above)	Base URL gambar (kosong = pakai yang di atas)	画像用 Base URL（空欄 = 上と同じ）
+生图 API Key（留空 = 用上面的）	Image API key (empty = use the one above)	Kunci API gambar (kosong = pakai yang di atas)	画像用 API キー（空欄 = 上と同じ）
+火山方舟 / OpenAI / 硅基流动 / 通义百炼：同一个 Key 就能两项都用，这里留空即可。 只有当「文本用 A 家、生图用 B 家」，或某家中转分开授权时，才需要分两把。	Volcengine Ark / OpenAI / SiliconFlow / Bailian: one key covers both, so leave this empty. You only need two keys when text and images come from different providers, or a relay authorizes them separately.	Volcengine Ark / OpenAI / SiliconFlow / Bailian: satu kunci cukup untuk keduanya, jadi biarkan kosong. Dua kunci hanya perlu bila teks dan gambar dari penyedia berbeda, atau relay memberi izin terpisah.	火山方舟 / OpenAI / SiliconFlow / 通義百煉：1 つのキーで両方使えるので、ここは空欄で構いません。テキストと画像を別のサービスで使う場合や、中継サービスが別々に認可する場合だけ 2 つ必要です。
+在输入框/文本域里打字时，单键快捷键不生效（避免误触）；带 Ctrl 的组合键仍可用。	Single-key shortcuts are off while you type in a text field (to avoid accidents); Ctrl combinations still work.	Pintasan satu tombol tidak aktif saat mengetik di kolom teks (agar tidak salah tekan); kombinasi Ctrl tetap berfungsi.	入力欄で文字を打っている間は 1 キーのショートカットは無効です（誤操作防止）。Ctrl との組み合わせは使えます。
+一键生成	Generate all	Buat semua	一括生成
+该页	This page	Halaman ini	このページ
+全部分镜	All panels	Semua panel	すべてのコマ
+确认	Confirm	Konfirmasi	確認
+这一步会花掉很多 token，而且中途停不下来	This step uses a lot of tokens and can’t be stopped midway	Langkah ini memakai banyak token dan tidak bisa dihentikan di tengah jalan	このステップは大量のトークンを使い、途中で止められません
+我已知晓上面的说明	I understand the above	Saya memahami penjelasan di atas	上記の説明を理解しました
+继续	Continue	Lanjut	続ける
+外观与配色	Appearance & color	Tampilan & warna	外観と配色
+全自动模式	Full-auto mode	Mode otomatis penuh	全自動モード
+界面语言	Language	Bahasa antarmuka	表示言語
+更多	More	Lainnya	その他
+把全文粘到这里，或把 .txt / .md 文件直接拖进这个框（小说／剧本／大纲都行）。开始后我会自己决定画几页、每页怎么分。	Paste the full text here, or drag a .txt / .md file into this box (novel, script or outline all work). Once started, I’ll decide how many pages to draw and how to split each one.	Tempel teks lengkap di sini, atau seret berkas .txt / .md ke kotak ini (novel, naskah, atau kerangka). Setelah mulai, saya akan menentukan jumlah halaman dan cara membaginya.	ここに全文を貼り付けるか、.txt / .md ファイルをこの枠にドラッグしてください（小説・脚本・プロットどれでも可）。開始すると、何ページ描くか、各ページをどう割るかを自分で決めます。
+例：黑短发、左眉疤、深色高领外套	e.g. short black hair, scar on left brow, dark turtleneck coat	mis. rambut hitam pendek, bekas luka di alis kiri, mantel kerah tinggi gelap	例：黒髪ショート、左眉に傷、濃い色のタートルネックのコート
+例：银色长发、白色披风、冷淡眼神	e.g. long silver hair, white cape, cool gaze	mis. rambut perak panjang, jubah putih, tatapan dingin	例：銀の長髪、白いマント、冷ややかな目つき
+让 AI 读剧情、挑版式、排戏（要填 Key）	Let the AI read the plot, pick a layout and stage the scene (needs a key)	Biarkan AI membaca alur, memilih tata letak, dan menyusun adegan (perlu kunci)	AI があらすじを読み、レイアウトを選び、演出します（キーが必要）
+角色名（沈砚 / 女主 …）	Character name (Shen Yan / Heroine …)	Nama karakter (Shen Yan / Tokoh wanita …)	キャラ名（沈硯 / ヒロイン …）
+外观一句话（黑短发、左眉疤）	Look in one line (short black hair, scar on left brow)	Tampilan dalam satu kalimat (rambut hitam pendek, bekas luka alis kiri)	見た目をひと言で（黒髪ショート、左眉に傷）
+把全部角色卡（含参考图）存成一个 JSON，发给团队一起用	Save all character cards (with reference images) as one JSON to share with your team	Simpan semua kartu karakter (beserta gambar referensi) sebagai satu JSON untuk dibagikan ke tim	すべてのキャラカード（参考画像込み）を 1 つの JSON に保存して、チームと共有します
+导入团队给的 角色卡.json	Import a team’s character-cards .json	Impor berkas kartu karakter .json dari tim	チームのキャラカード .json を読み込む
+导入多张图片，按阅读顺序填充空格	Import several images and fill empty panels in reading order	Impor beberapa gambar dan isi panel kosong sesuai urutan baca	複数の画像を読み込み、読む順に空きコマへ入れます
+用占位图预览填充效果	Preview with placeholder images	Pratinjau dengan gambar contoh	仮画像で埋めた見た目をプレビュー
+移除全部图片	Remove all images	Hapus semua gambar	すべての画像を外す
+只显示格线、不显示图片：用来单独看版式排版	Show only panel lines, no images — to check the layout on its own	Hanya tampilkan garis panel tanpa gambar — untuk memeriksa tata letak saja	枠線だけ表示して画像は隠します（レイアウトだけ確認したいとき）
+在格子上标出阅读顺序编号	Number the panels in reading order	Beri nomor urutan baca pada panel	コマに読む順の番号を表示
+查看全部快捷键（按 ? 也可以）	See all shortcuts (or press ?)	Lihat semua pintasan (atau tekan ?)	ショートカット一覧（? キーでも開けます）
+放大	Zoom in	Perbesar	拡大
+这一格的图片缩放	Image zoom for this panel	Zoom gambar panel ini	このコマの画像の拡大縮小
+缩小	Zoom out	Perkecil	縮小
+点一下复位到 100%	Click to reset to 100%	Klik untuk kembali ke 100%	クリックで 100% に戻す
+把当前页存下来，再加一页	Save this page and add another	Simpan halaman ini lalu tambah halaman baru	このページを保存してページを追加
+把每一页都导成 PNG	Export every page as PNG	Ekspor setiap halaman sebagai PNG	全ページを PNG で書き出す
+删掉本机草稿，回到空白第一页	Delete the local draft and start over from a blank first page	Hapus draf lokal dan mulai lagi dari halaman pertama kosong	この端末の下書きを消して、白紙の 1 ページ目に戻る
+上一格	Previous panel	Panel sebelumnya	前のコマ
+下一格	Next panel	Panel berikutnya	次のコマ
+编辑内容	Edit content	Edit isi	内容を編集
+按这一格的形状打开画布（双击格子 / 按 P 也行）	Open a canvas in this panel’s shape (or double-click the panel / press P)	Buka kanvas sesuai bentuk panel ini (atau klik dua kali panel / tekan P)	このコマの形でキャンバスを開く（コマをダブルクリック / P キーでも可）
+用这句话新建一个对话气泡	Create a speech bubble with this line	Buat balon kata dengan kalimat ini	このセリフでフキダシを作る
+让模型按「这一格要表达什么」写一句台词/旁白	Have the model write a line or narration based on what this panel needs to say	Minta model menulis dialog/narasi sesuai apa yang perlu disampaikan panel ini	「このコマで伝えたいこと」に沿ってモデルにセリフ / ナレーションを書かせる
+换一句（告诉模型别重复刚才那句）	Another line (tells the model not to repeat the last one)	Kalimat lain (minta model tidak mengulang yang tadi)	別のセリフ（さっきのを繰り返さないよう伝えます）
+把这一页所有空格子的台词都交给模型写	Have the model write lines for every empty panel on this page	Minta model menulis dialog untuk semua panel kosong di halaman ini	このページの空いているコマのセリフをすべてモデルに書かせる
+把这句思路填进上面的本格句子	Put this idea into the panel line above	Masukkan ide ini ke kalimat panel di atas	このアイデアを上のコマのセリフ欄に入れる
+按这一格的形状铺开画布，直接画（笔画出不了格子）	Lay out a canvas in this panel’s shape and draw directly (strokes stay inside the panel)	Bentangkan kanvas sesuai bentuk panel ini dan gambar langsung (goresan tidak keluar panel)	このコマの形のキャンバスで直接描きます（線はコマからはみ出しません）
+把这一格的底图（带形状参考）交给手机上别的绘画 App，画完分享回来自动填进这一格	Send this panel’s base image (with shape guide) to another drawing app on your phone; share it back when done and it fills this panel automatically	Kirim gambar dasar panel ini (dengan panduan bentuk) ke aplikasi gambar lain di ponsel; bagikan kembali setelah selesai dan panel terisi otomatis	このコマの下絵（形のガイド付き）をスマホの別のお絵かきアプリに渡します。描き終えて共有し戻すと、このコマに自動で入ります
+把这一格的图单独存成一张图（PNG / JPG）	Save this panel’s image as a separate picture (PNG / JPG)	Simpan gambar panel ini sebagai gambar tersendiri (PNG / JPG)	このコマの画像を 1 枚の画像として保存（PNG / JPG）
+清掉自己的写法，回到自动	Clear your own text and go back to auto	Hapus tulisan sendiri dan kembali ke otomatis	自分で書いた内容を消して自動に戻す
+提示词来源	Prompt source	Sumber prompt	プロンプトの出どころ
+形状开头词（构图前缀）—— 自己写的时候也会自动保留在最前面	Shape prefix (composition lead-in) — kept at the very start even when you write your own	Awalan bentuk (pembuka komposisi) — tetap di paling depan meski Anda menulis sendiri	形状プレフィックス（構図の書き出し）— 自分で書くときも先頭に自動で残ります
+写一段剧情并匹配后，这里会出现贴合这一格的提示词；也可以切到「自己写」	Write a plot and match it to see a prompt tailored to this panel here; or switch to “Write my own”	Tulis alur cerita lalu cocokkan untuk melihat prompt yang pas untuk panel ini; atau beralih ke “Tulis sendiri”	あらすじを書いてマッチさせると、このコマに合ったプロンプトがここに出ます。「自分で書く」に切り替えることもできます
+AI 动作	AI actions	Aksi AI	AI の操作
+按上面的选择：直接生图，或只让 AI 重写这一格提示词	Based on the choice above: generate the image directly, or only have the AI rewrite this panel’s prompt	Sesuai pilihan di atas: langsung buat gambar, atau hanya minta AI menulis ulang prompt panel ini	上の選択どおり：そのまま画像を生成するか、このコマのプロンプトだけ AI に書き直させます
+换一张（随机）	Another one (random)	Ganti (acak)	別の画像（ランダム）
+英文版，粘到国际模型提示词最前面	English version — paste at the start of prompts for international models	Versi Inggris — tempel di awal prompt untuk model internasional	英語版：海外モデルのプロンプトの先頭に貼ってください
+版式已经定死：让 AI 把源文本切成每格，并直接给出每格的生图提示词（长剧本 / 小说也切得准）	The layout is fixed: the AI splits the source text into panels and writes each panel’s image prompt (works well even for long scripts / novels)	Tata letak sudah tetap: AI membagi teks sumber ke tiap panel dan langsung menulis prompt gambarnya (tetap akurat untuk naskah / novel panjang)	レイアウトは確定済み：AI が元の文章を各コマに割り振り、コマごとの画像プロンプトも出します（長い脚本や小説でも正確）
+用 AI 把每格压成高密度生图提示词（保留形状开头词）	Use the AI to condense each panel into a dense image prompt (keeps the shape prefix)	Gunakan AI untuk meringkas tiap panel menjadi prompt gambar yang padat (awalan bentuk tetap)	AI で各コマを密度の高い画像プロンプトに圧縮します（形状プレフィックスは残します）
+不拉伸格子：等比缩放后居中留白（版面比例不变）	Don’t stretch the panels: scale proportionally and center with margins (page ratio unchanged)	Jangan regangkan panel: skala proporsional lalu tengahkan dengan margin (rasio halaman tetap)	コマを引き伸ばさず、等倍で縮小して中央に余白を取ります（ページ比率は変わりません）
+移除本页所有气泡	Remove all bubbles on this page	Hapus semua balon di halaman ini	このページのフキダシをすべて外す
+气泡里的话	Bubble text	Teks balon	フキダシのセリフ
+会真实生成一张小图，约 0.02 元，用来确认生图这条链路通不通	Actually generates one small image (about ¥0.02) to check that image generation works end to end	Benar-benar membuat satu gambar kecil (sekitar ¥0,02) untuk memastikan pembuatan gambar berjalan	実際に小さな画像を 1 枚生成し（約 0.02 元）、画像生成がつながるか確認します
+白底 / 透明：透明时导出的 PNG 带透明通道，方便叠到别的图上	White / transparent background: when transparent, the exported PNG keeps an alpha channel so it layers onto other images	Latar putih / transparan: saat transparan, PNG hasil ekspor punya kanal alfa sehingga mudah ditumpuk ke gambar lain	白背景 / 透明：透明にすると書き出した PNG に透過チャンネルが付き、他の画像に重ねやすくなります
+分享这一格：发到别的绘画 App / 微信 / 相册（手机上走系统分享面板）	Share this panel: send to another drawing app, a chat app or your photos (uses the system share sheet on phones)	Bagikan panel ini: kirim ke aplikasi gambar lain, aplikasi chat, atau galeri (memakai menu berbagi sistem di ponsel)	このコマを共有：別のお絵かきアプリ / チャット / 写真へ送ります（スマホではシステムの共有メニュー）
+把这一格现在的画面导成 PNG（按格子形状裁好）	Export this panel as it looks now to PNG (cropped to the panel shape)	Ekspor tampilan panel ini sekarang ke PNG (dipotong sesuai bentuk panel)	このコマの現在の画面を PNG で書き出します（コマの形で切り抜き）
+笔尖粗细	Brush size	Ukuran kuas	ペンの太さ
+颜色	Color	Warna	色
+撤销一笔	Undo stroke	Batalkan goresan	1 画戻す
+一键生成该页所有还没图的分镜 · 用每格现有提示词（含你手改过的），不会先做 AI 优化	Generate every panel on this page that has no image yet · uses each panel’s current prompt (including your edits), no AI optimization first	Buat semua panel di halaman ini yang belum bergambar · memakai prompt tiap panel saat ini (termasuk suntingan Anda), tanpa optimasi AI dulu	このページでまだ画像のないコマをすべて生成 · 各コマの今のプロンプト（手直し分を含む）を使い、先に AI 最適化はしません
+一键生成全部页面所有还没图的分镜 · 用每格现有提示词（含你手改过的），不会先做 AI 优化	Generate every panel without an image on all pages · uses each panel’s current prompt (including your edits), no AI optimization first	Buat semua panel tanpa gambar di semua halaman · memakai prompt tiap panel saat ini (termasuk suntingan Anda), tanpa optimasi AI dulu	全ページでまだ画像のないコマをすべて生成 · 各コマの今のプロンプト（手直し分を含む）を使い、先に AI 最適化はしません
+全文 {0} 字，按每页约 {1} 字需要 {2} 页，已按上限收到 {3} 页（避免一次花太多）	The text is {0} characters; at about {1} per page that is {2} pages, capped at {3} pages (to avoid spending too much at once)	Teks berisi {0} karakter; sekitar {1} per halaman berarti {2} halaman, dibatasi {3} halaman (agar tidak boros sekaligus)	全文 {0} 字。1 ページ約 {1} 字で {2} ページ必要ですが、上限の {3} ページに抑えました（一度に使いすぎないため）
+全文 {0} 字 → {1} 页 × 约 {2} 格 ≈ {3} 格	{0} characters → {1} pages × about {2} panels ≈ {3} panels	{0} karakter → {1} halaman × sekitar {2} panel ≈ {3} panel	全文 {0} 字 → {1} ページ × 約 {2} コマ ≈ {3} コマ
+估算页数：{0} 页 × 约 {1} 格	Estimate: {0} pages × about {1} panels	Perkiraan: {0} halaman × sekitar {1} panel	見積もり：{0} ページ × 約 {1} コマ
+生成全部图片（{0} 张，最贵的一步）	Generate all images ({0}, the most expensive step)	Buat semua gambar ({0}, langkah termahal)	すべての画像を生成（{0} 枚、いちばん費用がかかる工程）
+约 {0} 张图，按常见服务商 ¥0.02–0.25/张估算，合计约 ¥{1}–{2}（以你的服务商计费为准）	About {0} images; at typical rates of ¥0.02–0.25 each that is roughly ¥{1}–{2} (your provider’s pricing applies)	Sekitar {0} gambar; dengan tarif umum ¥0,02–0,25 per gambar totalnya sekitar ¥{1}–{2} (mengikuti tarif penyedia Anda)	約 {0} 枚。一般的な料金 1 枚 ¥0.02〜0.25 で計算すると合計約 ¥{1}〜{2}（実際はご利用のサービスの料金に従います）
+这一步不生成图片，只消耗文本 token	This step makes no images and only uses text tokens	Langkah ini tidak membuat gambar, hanya memakai token teks	このステップでは画像を作らず、テキストのトークンだけを使います
+最常用。适合普通对话，一行到两行字。	The everyday choice. For ordinary dialogue of one or two lines.	Paling umum. Untuk dialog biasa satu atau dua baris.	いちばん定番。ふつうの会話、1〜2 行のセリフに。
+现代条漫/I 气口对话首选，比椭圆更"干净"。	The go-to for modern webtoon dialogue; “cleaner” than an ellipse.	Pilihan utama dialog webtoon modern; lebih “bersih” dari elips.	現代の縦読み漫画の会話に最適。楕円より「すっきり」見えます。
+强调语气或重要台词，外圈留一道细边。	For emphasis or key lines, with a thin outer ring.	Untuk penekanan atau dialog penting, dengan garis tipis di luar.	語気を強めたいときや大事なセリフに。外側に細い縁取り。
+心里想的事，不张口。云边 + 三个小圆。	Unspoken thoughts. Cloud edge plus three small circles.	Pikiran yang tidak diucapkan. Tepi awan dan tiga bulatan kecil.	口に出さない心の声。雲形のフチと小さな丸 3 つ。
+内心独白/不确定的话。虚线让人觉得"未说出口"。	Inner monologue or uncertain words; the dashed line feels “unsaid”.	Monolog batin atau ucapan ragu; garis putus-putus terasa “tak terucap”.	モノローグや自信のない言葉。点線で「言葉にしていない」感じに。
+大喊、怒吼、受惊。尖角越密越激烈。	Shouting, roaring, being startled. The denser the spikes, the more intense.	Berteriak, meraung, terkejut. Makin rapat durinya, makin intens.	叫び・怒鳴り・驚き。トゲが細かいほど激しくなります。
+冲击/爆炸瞬间的拟声或短喊，边缘不规则。	Sound effects or short cries at the moment of impact or explosion; irregular edge.	Efek suara atau teriakan pendek saat benturan/ledakan; tepi tak beraturan.	衝撃・爆発の瞬間の擬音や短い叫び。フチは不規則。
+不需要尖角也要压住场面的喊话，粗框。	A shout that commands the scene without spikes; thick outline.	Seruan yang menguasai adegan tanpa duri; garis tepi tebal.	トゲなしでも場を圧倒する呼びかけ。太い枠。
+旁白/时间地点说明。直角细框，一般放画面上方。	Narration or time/place captions. Thin square box, usually at the top.	Narasi atau keterangan waktu/tempat. Kotak tipis bersudut, biasanya di atas.	ナレーションや時間・場所の説明。角の細い枠で、ふつうは画面上部に。
+带一条色块边的旁白，条漫里很常见（"三天后"）。	Narration with a colored edge strip, common in webtoons (“Three days later”).	Narasi dengan pita warna di tepi, umum di webtoon (“Tiga hari kemudian”).	色帯の付いたナレーション。縦読み漫画でよく使います（「三日後」）。
+黑底白字，强调一句判词或时间跳跃。	White on black, to stress a verdict or a time jump.	Teks putih di latar hitam, untuk menegaskan vonis atau lompatan waktu.	黒地に白文字。決め台詞や時間の跳躍を強調します。
+小声说、颤抖、虚弱。边缘起波纹。	Whispering, trembling, weak. Wavy edge.	Berbisik, gemetar, lemah. Tepi bergelombang.	小声・震え・弱々しさ。フチが波打ちます。
+拟声词旁边的小字或补充说明，字号更小。	Small text beside a sound effect or a side note, in a smaller size.	Teks kecil di samping efek suara atau catatan tambahan, ukuran lebih kecil.	擬音の横の小さな文字や補足。文字は小さめ。
+指向画面某处的说明（"这里！"），带一个箭头。	A note pointing at part of the image (“Here!”), with an arrow.	Keterangan yang menunjuk bagian gambar (“Di sini!”), dengan panah.	画面の一点を指す説明（「ここ！」）。矢印付き。
+竖椭圆对话泡	Tall oval bubble	Balon oval tegak	縦長楕円フキダシ
+竖向对白，适合两三行短句、竖排阅读。	Vertical dialogue for two or three short lines read top to bottom.	Dialog vertikal untuk dua atau tiga baris pendek, dibaca dari atas.	縦書きのセリフに。2〜3 行の短い文向け。
+胶囊对话泡	Capsule bubble	Balon kapsul	カプセル型フキダシ
+短促一句、条漫感强，像聊天气泡。	One short line with a strong webtoon feel, like a chat bubble.	Satu kalimat singkat bernuansa webtoon, seperti balon chat.	短いひと言。チャットの吹き出しのような縦読み漫画らしさ。
+细锯齿泡	Fine zigzag bubble	Balon gerigi halus	細ギザフキダシ
+压低声音、气氛紧绷时的对白，边缘带细刺。	Hushed lines in a tense moment; fine spikes along the edge.	Ucapan pelan saat suasana tegang; duri halus di tepi.	声をひそめた緊迫した場面のセリフ。フチに細かいトゲ。
+颤抖泡	Shaky bubble	Balon gemetar	震えフキダシ
+声音在抖（害怕 / 哭 / 力竭），边缘不规则抖动。	A shaking voice (fear / tears / exhaustion); the edge wobbles irregularly.	Suara bergetar (takut / menangis / kelelahan); tepinya bergoyang tak beraturan.	声が震えている（恐怖 / 涙 / 力尽き）。フチが不規則に揺れます。
+双圈圆角泡	Double-ring rounded bubble	Balon bulat dua lingkar	二重角丸フキダシ
+重要台词加强调，外圈多一道细线。	Extra emphasis for key lines, with an extra thin outer line.	Penekanan untuk dialog penting, dengan satu garis tipis tambahan di luar.	大事なセリフを強調。外側にもう 1 本細い線。
+虚线圈对话泡	Dashed bubble	Balon garis putus-putus	点線フキダシ
+说得含糊、听不清、或隔着距离传来的话。	Mumbled, hard to hear, or coming from a distance.	Ucapan samar, sulit terdengar, atau dari kejauhan.	はっきりしない・聞き取りにくい・遠くから届く言葉。
+方圆思考泡	Rounded-square thought bubble	Balon pikiran kotak bulat	角丸思考フキダシ
+理性思考、算计、独白，比云朵更"冷静"。	Rational thinking, scheming or monologue; “cooler” than a cloud.	Pikiran rasional, siasat, atau monolog; lebih “tenang” dari awan.	理性的な思考・計算・独白。雲形より「冷静」。
+同心圆发呆泡	Concentric daze bubble	Balon melamun konsentris	同心円ぼんやりフキダシ
+发呆、走神、懵住，中心再加一圈。	Spacing out, zoning out, dumbfounded; with an extra ring in the middle.	Melamun, bengong, terpaku; dengan satu lingkar lagi di tengah.	ぼんやり・上の空・呆然。中心にもう一重。
+小爆炸泡	Small burst bubble	Balon ledakan kecil	小爆発フキダシ
+一格里的短促喊声，不占画面。	A short cry inside a panel that doesn’t take over the image.	Teriakan pendek dalam panel tanpa menutupi gambar.	コマの中の短い叫び。画面を占領しません。
+放射线喊叫泡	Radiating shout bubble	Balon teriak berpancar	放射線叫びフキダシ
+情绪顶点的一声，外围放射线。	The cry at the emotional peak, with radiating lines around it.	Seruan di puncak emosi, dengan garis memancar di sekelilingnya.	感情が頂点に達したひと声。周りに放射線。
+竖长喊叫泡	Tall shout bubble	Balon teriak tinggi	縦長叫びフキダシ
+竖格里的怒吼，向上顶，压迫感强。	A roar in a tall panel, pushing upward with strong pressure.	Raungan di panel tinggi, mendorong ke atas dengan kesan menekan.	縦長のコマでの怒号。上へ突き上げ、圧迫感が強い。
+竖排旁白条	Vertical narration strip	Pita narasi vertikal	縦書きナレーション帯
+日式竖排旁白，贴在画面侧边。	Japanese-style vertical narration along the side of the image.	Narasi vertikal gaya Jepang di sisi gambar.	日本式の縦書きナレーション。画面の端に沿わせます。
+横贯字幕带	Full-width caption band	Pita keterangan melintang	横断字幕帯
+横穿整格的说明条（时间 / 地点 / 一句话过渡）。	A caption bar across the whole panel (time / place / one-line transition).	Pita keterangan melintasi seluruh panel (waktu / tempat / transisi satu kalimat).	コマを横切る説明の帯（時間 / 場所 / ひと言のつなぎ）。
+屏幕 / 手机泡	Screen / phone bubble	Balon layar / ponsel	画面 / スマホフキダシ
+手机、屏幕里冒出来的话，圆角带一道听筒线。	Words coming from a phone or screen; rounded, with an earpiece line.	Ucapan dari ponsel atau layar; sudut bulat dengan garis pengeras suara.	スマホや画面から出てくる言葉。角丸に受話口の線。
+机械方泡	Mechanical square bubble	Balon kotak mekanis	機械式角フキダシ
+对讲机、广播、机器人、录音，切角方框。	Walkie-talkies, broadcasts, robots, recordings; a box with cut corners.	Walkie-talkie, siaran, robot, rekaman; kotak bersudut terpotong.	トランシーバー・放送・ロボット・録音。角を落とした四角。
+回忆框	Flashback box	Kotak kilas balik	回想枠
+回忆 / 闪回里的对话，双层边表示"不是现在"。	Dialogue in a memory or flashback; the double edge says “not now”.	Dialog dalam kenangan/kilas balik; tepi ganda berarti “bukan sekarang”.	回想・フラッシュバックの会話。二重の縁で「今ではない」ことを示します。
+拟声牌	Sound-effect sign	Papan efek suara	擬音プレート
+「砰」「轰」这类拟声词，斜角牌子。	Sound effects like “Bang!” or “Boom!” on a slanted sign.	Efek suara seperti “Dor!” atau “Bum!” di papan miring.	「バン」「ドーン」などの擬音を斜めのプレートに。
+胶带条	Tape strip	Pita selotip	テープ帯
+便签 / 贴纸感，两端撕口。	A sticky-note / sticker feel with torn ends.	Kesan catatan tempel / stiker dengan ujung sobek.	メモやシール風。両端がちぎれた形。
+便签泡	Note bubble	Balon catatan	メモフキダシ
+作者吐槽、脚注、小提示，右下角折角。	Author asides, footnotes, small tips; folded bottom-right corner.	Celetukan penulis, catatan kaki, tips kecil; sudut kanan bawah terlipat.	作者のツッコミ・脚注・ちょっとしたヒント。右下が折れた形。
+远程心声泡	Telepathy bubble	Balon suara hati jarak jauh	遠隔の心の声フキダシ
+别人的心声、隔空传话，虚线方框带小圆。	Someone else’s thoughts or telepathic messages; dashed box with small circles.	Suara hati orang lain atau pesan jarak jauh; kotak putus-putus dengan bulatan kecil.	他人の心の声や離れた所からの声。点線の四角に小さな丸。
+像拟声词 → 拟声牌 / 小爆炸泡	Looks like a sound effect → sound-effect sign / small burst bubble	Mirip efek suara → papan efek suara / balon ledakan kecil	擬音っぽい → 擬音プレート / 小爆発フキダシ
+带感叹号 / 喊叫词 → 尖角或放射线喊叫泡	Has “!” or shouting words → spiky or radiating shout bubble	Ada tanda seru / kata teriakan → balon berduri atau balon teriak berpancar	感嘆符や叫ぶ言葉 → トゲか放射線の叫びフキダシ
+低语 / 颤抖 → 波纹、颤抖或细锯齿泡	Whisper / trembling → wavy, shaky or fine zigzag bubble	Bisikan / gemetar → balon bergelombang, gemetar, atau gerigi halus	ささやき / 震え → 波線・震え・細ギザのフキダシ
+没出声的想法 → 思考泡	Unspoken thought → thought bubble	Pikiran tak terucap → balon pikiran	声に出さない考え → 思考フキダシ
+回忆 / 过去时间 → 回忆框	Memory / the past → flashback box	Kenangan / masa lalu → kotak kilas balik	回想 / 過去 → 回想枠
+机器 / 屏幕在出声 → 屏幕或机械泡	A machine / screen is speaking → screen or mechanical bubble	Mesin / layar yang bersuara → balon layar atau mekanis	機械 / 画面がしゃべる → 画面か機械式のフキダシ
+叙述 / 时间地点 → 旁白框或字幕带	Narration / time and place → narration box or caption band	Narasi / waktu dan tempat → kotak narasi atau pita keterangan	語り / 時間・場所 → ナレーション枠か字幕帯
+疑问句 → 椭圆对话泡	Question → oval bubble	Kalimat tanya → balon oval	疑問文 → 楕円フキダシ
+还没写字，按这一格的景别推荐	No text yet — recommended for this panel’s shot	Belum ada teks — disarankan sesuai bidikan panel ini	まだ文字がありません。このコマのショットに合わせたおすすめです
+短句 → 胶囊对话泡	Short line → capsule bubble	Kalimat pendek → balon kapsul	短い文 → カプセル型フキダシ
+普通对白 → 椭圆对话泡	Ordinary dialogue → oval bubble	Dialog biasa → balon oval	ふつうのセリフ → 楕円フキダシ
+A4 页漫 1:1.414	A4 page 1:1.414	Halaman A4 1:1.414	A4 ページ 1:1.414
+B5 页漫 1:1.46	B5 page 1:1.46	Halaman B5 1:1.46	B5 ページ 1:1.46
+3:4 页漫	3:4 page	Halaman 3:4	3:4 ページ
+方形 1:1	Square 1:1	Persegi 1:1	正方形 1:1
+跨页横版 16:9	Spread 16:9	Halaman ganda 16:9	見開き横長 16:9
+竖屏条漫 9:16	Vertical strip 9:16	Strip vertikal 9:16	縦画面 縦読み 9:16
+竖屏长条 1:2	Tall strip 1:2	Strip tinggi 1:2	縦長ストリップ 1:2
+长条漫 1:2.6	Long strip 1:2.6	Strip panjang 1:2.6	長尺縦読み 1:2.6
+参考图还原	From reference	Dari referensi	参考画像の再現
+景	Scenery	Pemandangan	風景
+全页格	Full-page panel	Panel satu halaman	1 ページ大ゴマ
+破格	Broken frame	Bingkai pecah	変形ゴマ
+双栏四段式	Two columns, four tiers	Dua kolom, empat tingkat	2 列 4 段
+三段式（引子-事件-收束）	Three tiers (setup – event – resolution)	Tiga tingkat (pembuka – kejadian – penutup)	3 段構成（導入 - 事件 - 締め）
+2×2 四格	2×2, 4 panels	2×2, 4 panel	2×2 の 4 コマ
+3×2 六格	3×2, 6 panels	3×2, 6 panel	3×2 の 6 コマ
+3×3 九格	3×3, 9 panels	3×3, 9 panel	3×3 の 9 コマ
+十二格相册页	12-panel album page	Halaman album 12 panel	12 コマのアルバムページ
+整页一格	Single full-page panel	Satu panel penuh	1 ページ 1 コマ
+对角二格	Diagonal two panels	Dua panel diagonal	対角線の 2 コマ
+海报式（上文下图）	Poster (text above, image below)	Poster (teks di atas, gambar di bawah)	ポスター風（上に文字、下に絵）
+主格＋特写插入	Main panel + close-up inserts	Panel utama + sisipan close-up	メインゴマ＋アップの差し込み
+横幅＋四连	Banner + four panels	Spanduk + empat panel	横長バナー＋4 連
+五格	Five panels	Lima panel	5 コマ
+九格速写	Nine-panel sketch	Sketsa sembilan panel	9 コマのスケッチ
+左右二格（跨页感）	Left & right panels (spread feel)	Panel kiri & kanan (kesan halaman ganda)	左右 2 コマ（見開き風）
+横排四格（手机友好）	Four in a row (phone-friendly)	Empat sejajar (ramah ponsel)	横並び 4 コマ（スマホ向け）
+斜切横带（三格）	Diagonal band (three panels)	Pita diagonal (tiga panel)	斜めの帯（3 コマ）
+错位四格（不对称）	Offset four panels (asymmetric)	Empat panel bergeser (asimetris)	ずらし 4 コマ（非対称）
+宽银幕三格	Widescreen three panels	Tiga panel layar lebar	シネスコ 3 コマ
+起承转合（方形）	Setup–build–twist–payoff (square)	Pembuka–berkembang–twist–penutup (persegi)	起承転結（正方形）
+纵长条（手机友好）	Tall strip (phone-friendly)	Strip tinggi (ramah ponsel)	縦長帯（スマホ向け）
+错位变格	Offset, uneven panels	Panel bergeser tak seimbang	ずらし変形ゴマ
+三段落とし（标准事件页）	Three-tier drop (standard event page)	Tiga tingkat jatuh (halaman kejadian standar)	三段落とし（標準の事件ページ）
+斜切开场	Diagonal opening	Pembuka diagonal	斜めゴマの幕開け
+一撃大格（必杀页）	One-strike big panel (finisher page)	Panel besar satu serangan (halaman jurus pamungkas)	一撃の大ゴマ（必殺ページ）
+速度线长条	Speed-line strips	Strip garis kecepatan	スピード線の縦長ゴマ
+跨页对决（16:9）	Spread showdown (16:9)	Duel halaman ganda (16:9)	見開きの対決（16:9）
+越界ぶち抜き	Frame-breaking burst	Tembus bingkai	枠ぶち抜き
+全页插图＋角格	Full-page art + corner panel	Ilustrasi penuh + panel sudut	1 ページ絵＋隅ゴマ
+斜线花瓣格	Diagonal petal panels	Panel kelopak diagonal	斜線の花びらゴマ
+视线交错	Crossing gazes	Tatapan bersilang	視線の交差
+告白三格	Confession in three panels	Pengakuan dalam tiga panel	告白の 3 コマ
+回忆无框	Frameless flashback	Kilas balik tanpa bingkai	枠なしの回想
+竖长情绪格	Tall mood panels	Panel suasana tinggi	縦長の感情ゴマ
+六格密网	Dense six-panel grid	Jaringan rapat enam panel	6 コマの密な網
+对话堆叠（三带）	Stacked dialogue (three bands)	Dialog bertumpuk (tiga pita)	会話の積み重ね（3 段）
+横向蒙太奇	Horizontal montage	Montase horizontal	横のモンタージュ
+俯视压迫	Oppressive overhead	Sudut atas yang menekan	俯瞰の圧迫
+九宫密恐	Claustrophobic nine-grid	Sembilan kotak sesak	9 マスの息苦しさ
+特写堆叠	Stacked close-ups	Close-up bertumpuk	アップの積み重ね
+巨格留白	Huge empty panel	Panel raksasa kosong	巨大ゴマの余白
+密集横条	Dense horizontal strips	Strip horizontal rapat	密集した横帯
+逼近	Closing in	Mendekat	迫りくる
+门槛构图	Doorway composition	Komposisi ambang pintu	戸口の構図
+室内三带	Indoor three bands	Tiga pita dalam ruangan	室内の 3 段
+吐槽节奏	Punchline rhythm	Ritme celetukan	ツッコミのリズム
+压扁变格	Squashed panel	Panel gepeng	つぶれた変形ゴマ
+六格标准	Standard six panels	Enam panel standar	標準の 6 コマ
+双人对切	Two-person cutaway	Potongan bolak-balik dua orang	2 人の切り返し
+中竖切	Center vertical cut	Potongan vertikal tengah	中央の縦割り
+眼神四格	Four panels of glances	Empat panel tatapan	目線の 4 コマ
+上下二分（天与地）	Split top & bottom (sky and earth)	Terbelah atas & bawah (langit dan bumi)	上下二分（天と地）
+角插台词格	Corner dialogue panel	Panel dialog di sudut	隅にセリフゴマ
+三角冲击	Triangle impact	Benturan segitiga	三角の衝撃
+插入格五连	Five with inserts	Lima dengan sisipan	差し込みゴマの 5 連
+同ポジ四连（同一瞬间四机位）	Four angles, one moment	Empat sudut, satu momen	同ポジ 4 連（同じ瞬間を 4 アングル）
+柔光叠格	Soft-light overlaps	Tumpukan cahaya lembut	柔らかな光の重ねゴマ
+四格克制	Restrained four panels	Empat panel yang tertahan	抑えた 4 コマ
+阶梯格	Staircase panels	Panel tangga	階段ゴマ
+开场定场	Establishing opening	Pembuka penegasan adegan	幕開けの状況説明
+对话三连	Three-beat dialogue	Dialog tiga ketukan	会話の 3 連
+情绪递进（推镜）	Rising emotion (push-in)	Emosi meningkat (zoom masuk)	感情の高まり（寄り）
+一格爆发	One-panel burst	Ledakan satu panel	1 コマで爆発
+左右对峙	Left–right standoff	Konfrontasi kiri–kanan	左右の対峙
+大留白静默	Silence in wide space	Hening di ruang kosong	大きな余白の沈黙
+连击六格	Six-hit combo	Kombo enam panel	連撃の 6 コマ
+悬念钩子（截断式）	Cliffhanger (cut-off)	Cliffhanger (terpotong)	引きのフック（途切れ型）
+搞笑三连	Three-beat gag	Lelucon tiga ketukan	ギャグの 3 連
+回忆滤镜	Flashback filter	Filter kilas balik	回想フィルター
+恐怖逼近	Creeping horror	Horor mendekat	迫る恐怖
+一场戏	One scene	Satu adegan	ひと場面
+战斗长镜头	Long take fight	Pertarungan satu bidikan panjang	長回しのバトル
+恋爱长条	Romance strip	Strip romansa	恋愛の縦長
+悬疑长条	Mystery strip	Strip misteri	サスペンスの縦長
+日常四时	A day in four moments	Sehari dalam empat waktu	日常の四つの時
+真相揭示	The reveal	Pengungkapan	真相の発覚
+武侠对决（六格）	Wuxia duel (six panels)	Duel wuxia (enam panel)	武侠の対決（6 コマ）
+仙侠全景（三格）	Xianxia panorama (three panels)	Panorama xianxia (tiga panel)	仙侠の全景（3 コマ）
+宫斗密谈（六格）	Palace intrigue (six panels)	Intrik istana (enam panel)	宮廷の密談（6 コマ）
+都市爱情（五格）	City romance (five panels)	Romansa kota (lima panel)	都会の恋愛（5 コマ）
+玄幻爆发（四格）	Fantasy burst (four panels)	Ledakan fantasi (empat panel)	ファンタジーの爆発（4 コマ）
+志怪惊悚（五格）	Ghost-tale thriller (five panels)	Kisah hantu menegangkan (lima panel)	怪異のスリラー（5 コマ）
+杂志四格横排（彩漫）	Magazine four in a row (color)	Empat sejajar ala majalah (berwarna)	雑誌風の横並び 4 コマ（カラー）
+通版插图＋题字	Full-bleed art + title	Ilustrasi penuh + judul	全面イラスト＋題字
+三栏叙事（标准页）	Three-tier story (standard page)	Cerita tiga tingkat (halaman standar)	3 段の物語（標準ページ）
+竖切双线	Split into two storylines	Terbelah dua alur cerita	縦割りの 2 本の筋
+彩漫四格（2×2）	Color four panels (2×2)	Empat panel berwarna (2×2)	カラー 4 コマ（2×2）
+追逃斜线	Chase diagonals	Diagonal kejar-kejaran	追跡の斜線
+电影宽幅	Cinematic wide	Lebar sinematik	映画風ワイド
+对话错位（五格）	Offset dialogue (five panels)	Dialog bergeser (lima panel)	ずらした会話（5 コマ）
+剑拔弩张（斜线页）	Blades drawn (diagonal page)	Siaga tempur (halaman diagonal)	一触即発（斜線ページ）
+结印施法（五格）	Hand seals & spellcasting (five panels)	Segel tangan & mantra (lima panel)	印を結んで術（5 コマ）
+校园日常（七格）	School days (seven panels)	Keseharian sekolah (tujuh panel)	学園の日常（7 コマ）
+志怪长条	Ghost-tale strip	Strip kisah hantu	怪異の縦長
+开场（大片式定场）	Opening (blockbuster establishing shot)	Pembuka (bidikan pembuka ala film besar)	幕開け（大作映画風の状況説明）
+氛围两格（大留白）	Mood in two panels (wide space)	Suasana dua panel (ruang kosong luas)	空気感の 2 コマ（大きな余白）
+情绪四连（推近）	Four-step emotion (push-in)	Emosi empat tahap (zoom masuk)	感情の 4 連（寄り）
+对话五格	Five-panel dialogue	Dialog lima panel	会話の 5 コマ
+动作八格（快剪）	Eight-panel action (fast cuts)	Aksi delapan panel (potongan cepat)	アクション 8 コマ（速いカット）
+高潮三格（越界）	Climax in three (frame-breaking)	Klimaks tiga panel (tembus bingkai)	クライマックス 3 コマ（枠ぶち抜き）
+心动五格	Heart-skip in five panels	Debaran dalam lima panel	ときめきの 5 コマ
+惊悚六格	Six-panel thriller	Thriller enam panel	スリラーの 6 コマ
+回忆四格（去框）	Flashback in four (frameless)	Kilas balik empat panel (tanpa bingkai)	回想の 4 コマ（枠なし）
+搞笑五格	Five-panel gag	Lelucon lima panel	ギャグの 5 コマ
+截断钩子	Cut-off hook	Kail terpotong	途切れのフック
+插入格叠压	Overlapping inserts	Sisipan bertumpuk	差し込みゴマの重ね
+双栏分割	Two-column split	Belahan dua kolom	2 列の分割
+九格速写（1:2）	Nine-panel sketch (1:2)	Sketsa sembilan panel (1:2)	9 コマのスケッチ（1:2）
+一镜到底（长留白）	One long take (wide space)	Satu bidikan panjang (ruang kosong luas)	長回し（大きな余白）
+对视两格	Eye contact in two panels	Saling tatap dua panel	見つめ合う 2 コマ
+一话开场	Episode opening	Pembuka episode	1 話の幕開け
+打斗长条	Fight strip	Strip perkelahian	乱闘の縦長
+反转长条	Twist strip	Strip twist	どんでん返しの縦長
+时间流逝	Time passing	Waktu berlalu	時の流れ
+四段定格（印刷）	Four fixed tiers (print)	Empat tingkat tetap (cetak)	4 段の定型（印刷）
+动作页	Action page	Halaman aksi	アクションページ
+对话密网	Dense dialogue grid	Jaringan dialog rapat	会話の密な網
+恋爱页	Romance page	Halaman romansa	恋愛ページ
+正剧三格	Drama in three panels	Drama tiga panel	正統派ドラマの 3 コマ
+恐怖页	Horror page	Halaman horor	ホラーページ
+通版插图	Full-bleed illustration	Ilustrasi penuh	全面イラスト
+蒙太奇六格	Six-panel montage	Montase enam panel	モンタージュの 6 コマ
+对峙页	Standoff page	Halaman konfrontasi	対峙ページ
+搞笑四格	Four-panel gag	Lelucon empat panel	ギャグ 4 コマ
+错位单格（招牌不对称）	Offset panels (signature asymmetry)	Panel bergeser (asimetri khas)	ずらしゴマ（定番の非対称）
+双人错位	Offset pair	Pasangan bergeser	2 人のずらし
+宽幅电影感	Cinematic widescreen	Layar lebar sinematik	ワイドな映画感
+窄栏特写（竖条）	Narrow close-up (tall strip)	Close-up sempit (strip tinggi)	細い縦長のアップ
+季节转场	Seasons changing	Pergantian musim	季節の移り変わり
+对角插入格	Diagonal inserts	Sisipan diagonal	対角の差し込みゴマ
+五格密排	Five tightly packed	Lima panel rapat	詰めた 5 コマ
+不该出现的身影	A figure that shouldn’t be there	Sosok yang tak seharusnya ada	いるはずのない人影
+标题/题字区	Title / lettering area	Area judul / tulisan	タイトル / 題字エリア
+角格：一句台词	Corner panel: one line	Panel sudut: satu kalimat	隅ゴマ：セリフひと言
+瞳孔里有对方	The other person in their pupils	Sosok lawan bicara di pupil matanya	瞳に相手が映る
+记忆锚点	Memory anchor	Jangkar ingatan	記憶の手がかり
+插入：对方瞳孔	Insert: the other’s pupils	Sisipan: pupil lawan bicara	差し込み：相手の瞳
+空白处排旁白	Narration in the empty space	Narasi di ruang kosong	余白にナレーション
+角格特写	Corner close-up	Close-up sudut	隅ゴマのアップ
+插画	Illustration	Ilustrasi	イラスト
+台阶	Steps	Bertingkat	段差
+留白过多	Too much empty space	Terlalu banyak ruang kosong	余白が多すぎる
+高密度	High density	Kepadatan tinggi	高密度
+小格多	Many small panels	Banyak panel kecil	小ゴマが多い
+战斗	Combat	Pertarungan	バトル
+大格唯一	One big panel only	Hanya satu panel besar	大ゴマ 1 つだけ
+无框全开	Frameless, wide open	Tanpa bingkai, terbuka	枠なし全開
+渐层	Gradation	Gradasi	グラデーション
+明亮	Bright	Cerah	明るい
+可爱	Cute	Imut	かわいい
+暗部密	Dense shadows	Bayangan pekat	暗部が濃い
+朦胧	Hazy	Samar	おぼろげ
+多格等分	Many equal panels	Banyak panel sama besar	均等な多コマ
+空镜	Empty shot	Bidikan kosong	空ショット
+横长	Wide	Melebar	横長
+实际请求：{0} · model={1}	Request sent to: {0} · model={1}	Permintaan dikirim ke: {0} · model={1}	実際のリクエスト先：{0} · model={1}
+Key 无效或无权限：检查 Key 是否完整；火山方舟还要确认该模型在「开通管理」里已开通（{0}）	Invalid key or no permission: check the key is complete; on Volcengine Ark also make sure the model is enabled under “Activation management” ({0})	Kunci tidak valid atau tanpa izin: pastikan kunci lengkap; di Volcengine Ark pastikan juga model sudah diaktifkan di “Manajemen aktivasi” ({0})	キーが無効か権限がありません：キーが欠けていないか確認してください。火山方舟では「開通管理」でそのモデルを有効にしているかも確認してください（{0}）
+这不是路径问题，是账号里没有这个模型。三步排查：	This isn’t a path problem — your account doesn’t have this model. Check three things:	Ini bukan masalah path — akun Anda tidak punya model ini. Periksa tiga hal:	パスの問題ではなく、アカウントにこのモデルがありません。次の 3 点を確認してください：
+这不是路径问题，是账号里没有这个模型。三步排查：① 方舟控制台 →「开通管理」把要用的模型开通（开通免费，按量计费）；② 到「模型广场」复制模型 ID（doubao-seed-… 带日期后缀），或创建推理接入点用 ep-… 开头的 ID；③ 模型栏不要填「豆包」这类产品名。（{0}）	This isn’t a path problem — your account doesn’t have this model. Check three things: ① In the Ark console → “Activation management”, enable the model (free to enable, pay as you go); ② copy the model ID from “Model Square” (doubao-seed-… with a date suffix), or create an inference endpoint and use its ep-… ID; ③ don’t put a product name like “Doubao” in the model field. ({0})	Ini bukan masalah path — akun Anda tidak punya model ini. Periksa tiga hal: ① Di konsol Ark → “Manajemen aktivasi”, aktifkan modelnya (gratis, bayar sesuai pemakaian); ② salin ID model dari “Model Square” (doubao-seed-… dengan akhiran tanggal), atau buat endpoint inferensi dan pakai ID ep-…; ③ jangan isi kolom model dengan nama produk seperti “Doubao”. ({0})	パスの問題ではなく、アカウントにこのモデルがありません。次の 3 点を確認してください：① 方舟コンソール →「開通管理」で使うモデルを有効にする（有効化は無料、従量課金）；② 「モデル広場」からモデル ID をコピーする（doubao-seed-… の日付付き）か、推論エンドポイントを作って ep-… で始まる ID を使う；③ モデル欄に「Doubao」のような製品名を入れない。（{0}）
+① 方舟控制台 →「开通管理」把要用的模型开通（开通免费，按量计费）；	① In the Ark console → “Activation management”, enable the model you need (free to enable, pay as you go);	① Di konsol Ark → “Manajemen aktivasi”, aktifkan model yang dibutuhkan (gratis, bayar sesuai pemakaian);	① 方舟コンソール →「開通管理」で使うモデルを有効にする（有効化は無料、従量課金）；
+② 到「模型广场」复制模型 ID（doubao-seed-… 带日期后缀），或创建推理接入点用 ep-… 开头的 ID；	② copy the model ID from “Model Square” (doubao-seed-… with a date suffix), or create an inference endpoint and use its ep-… ID;	② salin ID model dari “Model Square” (doubao-seed-… dengan akhiran tanggal), atau buat endpoint inferensi dan pakai ID ep-…;	② 「モデル広場」からモデル ID をコピーする（doubao-seed-… の日付付き）か、推論エンドポイントを作って ep-… で始まる ID を使う；
+③ 模型栏不要填「豆包」这类产品名。	③ don’t put a product name like “Doubao” in the model field.	③ jangan isi kolom model dengan nama produk seperti “Doubao”.	③ モデル欄に「Doubao」のような製品名を入れない。
+404 且提示模型不存在：确认「模型」填的是真实 model id，不是产品名。（{0}）	404 and “model not found”: make sure the Model field holds a real model ID, not a product name. ({0})	404 dan “model tidak ditemukan”: pastikan kolom Model berisi ID model asli, bukan nama produk. ({0})	404 で「モデルが存在しない」：「モデル」欄が製品名ではなく実際の model id か確認してください。（{0}）
+baseUrl 路径不对：OpenAI 兼容端填到 https://host/v1 或 https://host；火山方舟填到 .../api/v3。（{0}）	Wrong baseUrl path: for OpenAI-compatible services use https://host/v1 or https://host; for Volcengine Ark use .../api/v3. ({0})	Path baseUrl salah: untuk layanan kompatibel OpenAI pakai https://host/v1 atau https://host; untuk Volcengine Ark pakai .../api/v3. ({0})	baseUrl のパスが違います：OpenAI 互換は https://host/v1 か https://host、火山方舟は .../api/v3 まで入れてください。（{0}）
+额度或频率受限：稍后再试，或换一个服务商/Key	Quota or rate limit hit: try again later, or switch provider / key	Kuota atau batas laju tercapai: coba lagi nanti, atau ganti penyedia / kunci	利用枠か頻度の制限に達しました：時間をおいて試すか、別のサービス / キーに切り替えてください
+未配置模型 API Key	No model API key set	Kunci API model belum diatur	モデルの API キーが未設定です
+在网页「AI 导演」里填 baseUrl / apiKey / model	Fill in baseUrl / apiKey / model under “AI director”	Isi baseUrl / apiKey / model di “Sutradara AI”	「AI 監督」で baseUrl / apiKey / model を入力してください
+模型接口返回 {0}：{1}	The model API returned {0}: {1}	API model mengembalikan {0}: {1}	モデル API が {0} を返しました：{1}
+模型接口超时（{0}ms）	The model API timed out ({0} ms)	API model kehabisan waktu ({0} ms)	モデル API がタイムアウトしました（{0}ms）
+浏览器无法直连该接口（多半是 CORS 或网络）	The browser can’t reach this API directly (usually CORS or the network)	Browser tidak bisa menjangkau API ini langsung (biasanya CORS atau jaringan)	ブラウザからこの API に直接つながりません（たいてい CORS かネットワーク）
+确认 baseUrl 支持浏览器直连（DeepSeek / OpenAI / SiliconFlow 可以；部分企业网关不行）。也可以改用本地版或自建中转。	Make sure the baseUrl allows direct browser access (DeepSeek / OpenAI / SiliconFlow do; some corporate gateways don’t). You can also use the local version or your own relay.	Pastikan baseUrl mengizinkan akses langsung dari browser (DeepSeek / OpenAI / SiliconFlow bisa; sebagian gateway perusahaan tidak). Anda juga bisa memakai versi lokal atau relay sendiri.	baseUrl がブラウザからの直接接続に対応しているか確認してください（DeepSeek / OpenAI / SiliconFlow は可、一部の企業ゲートウェイは不可）。ローカル版や自前の中継を使う方法もあります。
+模型返回为空	The model returned nothing	Model tidak mengembalikan apa pun	モデルの応答が空です
+模型返回里没有 JSON 对象	The model’s reply has no JSON object	Balasan model tidak berisi objek JSON	モデルの応答に JSON オブジェクトがありません
+模型返回的 JSON 解析失败：{0} 片段={1}	Couldn’t parse the model’s JSON: {0} snippet={1}	Gagal mengurai JSON dari model: {0} cuplikan={1}	モデルの JSON を解析できませんでした：{0} 断片={1}
+（响应体为空，服务端没给原因）	(empty response body — the server gave no reason)	(isi respons kosong — server tidak memberi alasan)	（レスポンスが空で、サーバーは理由を返していません）
+生图接口返回 {0}：{1}	The image API returned {0}: {1}	API gambar mengembalikan {0}: {1}	画像 API が {0} を返しました：{1}
+生图接口返回 {0}：{1} POST {2} model={3} · provider={4}	The image API returned {0}: {1} POST {2} model={3} · provider={4}	API gambar mengembalikan {0}: {1} POST {2} model={3} · provider={4}	画像 API が {0} を返しました：{1} POST {2} model={3} · provider={4}
+账号里没有这个生图模型：方舟控制台 →「开通管理」开通 Seedream；模型 ID 从「模型广场」复制	Your account doesn’t have this image model: enable Seedream in the Ark console → “Activation management”, and copy the model ID from “Model Square”	Akun Anda tidak punya model gambar ini: aktifkan Seedream di konsol Ark → “Manajemen aktivasi”, lalu salin ID model dari “Model Square”	アカウントにこの画像モデルがありません：方舟コンソール →「開通管理」で Seedream を有効にし、モデル ID は「モデル広場」からコピーしてください
+账号里没有这个生图模型：方舟控制台 →「开通管理」开通 Seedream；模型 ID 从「模型广场」复制（如 doubao-seedream-5-0-pro-260628）；确认 Key 与接入点在同一个 region（cn-beijing）	Your account doesn’t have this image model: enable Seedream in the Ark console → “Activation management”; copy the model ID from “Model Square” (e.g. doubao-seedream-5-0-pro-260628); make sure the key and endpoint are in the same region (cn-beijing)	Akun Anda tidak punya model gambar ini: aktifkan Seedream di konsol Ark → “Manajemen aktivasi”; salin ID model dari “Model Square” (mis. doubao-seedream-5-0-pro-260628); pastikan kunci dan endpoint ada di region yang sama (cn-beijing)	アカウントにこの画像モデルがありません：方舟コンソール →「開通管理」で Seedream を有効にし、モデル ID は「モデル広場」からコピー（例：doubao-seedream-5-0-pro-260628）。キーとエンドポイントが同じ region（cn-beijing）か確認してください
+（如 doubao-seedream-5-0-pro-260628）；确认 Key 与接入点在同一个 region（cn-beijing）	(e.g. doubao-seedream-5-0-pro-260628); make sure the key and endpoint are in the same region (cn-beijing)	(mis. doubao-seedream-5-0-pro-260628); pastikan kunci dan endpoint di region yang sama (cn-beijing)	（例：doubao-seedream-5-0-pro-260628）。キーとエンドポイントが同じ region（cn-beijing）か確認してください
+确认生图模型 ID 与服务商匹配，且该模型已开通/有权限	Check the image model ID matches the provider and that the model is enabled / permitted	Pastikan ID model gambar cocok dengan penyedia dan model sudah aktif / diizinkan	画像モデル ID がサービスと合っているか、そのモデルが有効 / 利用可能か確認してください
+生图端点不对：Base URL 要填到版本段（OpenAI 兼容 …/v1，火山方舟 …/api/v3）	Wrong image endpoint: the Base URL must include the version segment (OpenAI-compatible …/v1, Volcengine Ark …/api/v3)	Endpoint gambar salah: Base URL harus sampai segmen versi (kompatibel OpenAI …/v1, Volcengine Ark …/api/v3)	画像エンドポイントが違います：Base URL はバージョン部分まで入れてください（OpenAI 互換 …/v1、火山方舟 …/api/v3）
+Key 无生图权限：换成有该模型权限的 Key，或在方舟「开通管理」里开通这个模型	This key can’t generate images: use a key with access to the model, or enable the model under Ark “Activation management”	Kunci ini tidak bisa membuat gambar: pakai kunci yang punya akses ke model, atau aktifkan model di “Manajemen aktivasi” Ark	このキーには画像生成の権限がありません：権限のあるキーに替えるか、方舟の「開通管理」でこのモデルを有効にしてください
+额度/频率（IPM）受限：降低频率或换 Key	Quota / rate (IPM) limit hit: slow down or switch keys	Batas kuota / laju (IPM) tercapai: kurangi frekuensi atau ganti kunci	利用枠 / 頻度（IPM）の制限：頻度を下げるかキーを替えてください
+这个模型不接受当前尺寸：换 seedream 4.0/5.0，或把尺寸改成 1024x1024	This model doesn’t accept the current size: switch to seedream 4.0/5.0, or set the size to 1024x1024	Model ini tidak menerima ukuran sekarang: ganti ke seedream 4.0/5.0, atau ubah ukuran ke 1024x1024	このモデルは今のサイズを受け付けません：seedream 4.0/5.0 に替えるか、サイズを 1024x1024 にしてください
+参数不被接受：检查模型名与提示词长度（Seedream 建议中文 ≤300 字）	Parameters rejected: check the model name and prompt length (Seedream suggests ≤300 Chinese characters)	Parameter ditolak: periksa nama model dan panjang prompt (Seedream menyarankan ≤300 karakter Mandarin)	パラメータが受け付けられません：モデル名とプロンプトの長さを確認してください（Seedream は中国語 300 字以内を推奨）
+未配置生图 Key	No image key set	Kunci gambar belum diatur	画像用キーが未設定です
+在「AI 导演」里填 Base URL / Key，再填一个生图模型（如 gpt-image-1、dall-e-3、Kwai-Kolors/Kolors）	Fill in Base URL / key under “AI director”, plus an image model (e.g. gpt-image-1, dall-e-3, Kwai-Kolors/Kolors)	Isi Base URL / kunci di “Sutradara AI”, lalu satu model gambar (mis. gpt-image-1, dall-e-3, Kwai-Kolors/Kolors)	「AI 監督」で Base URL / キーを入れ、画像モデルも 1 つ指定してください（例：gpt-image-1、dall-e-3、Kwai-Kolors/Kolors）
+方舟返回里没有图片	Ark returned no image	Ark tidak mengembalikan gambar	方舟の応答に画像がありません
+Stability 路径应为 {base}/v2beta/stable-image/generate/core	The Stability path should be {base}/v2beta/stable-image/generate/core	Path Stability seharusnya {base}/v2beta/stable-image/generate/core	Stability のパスは {base}/v2beta/stable-image/generate/core です
+Key 无权限	Key has no permission	Kunci tanpa izin	キーに権限がありません
+可能是内容审核拦截	Possibly blocked by content moderation	Mungkin diblokir moderasi konten	コンテンツ審査で止められた可能性があります
+参考图生图返回 {0}：{1}	Reference-image generation returned {0}: {1}	Pembuatan dari gambar referensi mengembalikan {0}: {1}	参考画像からの生成が {0} を返しました：{1}
+这个端点可能不支持 /images/edits；把服务商切到硅基流动或去掉参考图	This endpoint may not support /images/edits; switch the provider to SiliconFlow or remove the reference images	Endpoint ini mungkin tidak mendukung /images/edits; ganti penyedia ke SiliconFlow atau hapus gambar referensi	このエンドポイントは /images/edits に対応していないかもしれません。サービスを SiliconFlow に替えるか参考画像を外してください
+这个 Base URL 可能没有 /images/generations；换一个生图服务商或填全路径	This Base URL may not have /images/generations; switch image provider or enter the full path	Base URL ini mungkin tidak punya /images/generations; ganti penyedia gambar atau isi path lengkap	この Base URL には /images/generations がないかもしれません。画像サービスを替えるかフルパスを入れてください
+Key 无生图权限	Key can’t generate images	Kunci tidak bisa membuat gambar	キーに画像生成の権限がありません
+这个模型不接受 {0} 这个尺寸：换一个模型，或在生图服务商里选「硅基流动」这类按比例出图的	This model doesn’t accept the size {0}: switch models, or pick an image provider that works by aspect ratio, such as SiliconFlow	Model ini tidak menerima ukuran {0}: ganti model, atau pilih penyedia gambar berbasis rasio seperti SiliconFlow	このモデルは {0} のサイズを受け付けません：モデルを替えるか、画像サービスで「SiliconFlow」のような比率指定のものを選んでください
+模型名可能不对（有的服务商叫 Kwai-Kolors/Kolors、dall-e-3…）	The model name may be wrong (some providers call it Kwai-Kolors/Kolors, dall-e-3…)	Nama model mungkin salah (sebagian penyedia menamainya Kwai-Kolors/Kolors, dall-e-3…)	モデル名が違うかもしれません（Kwai-Kolors/Kolors、dall-e-3… などの名前のサービスもあります）
+生图接口没有返回图片（既没有 b64_json 也没有 url）	The image API returned no image (neither b64_json nor url)	API gambar tidak mengembalikan gambar (tanpa b64_json maupun url)	画像 API が画像を返しませんでした（b64_json も url もありません）
+生图超时（90s+）	Image generation timed out (90 s+)	Pembuatan gambar kehabisan waktu (90 dtk+)	画像生成がタイムアウトしました（90 秒以上）
+浏览器无法直连生图接口（CORS / 网络）	The browser can’t reach the image API directly (CORS / network)	Browser tidak bisa menjangkau API gambar langsung (CORS / jaringan)	ブラウザから画像 API に直接つながりません（CORS / ネットワーク）
+生图接口多半不放行浏览器直连：可以用本地版（node server.mjs）走服务端中转，或自建中转	Most image APIs block direct browser access: use the local version (node server.mjs) to relay through the server, or set up your own relay	Sebagian besar API gambar memblokir akses langsung dari browser: pakai versi lokal (node server.mjs) sebagai relay server, atau buat relay sendiri	画像 API はたいていブラウザからの直接接続を許可していません：ローカル版（node server.mjs）でサーバー中継するか、自前の中継を用意してください
+旁白	Narration	Narasi	ナレーション
+内心	Inner voice	Suara hati	心の声
+独白	Monologue	Monolog	独白
+拟声	Sound effect	Efek suara	擬音
+对话比例高	Dialogue-heavy	Banyak dialog	会話が多い
+校园	School	Sekolah	学園
+戏路匹配「{0}」	Genre match: “{0}”	Genre cocok: “{0}”	ジャンル一致「{0}」
+画面气质命中：{0}	Visual traits matched: {0}	Ciri visual cocok: {0}	画面の雰囲気が一致：{0}
+基调契合：{0}（{1}）	Tone fits: {0} ({1})	Nada cocok: {0} ({1})	トーンが合う：{0}（{1}）
+基调契合：{0}	Tone fits: {0}	Nada cocok: {0}	トーンが合う：{0}
+节拍全中：{#0} 拍正好落在 {#1} 格	All beats land: {0} beats fit {1} panels exactly	Semua ketukan pas: {0} ketukan tepat di {1} panel	ビートが全部一致：{0} ビートがちょうど {1} コマに収まる
+节拍命中 {#0}%（{#1} 拍）	Beats matched {0}% ({1} beats)	Ketukan cocok {0}% ({1} ketukan)	ビート一致 {0}%（{1} ビート）
+画风体系：{0}	Art style family: {0}	Rumpun gaya gambar: {0}	画風の系統：{0}
+竖屏滚动画幅匹配	Fits vertical scrolling	Cocok untuk gulir vertikal	縦スクロールの画面比に合う
+高密度格子契合快节奏	Dense panels suit the fast pace	Panel padat cocok untuk tempo cepat	密なコマ割りが速いテンポに合う
+右 → 左，上 → 下	right → left, top → bottom	kanan → kiri, atas → bawah	右 → 左、上 → 下
+上 → 下	top → bottom	atas → bawah	上 → 下
+左 → 右，上 → 下	left → right, top → bottom	kiri → kanan, atas → bawah	左 → 右、上 → 下
+从右往左	Right to left	Kanan ke kiri	右から左
+由上往下	Top to bottom	Atas ke bawah	上から下
+从左往右	Left to right	Kiri ke kanan	左から右
+共 {#0} 格，阅读顺序：{1}	{0} panels, reading order: {1}	{0} panel, urutan baca: {1}	全 {0} コマ、読む順：{1}
+建议整页导出宽度 {#0}px；每格给出像素尺寸与最接近的出图尺寸，可直接用于 AI 生图	Suggested page export width {0}px; each panel lists its pixel size and the nearest generation size, ready for AI image generation	Lebar ekspor halaman yang disarankan {0}px; tiap panel mencantumkan ukuran piksel dan ukuran pembuatan terdekat, siap untuk AI	ページの書き出し幅は {0}px がおすすめ。各コマのピクセルサイズと最も近い生成サイズを出しているので、そのまま AI 画像生成に使えます
+每格提示词已含景别、构图意图与画风包；subject 处替换为你的角色/场景描述	Each panel prompt already includes the shot, composition intent and style pack; replace “subject” with your character / scene description	Prompt tiap panel sudah memuat bidikan, maksud komposisi, dan paket gaya; ganti “subject” dengan deskripsi karakter / adegan Anda	各コマのプロンプトにはショット・構図の意図・画風パックが入っています。subject の部分をキャラ / 場面の説明に置き換えてください
+已按硬约束（画幅/边框）过滤模板	Templates filtered by hard constraints (format / frames)	Templat disaring berdasarkan batasan wajib (format / bingkai)	必須条件（画面比 / 枠）でテンプレートを絞り込みました
+按景别构图	Compose by shot	Komposisi sesuai bidikan	ショットに合わせた構図
+三角格	Triangle panel	Panel segitiga	三角ゴマ
+三角格：主体压在角上，另一角留大面积空白。画满就浪费了这个形状。	Triangle panel: anchor the subject in a corner and leave the other corner wide open. Filling it up wastes the shape.	Panel segitiga: letakkan subjek di satu sudut dan biarkan sudut lain kosong luas. Mengisinya penuh menyia-nyiakan bentuknya.	三角ゴマ：主体を角に寄せ、もう一方の角は大きく空けます。埋め尽くすとこの形がもったいない。
+压在别的格子上的小格	A small panel laid over another panel	Panel kecil yang menumpang di atas panel lain	別のコマに重ねた小ゴマ
+出血格	Bleed panel	Panel bleed	裁ち切りゴマ
+有边延伸到页面边缘	Has an edge running off the page	Ada sisi yang sampai ke tepi halaman	辺がページの端まで伸びている
+出血格：可以让人或物冲出画面边缘，气势最大，别画成规矩的框内构图。	Bleed panel: let people or objects burst past the edge for maximum force; don’t compose it like a tidy framed panel.	Panel bleed: biarkan orang atau benda menembus tepi untuk kesan paling kuat; jangan disusun seperti panel berbingkai rapi.	裁ち切りゴマ：人や物を画面の端から飛び出させると迫力が最大に。枠に収まったきちんとした構図にしないこと。
+横长全景格	Wide panorama panel	Panel panorama lebar	横長パノラマゴマ
+横长条：讲空间、追逐、群像最合适；人物可以画得很小。	Wide strip: best for space, chases and ensembles; figures can be drawn very small.	Strip lebar: paling cocok untuk ruang, kejar-kejaran, dan kelompok; tokoh boleh digambar sangat kecil.	横長の帯：空間・追跡・群像に最適。人物はかなり小さく描いても大丈夫。
+小方格	Small square panel	Panel persegi kecil	小さな正方形ゴマ
+其它矩形格	Other rectangular panel	Panel persegi panjang lain	その他の四角いコマ
+整格交代地点/时间，人物可极小或只有剪影，重点在环境轮廓	The whole panel sets up place and time; figures can be tiny or just silhouettes — the environment is the focus	Seluruh panel memperkenalkan tempat dan waktu; tokoh bisa sangat kecil atau siluet saja — fokus pada lingkungan	コマ全体で場所と時間を示す。人物はごく小さいかシルエットだけでよく、主役は環境の輪郭
+长条格专供：横向铺开的空间感，适合建立大场面	For wide strips: a sense of space spread horizontally, good for establishing big scenes	Khusus strip lebar: kesan ruang yang melebar, cocok untuk membuka adegan besar	横長ゴマ専用：横に広がる空間で、大きな場面を見せるのに向く
+全身入画，动作方向清晰，留出运动空间	Full body in frame, clear direction of movement, room to move	Seluruh tubuh dalam bingkai, arah gerak jelas, ada ruang untuk bergerak	全身を入れ、動きの方向をはっきりさせ、動く余地を残す
+全身定格，强调姿态与服装，背景简化	Full-body freeze that stresses pose and costume, with a simplified background	Pose seluruh tubuh yang menonjolkan sikap dan kostum, latar disederhanakan	全身で止め、ポーズと衣装を強調し、背景は簡略に
+多人分层站位（前/中/后），避免同高排排站	Stagger several people in depth (front / middle / back); avoid lining them up at one height	Atur beberapa orang berlapis (depan / tengah / belakang); hindari berjajar sejajar	複数人を前・中・後ろに重ねて配置し、同じ高さで横一列に並べない
+腰部以上，兼顾表情和手势，最常用的叙事格	Waist up, showing both expression and gesture — the most common storytelling panel	Dari pinggang ke atas, menampilkan ekspresi dan gerak tangan — panel cerita paling umum	腰から上。表情と手振りの両方を見せる、いちばんよく使う語りのコマ
+两人同格对峙/交谈，用间距与视线表达关系	Two people facing off or talking in one panel; spacing and gaze show their relationship	Dua orang berhadapan atau bicara dalam satu panel; jarak dan tatapan menunjukkan hubungan	2 人が同じコマで対峙 / 会話。間合いと視線で関係を見せる
+胸部以上，情绪开始占据画面	Chest up; emotion starts to fill the frame	Dari dada ke atas; emosi mulai memenuhi gambar	胸から上。感情が画面を占め始める
+脸占满格，眼神与嘴角是重点	The face fills the panel; eyes and mouth corners are the focus	Wajah memenuhi panel; mata dan sudut bibir jadi fokus	顔がコマいっぱいに。目と口元が要
+瞳孔反光可映出对方/回忆，一格顶十句台词	A pupil’s reflection can show the other person or a memory — one panel worth ten lines	Pantulan di pupil bisa memperlihatkan orang lain atau kenangan — satu panel senilai sepuluh kalimat	瞳の映り込みで相手や記憶を見せる。1 コマでセリフ 10 行分
+手是情绪的替身：握紧、发抖、松开	Hands stand in for emotion: clenching, trembling, letting go	Tangan mewakili emosi: mengepal, gemetar, melepas	手は感情の代役：握る、震える、離す
+道具/线索特写，承担信息传递	Close-up of a prop or clue that carries information	Close-up properti atau petunjuk yang menyampaikan informasi	小道具 / 手がかりのアップで情報を伝える
+动作瞬间，肢体出格/越界更有冲击力	The instant of action; limbs breaking out of the frame hit harder	Momen aksi; anggota tubuh yang keluar bingkai lebih berdampak	動きの瞬間。手足が枠からはみ出すと迫力が増す
+整页最重要的格：最大面积、最强对比、速度线放射	The most important panel on the page: largest area, strongest contrast, radiating speed lines	Panel terpenting di halaman: area terbesar, kontras terkuat, garis kecepatan memancar	ページでいちばん大事なコマ：最大の面積、最強のコントラスト、放射状のスピード線
+小格里的大反应，是日漫节奏的呼吸点	A big reaction in a small panel — the breathing point of manga rhythm	Reaksi besar di panel kecil — titik napas ritme manga	小ゴマの大きなリアクションは、日本の漫画のリズムの息継ぎ
+大面积留白，无台词，让上一格的情绪落地	Lots of empty space and no lines, letting the previous panel’s emotion land	Banyak ruang kosong tanpa dialog, membiarkan emosi panel sebelumnya mengendap	大きな余白でセリフなし。前のコマの感情を着地させる
+角色眼里的世界：空景代替独白	The world through the character’s eyes: an empty scene instead of a monologue	Dunia di mata tokoh: pemandangan kosong menggantikan monolog	キャラの目に映る世界：独白の代わりに空の風景
+俯视压人：表现孤立、被围、无力	Looking down to crush: isolation, being surrounded, helplessness	Sudut atas yang menekan: terasing, terkepung, tak berdaya	俯瞰で押しつぶす：孤立・包囲・無力感
+仰视抬人：压迫感、英雄感、威胁感	Looking up to elevate: pressure, heroism, menace	Sudut bawah yang mengangkat: tekanan, kepahlawanan, ancaman	あおりで持ち上げる：威圧感・英雄感・脅威
+背影＝拒绝沟通或决意离开，情绪后置	A back view = refusing to talk or resolving to leave; the emotion comes later	Tampak belakang = menolak bicara atau bertekad pergi; emosinya muncul belakangan	後ろ姿＝対話の拒絶か去る決意。感情はあとから
+剪影隐藏身份，常用于反派登场或回忆	A silhouette hides identity — often used for a villain’s entrance or a flashback	Siluet menyembunyikan identitas — sering untuk kemunculan penjahat atau kilas balik	シルエットで正体を隠す。悪役の登場や回想によく使う
+压在别格上的小格，做细节强调或心理插入	A small panel over another, for a detail or a glimpse of thought	Panel kecil di atas panel lain, untuk menonjolkan detail atau sisipan batin	別のコマに重ねる小ゴマ。細部の強調や心の差し込みに
+发起攻击	Attack	Serangan dimulai	攻撃開始
+动作起势，肢体出格	Wind-up, limbs breaking the frame	Ancang-ancang, anggota tubuh keluar bingkai	動きの起こり、手足が枠からはみ出す
+撞击点最大格，速度线放射	Biggest panel at the point of impact, radiating speed lines	Panel terbesar di titik benturan, garis kecepatan memancar	衝突点を最大ゴマに、スピード線を放射状に
+小格反应，破碎或惊愕	Small-panel reaction: shattering or shock	Reaksi di panel kecil: hancur atau terkejut	小ゴマのリアクション：砕ける、または驚愕
+二次冲击，角度要换	Second strike — change the angle	Serangan kedua — ganti sudut	二度目の衝撃、アングルを変える
+落地收势	Landing and recovery	Mendarat dan kembali tenang	着地して構えを解く
+留白或背影，收住节奏	Empty space or a back view to settle the rhythm	Ruang kosong atau tampak belakang untuk meredakan ritme	余白か後ろ姿でリズムを締める
+蓄力/前奏	Charge-up / prelude	Mengumpulkan tenaga / pendahuluan	溜め / 前振り
+局部特写蓄势	Build tension with partial close-ups	Bangun ketegangan dengan close-up sebagian	部分のアップで力を溜める
+释放	Release	Lepaskan	解放
+整页最大格，全页留给这一击	The page’s biggest panel — the whole page goes to this strike	Panel terbesar halaman — seluruh halaman untuk serangan ini	ページ最大のコマ。ページ全体をこの一撃に
+余波	Aftermath	Dampak sesudahnya	余波
+尘埃、残骸、静默	Dust, debris, silence	Debu, puing, hening	塵、残骸、静寂
+奔跑/追逐	Running / chasing	Berlari / mengejar	走る / 追う
+横向长格，速度线拉长	Long horizontal panel with stretched speed lines	Panel horizontal panjang dengan garis kecepatan memanjang	横長のコマでスピード線を長く
+回头一瞥	A glance back	Menoleh sekilas	振り返る一瞬
+回头的紧张感	The tension of looking back	Ketegangan saat menoleh	振り返るときの緊張感
+被拦住/转向	Blocked / changing course	Terhadang / berbelok	行く手を阻まれる / 方向転換
+路线被切断	The way is cut off	Jalan terputus	道が断たれる
+险中脱身	Narrow escape	Lolos dari bahaya	間一髪の脱出
+冲刺或静默收尾	End on a sprint or in silence	Akhiri dengan lari kencang atau hening	ダッシュか静けさで締める
+隐忍	Holding back	Menahan diri	こらえる
+情绪压着不说	Emotion kept inside, unspoken	Emosi ditahan, tak diucapkan	感情を抑えて口にしない
+细节泄露	A telling detail	Detail yang membocorkan	細部に表れる
+眼睛/手/物件泄底	Eyes / hands / an object give it away	Mata / tangan / benda membocorkannya	目 / 手 / 物が本音を漏らす
+爆发	Outburst	Meledak	爆発
+最大格给情绪第一次破防	The biggest panel for the first time the emotion breaks through	Panel terbesar untuk pertama kalinya emosi jebol	最大ゴマで感情が初めて決壊する
+余韵	Lingering feeling	Kesan yang tertinggal	余韻
+留白或空镜落地	Land it with empty space or an empty shot	Akhiri dengan ruang kosong atau bidikan kosong	余白か空ショットで着地
+先给全景/双人，交代站位	Start with a wide or two-shot to establish positions	Mulai dengan bidikan lebar atau dua orang untuk menunjukkan posisi	まず全景か 2 人のショットで立ち位置を示す
+发言方	Speaker	Pembicara	話し手
+说话者中景，留气泡位	Medium shot of the speaker, leaving room for the bubble	Bidikan sedang pembicara, sisakan ruang untuk balon	話し手を中景で、フキダシの場所を空ける
+倾听方	Listener	Pendengar	聞き手
+听者反应，视线指向对方	The listener reacts, gaze on the other person	Pendengar bereaksi, tatapan ke lawan bicara	聞き手のリアクション、視線は相手へ
+转折台词	Turning-point line	Kalimat titik balik	転機のセリフ
+关键台词给特写	Give the key line a close-up	Beri close-up pada kalimat kunci	大事なセリフはアップで
+停顿	Pause	Jeda	間
+沉默格收尾	End on a silent panel	Akhiri dengan panel hening	沈黙のコマで締める
+误导/平静	Misdirection / calm	Pengalihan / tenang	ミスリード / 平静
+先给一个看似平常的格	First, a panel that looks ordinary	Awali dengan panel yang tampak biasa	まずは何気なく見えるコマ
+揭示	Reveal	Pengungkapan	明かす
+最大格放真相，视角突变	The truth in the biggest panel, with a sudden change of angle	Kebenaran di panel terbesar, sudut pandang berubah tiba-tiba	最大ゴマで真相を、視点を急に変える
+震惊反应	Shocked reaction	Reaksi terkejut	驚きのリアクション
+小格放大反应	Magnify the reaction in a small panel	Perbesar reaksi di panel kecil	小ゴマでリアクションを大きく
+氛围转向	Shift in mood	Suasana berubah	空気が変わる
+空镜/剪影收束	Close with an empty shot or silhouette	Tutup dengan bidikan kosong atau siluet	空ショット / シルエットで締める
+空间异样	Something off about the space	Ada yang janggal dengan ruangan	空間の違和感
+空间空得过分	The space is too empty	Ruangan terlalu kosong	空間が不自然なほど空っぽ
+异常细节	An odd detail	Detail yang aneh	異常な細部
+一个不该出现的细节	A detail that shouldn’t be there	Detail yang tak seharusnya ada	あるはずのない細部
+威胁从边缘压入	The threat presses in from the edge	Ancaman merangsek dari tepi	脅威が端から迫る
+屏息	Holding breath	Menahan napas	息をのむ
+全格留白，读者自己害怕	A whole empty panel; readers scare themselves	Satu panel kosong penuh; pembaca menakuti diri sendiri	コマ全体を余白に、読者が自分で怖がる
+日常伪装	Everyday disguise	Kedok keseharian	日常の仮面
+先给安全的日常	Start with safe everyday life	Awali dengan keseharian yang aman	まずは安全な日常を
+不对劲	Something’s wrong	Ada yang tidak beres	何かおかしい
+细节出错	A detail is wrong	Ada detail yang salah	細部が狂っている
+怪物现身	The monster appears	Monster muncul	怪物が姿を現す
+最大格，越界出血	Biggest panel, breaking the frame and bleeding off	Panel terbesar, menembus bingkai hingga tepi	最大ゴマで枠をはみ出し裁ち切る
+逃命	Running for your life	Lari menyelamatkan diri	命からがら逃げる
+小格慌乱	Panic in small panels	Panik di panel-panel kecil	小ゴマで慌てふためく
+距离感	Sense of distance	Kesan jarak	距離感
+两人间距是全部戏	The space between the two is the whole drama	Jarak di antara keduanya adalah seluruh dramanya	2 人の間合いがすべての芝居
+偷看	Stealing a look	Mencuri pandang	盗み見る
+视线偷瞄，瞳孔高光	A sidelong glance, highlights in the pupils	Lirikan diam-diam, kilau di pupil	こっそり見る視線、瞳のハイライト
+心跳一拍	A skipped heartbeat	Jantung berdebar sesaat	胸が高鳴る一瞬
+手/物件/留白表达心动	Hands / an object / empty space show the flutter	Tangan / benda / ruang kosong menunjukkan debaran	手 / 物 / 余白でときめきを表す
+开口	Speaking up	Mengutarakan	口を開く
+告白瞬间仰视或平视特写	Close-up at the moment of confession, from below or at eye level	Close-up saat pengakuan, dari bawah atau sejajar mata	告白の瞬間をあおりか目線の高さでアップに
+铺垫	Setup	Persiapan	前振り
+正常地铺垫	A normal setup	Persiapan yang biasa	ふつうに前振りする
+停顿一拍	A beat of pause	Jeda sejenak	一拍おく
+一拍空镜，笑点前摇	One empty-shot beat before the punchline	Satu bidikan kosong sebelum punchline	笑いの前に一拍の空ショット
+抖包袱	Punchline	Punchline	オチ
+小格/变形格放大反应	Exaggerate the reaction in a small or distorted panel	Lebih-lebihkan reaksi di panel kecil atau berubah bentuk	小ゴマ / 変形ゴマでリアクションを誇張
+吐槽收尾	End with a quip	Akhiri dengan celetukan	ツッコミで締める
+旁人吐槽格	A bystander’s quip panel	Panel celetukan orang lain	周りのツッコミゴマ
+时空切换	Shift in time and place	Perpindahan waktu dan tempat	時空の切り替え
+用空镜完成时空切换	Use an empty shot to move through time and place	Gunakan bidikan kosong untuk berpindah waktu dan tempat	空ショットで時空を切り替える
+记忆画面	Memory scene	Adegan kenangan	記憶の場面
+构图比现实更工整	Composition neater than reality	Komposisi lebih rapi dari kenyataan	現実より整った構図
+一个记不清的细节	A detail you can’t quite remember	Detail yang samar diingat	よく思い出せない細部
+回到现在	Back to the present	Kembali ke masa kini	現在に戻る
+回到现实，视线落回	Back to reality, the gaze returns	Kembali ke kenyataan, tatapan kembali	現実に戻り、視線が戻る
+时间切片一	Time slice one	Irisan waktu satu	時間の断片 1
+同一地点的第一个时刻	The first moment in one place	Momen pertama di satu tempat	同じ場所の最初の時刻
+时间切片二	Time slice two	Irisan waktu dua	時間の断片 2
+同机位、不同时间	Same angle, different time	Sudut sama, waktu berbeda	同じアングル、違う時間
+时间切片三	Time slice three	Irisan waktu tiga	時間の断片 3
+细节变化提示时间	Changing details show time passing	Perubahan detail menandai waktu	細部の変化で時間を示す
+现在落点	Landing in the now	Mendarat di masa kini	今に着地
+落在当下	Settle in the present	Berlabuh di saat ini	今この時に落ち着く
+大留白	Wide empty space	Ruang kosong luas	大きな余白
+一格占掉大半页	One panel takes most of the page	Satu panel memakan sebagian besar halaman	1 コマでページの大半を使う
+一处细节	One detail	Satu detail	一つの細部
+安静里唯一的动	The only movement in the stillness	Satu-satunya gerak dalam keheningan	静けさの中の唯一の動き
+收尾	Wrap-up	Penutup	締め
+空镜收尾	End on an empty shot	Akhiri dengan bidikan kosong	空ショットで締める
+地点交代	Establishing the place	Memperkenalkan tempat	場所の説明
+建立日常空间	Establish the everyday space	Bangun ruang keseharian	日常の空間を見せる
+人物登场	Character entrance	Tokoh muncul	人物の登場
+人与人的位置关系	Where people stand relative to each other	Posisi antarorang	人と人の位置関係
+生活细节	Everyday details	Detail keseharian	生活の細部
+生活质感细节	Textured details of daily life	Detail tekstur kehidupan sehari-hari	生活感のある細部
+气氛落点	Mood landing	Titik suasana	空気の着地点
+情绪落点	Emotional landing	Titik emosi	感情の着地点
+拉开距离	Opening the distance	Menjauhkan jarak	間合いを取る
+横长全景交代对峙关系	A wide panorama to show the standoff	Panorama lebar untuk memperlihatkan konfrontasi	横長の全景で対峙の関係を示す
+眼神交锋	Clash of glares	Adu tatapan	視線のぶつかり合い
+特写眼神，一格一刀	Eye close-ups, each panel a cut	Close-up mata, tiap panel satu tebasan	目のアップ、1 コマに一太刀
+起手	Opening move	Langkah pertama	初手
+第一动	The first move	Gerakan pertama	最初の一動
+定格	Freeze	Diam membeku	静止
+最静的一格放最重的一击	The stillest panel carries the heaviest blow	Panel paling hening membawa pukulan terberat	いちばん静かなコマに最も重い一撃を
+大景	Big vista	Pemandangan luas	大きな景色
+一格吃掉大半页	One panel eats most of the page	Satu panel menghabiskan sebagian besar halaman	1 コマでページの大半を使う
+人在景中	Figure in the landscape	Sosok dalam pemandangan	景色の中の人
+人物极小，衬景	A tiny figure that sets off the scenery	Tokoh sangat kecil, menonjolkan pemandangan	人物はごく小さく、景色を引き立てる
+景中细节	Detail in the scenery	Detail dalam pemandangan	景色の細部
+风、雨、一片叶子	Wind, rain, a single leaf	Angin, hujan, sehelai daun	風、雨、一枚の葉
+赛场全景	Arena wide shot	Bidikan lebar arena	会場の全景
+交代场地与人数	Show the venue and how many people	Tunjukkan arena dan jumlah orang	会場と人数を示す
+交锋	Clash	Bentrokan	ぶつかり合い
+对抗瞬间，肢体张力	The moment of contest, bodies under strain	Momen adu, tubuh menegang	対決の瞬間、体の緊張
+极限	At the limit	Di batas	限界
+咬牙、汗水、充血的眼	Gritted teeth, sweat, bloodshot eyes	Gigi terkatup, keringat, mata merah	歯を食いしばり、汗、血走った目
+得分/绝杀	Score / winning shot	Skor / tembakan penentu	得点 / 決勝点
+最大格给结果	The biggest panel for the result	Panel terbesar untuk hasilnya	最大ゴマで結果を
+反应	Reaction	Reaksi	リアクション
+观众/队友的反应	The crowd / teammates react	Reaksi penonton / rekan tim	観客 / 仲間の反応
+备料	Prep	Persiapan bahan	下ごしらえ
+手部与食材特写	Close-ups of hands and ingredients	Close-up tangan dan bahan	手と食材のアップ
+烹饪	Cooking	Memasak	調理
+火候、油花、蒸汽	Heat, sizzling oil, steam	Panas, minyak memercik, uap	火加減、油はね、湯気
+上桌	Served	Disajikan	食卓へ
+整桌与环境	The full table and surroundings	Meja penuh dan sekitarnya	食卓全体と周囲
+入口	First bite	Suapan pertama	ひと口
+咬下的瞬间	The moment of the bite	Momen menggigit	かじる瞬間
+感动	Moved	Terharu	感動
+夸张或安静的反应	An over-the-top or quiet reaction	Reaksi berlebihan atau tenang	大げさか静かなリアクション
+战场全景	Battlefield wide shot	Bidikan lebar medan perang	戦場の全景
+规模感优先	Scale comes first	Utamakan skala	規模感を優先
+冲锋	Charge	Serbuan	突撃
+人潮与速度线	A surging crowd and speed lines	Gelombang orang dan garis kecepatan	人の波とスピード線
+混战	Melee	Pertempuran kacau	乱戦
+最大格给碰撞	The biggest panel for the collision	Panel terbesar untuk benturan	最大ゴマで衝突を
+伤亡	Casualties	Korban	死傷
+具体的一具身体	One specific body	Satu tubuh yang konkret	具体的な一つの体
+战后	After the battle	Setelah perang	戦いのあと
+静下来的废墟	Ruins gone quiet	Reruntuhan yang sunyi	静まり返った廃墟
+空间交代	Setting the space	Memperkenalkan ruang	空間の説明
+法庭/审讯室全景	Wide shot of the courtroom / interrogation room	Bidikan lebar ruang sidang / ruang interogasi	法廷 / 取調室の全景
+指控	Accusation	Tuduhan	告発
+发言者与听者	Speaker and listeners	Pembicara dan pendengar	話し手と聞き手
+呈证	Presenting evidence	Menyerahkan bukti	証拠の提示
+证据特写	Close-up of the evidence	Close-up bukti	証拠のアップ
+反驳	Rebuttal	Bantahan	反論
+情绪对抗	Emotional face-off	Adu emosi	感情のぶつかり合い
+判决	Verdict	Putusan	判決
+结果落槌	The gavel falls on the result	Palu diketuk untuk hasilnya	結果に槌が下りる
+写字楼/会议室	Office tower / meeting room	Gedung kantor / ruang rapat	オフィスビル / 会議室
+谈判桌上的距离	The distance across the negotiating table	Jarak di meja perundingan	交渉の席の距離
+文件/屏幕	Documents / screen	Dokumen / layar	書類 / 画面
+信息物件	Objects that carry information	Benda pembawa informasi	情報を持つ物
+压力	Pressure	Tekanan	重圧
+脸色与汗	Complexion and sweat	Raut wajah dan keringat	顔色と汗
+决断	Decision	Keputusan	決断
+起身/转身	Standing up / turning away	Berdiri / berbalik	立ち上がる / 振り向く
+急诊空间	The ER	Ruang gawat darurat	救急の空間
+冷光下的空间	A space under cold light	Ruangan di bawah cahaya dingin	冷たい光の下の空間
+抢救	Resuscitation	Pertolongan darurat	救命処置
+手、器械、压迫	Hands, instruments, pressure	Tangan, alat, tekanan	手、器具、圧迫
+监护	Monitoring	Pemantauan	モニター
+心电图/仪器特写	Close-up of the ECG / instruments	Close-up EKG / alat	心電図 / 機器のアップ
+面孔	Faces	Wajah	顔
+医生与病人	Doctor and patient	Dokter dan pasien	医師と患者
+门外	Outside the door	Di luar pintu	扉の外
+走廊与等待	The corridor and the waiting	Lorong dan penantian	廊下と待つ時間
+结印/蓄力	Hand seals / charging up	Segel tangan / mengumpulkan tenaga	印を結ぶ / 溜め
+手与眼，先给局部	Hands and eyes — details first	Tangan dan mata — detail dulu	手と目、まずは部分を
+施法	Casting	Merapal mantra	術の発動
+最大格给光效	The biggest panel for the light effects	Panel terbesar untuk efek cahaya	最大ゴマで光のエフェクトを
+术法效果	Spell effects	Efek sihir	術の効果
+地面裂纹/光柱	Cracks in the ground / pillars of light	Retakan tanah / pilar cahaya	地面のひび / 光の柱
+烟尘与呼吸	Smoke and breathing	Asap dan napas	煙と息づかい
+异常征兆	Strange omens	Tanda-tanda aneh	異変の兆し
+先给征兆	Show the omens first	Tunjukkan tandanya dulu	まず兆しを見せる
+灾难降临	Disaster strikes	Bencana datang	災厄の到来
+最大格给毁灭	The biggest panel for the destruction	Panel terbesar untuk kehancuran	最大ゴマで破壊を
+逃难	Fleeing	Mengungsi	避難
+人潮与方向	Crowds and direction	Kerumunan dan arah	人の波と向き
+废墟	Ruins	Reruntuhan	廃墟
+幸存	Survival	Bertahan hidup	生き残り
+一个人的呼吸	One person breathing	Napas satu orang	一人の息づかい
+现场	The scene	Lokasi kejadian	現場
+整体与被破坏的秩序	The whole and the broken order	Keseluruhan dan keteraturan yang rusak	全体と壊された秩序
+线索	Clue	Petunjuk	手がかり
+一个不该有/该有的东西	Something that should / shouldn’t be there	Sesuatu yang seharusnya / tak seharusnya ada	あるべき / あるはずのない物
+推理	Deduction	Deduksi	推理
+沉默里的连线	Connecting the dots in silence	Menghubungkan titik dalam diam	沈黙の中で線がつながる
+盘问	Questioning	Interogasi	問い詰め
+两人距离	The distance between two	Jarak antara dua orang	2 人の距離
+真相	The truth	Kebenaran	真相
+揭晓的一格	The panel that reveals it	Panel pengungkapan	明かされる 1 コマ
+出发	Setting out	Berangkat	出発
+背对镜头走出画面	Walking out of frame, back to the camera	Berjalan keluar bingkai membelakangi kamera	カメラに背を向けて画面の外へ
+路上	On the road	Di perjalanan	道中
+横向铺开的路	A road stretching sideways	Jalan yang membentang menyamping	横に伸びる道
+歇脚	Taking a rest	Beristirahat	ひと休み
+小物件与疲惫	Small objects and weariness	Benda kecil dan rasa lelah	小物と疲れ
+风景	Scenery	Pemandangan	風景
+大景留白	A big vista with empty space	Pemandangan luas dengan ruang kosong	大きな景色と余白
+抵达	Arrival	Tiba	到着
+终止在远处	Ending in the distance	Berakhir di kejauhan	遠くで終わる
+现代都市	Modern city	Kota modern	現代の都会
+古代/江湖	Ancient / jianghu	Kuno / jianghu	古代 / 江湖
+异世界	Another world	Dunia lain	異世界
+科幻	Sci-fi	Fiksi ilmiah	SF
+恐怖场所	Scary places	Tempat seram	怖い場所
+乡野自然	Countryside & nature	Pedesaan & alam	田舎と自然
+热血	Hot-blooded	Penuh semangat	熱血
+压抑	Oppressive	Menekan	重苦しい
+温馨	Heartwarming	Hangat	心温まる
+诡异	Eerie	Ganjil	不気味
+荒诞	Absurd	Absurd	不条理
+紧张	Tense	Tegang	緊迫
+唯美	Aesthetic	Estetis	耽美
+悲怆	Tragic	Tragis	悲壮
+竖屏条漫	Vertical webtoon	Webtoon vertikal	縦画面の縦読み漫画
+跨页横版	Landscape spread	Halaman ganda melebar	見開き横長
+方形四格	Square four panels	Empat panel persegi	正方形の 4 コマ
+整页插画	Full-page illustration	Ilustrasi satu halaman	1 ページイラスト
+无框图	Frameless	Tanpa bingkai	枠なし
+黑白网点、大量速度线、格与格之间留下明确的墨线	Black-and-white screentones, plenty of speed lines, clear ink gutters between panels	Screentone hitam-putih, banyak garis kecepatan, garis tinta jelas di antara panel	白黒のスクリーントーン、多めのスピード線、コマとコマの間にはっきりした墨線
+中式彩漫	Chinese color comic	Komik warna Tiongkok	中国式カラー漫画
+彩色、干净线稿、饱和度高，条漫多为无框分隔	Full color, clean lineart, high saturation; webtoons mostly separate panels without frames	Berwarna penuh, garis bersih, saturasi tinggi; webtoon umumnya memisahkan panel tanpa bingkai	フルカラー、きれいな線画、高い彩度。縦読みは枠なしで区切ることが多い
+细线＋柔和厚涂、无边框、用大面积留白控制阅读节奏	Thin lines + soft painterly shading, no borders, large empty space to pace the reading	Garis tipis + arsiran lukis lembut, tanpa batas, ruang kosong luas untuk mengatur ritme baca	細い線＋柔らかい厚塗り、枠なし、大きな余白で読むリズムを作る
+请求体过大（>{0}MB）	Request body too large (>{0} MB)	Isi permintaan terlalu besar (>{0} MB)	リクエストが大きすぎます（{0}MB 超）
+请求体不是合法 JSON	The request body isn’t valid JSON	Isi permintaan bukan JSON yang valid	リクエストが正しい JSON ではありません
+规则版提示词已经在每格里（promptEn / promptShort），可以直接用	The rule-based prompts are already in each panel (promptEn / promptShort) and ready to use	Prompt berbasis aturan sudah ada di tiap panel (promptEn / promptShort) dan siap dipakai	ルール版のプロンプトは各コマに入っています（promptEn / promptShort）。そのまま使えます
+规则引擎的分格仍然可用：点「按规则匹配」或直接看每格的规则版提示词	The rule engine’s panel split still works: click “Match by rules” or check each panel’s rule-based prompt	Pembagian panel mesin aturan tetap bisa dipakai: klik “Cocokkan dengan aturan” atau lihat prompt berbasis aturan di tiap panel	ルールエンジンのコマ割りはそのまま使えます：「ルールでマッチ」を押すか、各コマのルール版プロンプトを見てください
+喊叫	Shout	Teriakan	叫び
+注释	Note	Catatan	注釈
+缺少 x-pf-client 头（仅网页编辑器自用）	Missing the x-pf-client header (for the web editor only)	Header x-pf-client tidak ada (khusus editor web)	x-pf-client ヘッダーがありません（Web エディター専用）
+规则引擎结果仍然可用：把 mode 换成 rules，或直接在网页里点「按规则匹配」	The rule engine result still works: switch mode to rules, or click “Match by rules” on the page	Hasil mesin aturan tetap bisa dipakai: ganti mode ke rules, atau klik “Cocokkan dengan aturan” di halaman	ルールエンジンの結果は使えます：mode を rules に替えるか、画面で「ルールでマッチ」を押してください
+规则引擎结果仍然可用：直接在网页里点「按规则匹配」	The rule engine result still works: just click “Match by rules” on the page	Hasil mesin aturan tetap bisa dipakai: klik saja “Cocokkan dengan aturan” di halaman	ルールエンジンの結果は使えます：画面で「ルールでマッチ」を押してください
+图片代理已禁用	The image proxy is turned off	Proksi gambar dinonaktifkan	画像プロキシは無効です
+默认只在监听 127.0.0.1 时开启。公网部署想用请设 ENABLE_PROXY=1（注意：这等于给你的服务器开了一个出站代理，需自行评估 SSRF 风险）	By default it’s only on when listening on 127.0.0.1. To use it on a public deployment set ENABLE_PROXY=1 (note: this opens an outbound proxy on your server — assess the SSRF risk yourself)	Secara bawaan hanya aktif saat mendengarkan di 127.0.0.1. Untuk server publik, setel ENABLE_PROXY=1 (catatan: ini membuka proksi keluar di server Anda — nilai sendiri risiko SSRF-nya)	既定では 127.0.0.1 で待ち受けているときだけ有効です。公開環境で使うなら ENABLE_PROXY=1 を設定してください（注意：サーバーに外向きのプロキシを開けることになるので、SSRF のリスクはご自身で判断してください）
+拒绝外部来源调用代理	Proxy calls from other origins are refused	Panggilan proksi dari asal lain ditolak	外部からのプロキシ呼び出しは拒否されます
+需要 url=http(s)://...	Needs url=http(s)://...	Perlu url=http(s)://...	url=http(s)://... が必要です
+url 无法解析	Can’t parse the url	url tidak dapat diurai	url を解析できません
+拒绝访问内网/本机地址	Access to local / private-network addresses is refused	Akses ke alamat lokal / jaringan internal ditolak	ローカル / 社内ネットワークのアドレスへのアクセスは拒否されます
+要贴内网图片请在浏览器里直接上传本地文件	For images on a private network, upload the file from your computer instead	Untuk gambar di jaringan internal, unggah berkasnya langsung dari komputer	社内ネットワークの画像は、ブラウザでファイルを直接アップロードしてください
+上游返回 {0}	The source server returned {0}	Server sumber mengembalikan {0}	取得元のサーバーが {0} を返しました
+在左边「AI 导演」里填 baseUrl / apiKey / model 就能用（Key 只存在你浏览器里）	Fill in baseUrl / apiKey / model under “AI director” on the left to use it (the key stays in your browser)	Isi baseUrl / apiKey / model di “Sutradara AI” di kiri untuk memakainya (kunci hanya tersimpan di browser Anda)	左の「AI 監督」で baseUrl / apiKey / model を入れれば使えます（キーはブラウザにだけ保存されます）
+PanelForge 分镜坊（静态版）	PanelForge Storyboard Forge (static edition)	PanelForge Studio Papan Cerita (edisi statis)	PanelForge コマ割り工房（静的版）
+中性骨架，任何画风都能套	A neutral skeleton that fits any art style	Kerangka netral yang cocok untuk gaya apa pun	どの画風にも合う中立的な骨組み
+缺少 plot 字段（剧情文本）	Missing the plot field (story text)	Kolom plot tidak ada (teks cerita)	plot フィールド（あらすじ）がありません
+题材必须属于「{0}」	The genre must be one of “{0}”	Genre harus salah satu dari “{0}”	ジャンルは「{0}」のいずれかにしてください
+需要 templateId：先选一套版式再优化提示词	Needs a templateId: pick a layout before optimizing prompts	Perlu templateId: pilih tata letak dulu sebelum mengoptimalkan prompt	templateId が必要です：レイアウトを選んでからプロンプトを最適化してください
+需要 templateId：先选一套版式再让 AI 切原文	Needs a templateId: pick a layout before letting the AI split the text	Perlu templateId: pilih tata letak dulu sebelum AI membagi teks	templateId が必要です：レイアウトを選んでから AI に原文を割り振らせてください
+缺少 plot 字段（源文本）	Missing the plot field (source text)	Kolom plot tidak ada (teks sumber)	plot フィールド（元の文章）がありません
+静态版没有图片代理：跨域图片无法栅格化导出，请改用本地上传	The static edition has no image proxy: cross-origin images can’t be rasterized for export, so upload them from your computer instead	Edisi statis tidak punya proksi gambar: gambar lintas asal tidak bisa dirasterisasi untuk ekspor, jadi unggah dari komputer	静的版には画像プロキシがありません。別ドメインの画像は書き出し用にラスタライズできないので、ファイルをアップロードしてください
+代理拉取失败 {0}	Proxy fetch failed {0}	Gagal mengambil lewat proksi {0}	プロキシでの取得に失敗 {0}
+PanelForge 画师版 · 分镜与绘制	PanelForge for artists · Storyboard & drawing	PanelForge untuk ilustrator · Papan cerita & menggambar	PanelForge 作画版 · コマ割りと作画
+本地规则引擎 v{0}：	Local rule engine v{0}:	Mesin aturan lokal v{0}:	ローカルルールエンジン v{0}：
+没有「{0}」这套模板（可能是旧链接），先给你默认版式	There’s no template “{0}” (maybe an old link), so here’s the default layout	Tidak ada templat “{0}” (mungkin tautan lama), jadi dipakai tata letak bawaan	テンプレート「{0}」はありません（古いリンクかもしれません）。既定のレイアウトを表示します
+链接里的模板「{0}」不存在，已载入默认版式 —— 从左边模板库挑一套即可	The template “{0}” in the link doesn’t exist; the default layout is loaded — just pick one from the library on the left	Templat “{0}” di tautan tidak ada; tata letak bawaan dimuat — pilih saja dari perpustakaan di kiri	リンクのテンプレート「{0}」は存在しないので、既定のレイアウトを読み込みました。左のテンプレート集から選んでください
+模板不存在：{0}	Template not found: {0}	Templat tidak ditemukan: {0}	テンプレートが見つかりません：{0}
+新模板只有 {#0} 格，超出的 {#1} 张图未放入	The new template has only {0} panels; {1} extra images were left out	Templat baru hanya punya {0} panel; {1} gambar lebihnya tidak dimasukkan	新しいテンプレートは {0} コマしかないため、はみ出した {1} 枚は入れていません
+收到一张图，但还没有版式：先选一套分镜	Got an image, but there’s no layout yet: pick a template first	Gambar diterima, tetapi belum ada tata letak: pilih templat dulu	画像を受け取りましたが、まだレイアウトがありません。先にテンプレートを選んでください
+收到分享的图，已填入第 {#0} 格	Got the shared image and put it in panel {0}	Gambar yang dibagikan sudah dimasukkan ke panel {0}	共有された画像を受け取り、{0} コマ目に入れました
+未知错误	Unknown error	Kesalahan tak dikenal	不明なエラー
+建议：{0}	Suggestion: {0}	Saran: {0}	対処：{0}
+建议：	Suggestion:	Saran:	対処：
+完整信息（可选中复制）	Full details (select to copy)	Detail lengkap (pilih untuk menyalin)	詳細（選択してコピーできます）
+复制错误信息	Copy error details	Salin detail kesalahan	エラー内容をコピー
+知道了	Got it	Mengerti	わかった
+错误信息已复制	Error details copied	Detail kesalahan disalin	エラー内容をコピーしました
+{#0} px（模板坐标）	{0} px (template units)	{0} px (koordinat templat)	{0} px（テンプレート座標）
+等比留白	Proportional margins	Margin proporsional	等比の余白
+这一套渲染出错了	This template failed to render	Templat ini gagal ditampilkan	このテンプレートの描画でエラーが起きました
+模板 {0} · 换一套版式，或把这句话发给我	Template {0} · try another layout, or send me this message	Templat {0} · coba tata letak lain, atau kirimkan pesan ini kepada saya	テンプレート {0} · 別のレイアウトにするか、このメッセージを送ってください
+镂空模式：只显示格线，图片被隐藏 —— 关掉「镂空」就能看到图片	Outline mode: only panel lines are shown and images are hidden — turn off “Outline” to see them	Mode kerangka: hanya garis panel yang tampil, gambar disembunyikan — matikan “Kerangka” untuk melihatnya	枠線モード：枠線だけを表示し画像は隠れています。「枠線のみ」をオフにすると画像が見えます
+双击进入第 {#0} 格的编辑	Double-click to edit panel {0}	Klik dua kali untuk mengedit panel {0}	ダブルクリックで {0} コマ目を編集
+已复位：清掉进行中标记、关掉浮层（你的内容没动）	Reset: cleared in-progress markers and closed overlays (your content is untouched)	Direset: penanda proses dibersihkan dan lapisan ditutup (isi Anda tidak berubah)	リセットしました：処理中の印を消し、パネルを閉じました（内容はそのままです）
+镂空预览模式下不能填图，先关掉「镂空」	You can’t add images in outline preview; turn off “Outline” first	Tidak bisa menambah gambar di pratinjau kerangka; matikan “Kerangka” dulu	枠線プレビュー中は画像を入れられません。先に「枠線のみ」をオフにしてください
+完整显示	Fit	Tampilkan utuh	全体を表示
+填满裁切	Fill & crop	Isi & potong	埋めて切り抜き
+图片已复位	Image reset	Gambar direset	画像をリセットしました
+已移除该格图片	Removed this panel’s image	Gambar panel ini dihapus	このコマの画像を外しました
+已清空全部图片	Cleared all images	Semua gambar dihapus	すべての画像を外しました
+已移除	Removed	Dihapus	外しました
+完整显示（可留白）	Fit (may leave margins)	Tampilkan utuh (bisa ada margin)	全体を表示（余白あり）
+填满格子（裁切）	Fill the panel (crop)	Isi panel (potong)	コマを埋める（切り抜き）
+已复位	Reset	Direset	リセットしました
+提示词已复制	Prompt copied	Prompt disalin	プロンプトをコピーしました
+已填进本格句子（可撤销）	Added to this panel’s line (undoable)	Ditambahkan ke kalimat panel ini (bisa dibatalkan)	このコマのセリフに入れました（元に戻せます）
+已恢复自动生成的提示词	Restored the auto-generated prompt	Prompt otomatis dipulihkan	自動生成のプロンプトに戻しました
+清空本机草稿？所有页的图片、气泡和句子都会删掉，不能恢复。	Clear the local draft? All pages’ images, bubbles and lines will be deleted and can’t be recovered.	Hapus draf lokal? Semua gambar, balon, dan kalimat di semua halaman akan terhapus dan tidak bisa dipulihkan.	この端末の下書きを消しますか？すべてのページの画像・フキダシ・セリフが削除され、元に戻せません。
+草稿已清空	Draft cleared	Draf dihapus	下書きを消しました
+候选还不够，再生一张吧	Not enough candidates — generate another	Kandidat belum cukup — buat satu lagi	候補が足りません。もう 1 枚生成しましょう
+已清空本页气泡	Cleared this page’s bubbles	Balon di halaman ini dihapus	このページのフキダシを外しました
+按内容选「{0}」· {1}	Picked “{0}” for the text · {1}	Dipilih “{0}” sesuai isi · {1}	内容に合わせて「{0}」を選択 · {1}
+已加一个空气泡，用上面的「文字」填内容	Added an empty bubble — fill it in with “Text” above	Balon kosong ditambahkan — isi lewat “Teks” di atas	空のフキダシを追加しました。上の「文字」で内容を入れてください
+整页分镜表已复制	Storyboard sheet copied	Lembar papan cerita disalin	ページ全体のコマ割り表をコピーしました
+已按阅读顺序填入 {#0} 格	Filled {0} panels in reading order	{0} panel diisi sesuai urutan baca	読む順に {0} コマへ入れました
+这张图读不出来，换一张试试	Can’t read this image — try another	Gambar ini tidak terbaca — coba yang lain	この画像は読み込めません。別の画像を試してください
+图片链接（http/https，或用 data:image/... 开头）：	Image link (http/https, or starting with data:image/...):	Tautan gambar (http/https, atau diawali data:image/...):	画像のリンク（http/https、または data:image/... で始まるもの）：
+已填入链接图片	Added the linked image	Gambar dari tautan dimasukkan	リンクの画像を入れました
+导入失败：{0}	Import failed: {0}	Impor gagal: {0}	読み込みに失敗しました：{0}
+导入失败：	Import failed:	Impor gagal:	読み込みに失敗しました：
+三天后 · 旧城区	Three days later · Old town	Tiga hari kemudian · Kota tua	三日後 · 旧市街
+雨停了吗？	Has the rain stopped?	Hujannya sudah reda?	雨、やんだ？
+已用占位图预览填充效果	Previewing with placeholder images	Pratinjau dengan gambar contoh	仮画像で埋めた見た目をプレビューしています
+状态	Status	Status	状態
+先在左边写剧情并点「按规则匹配」，或让 AI 导演排一次戏	Write a plot on the left and click “Match by rules”, or let the AI director stage it	Tulis alur cerita di kiri lalu klik “Cocokkan dengan aturan”, atau biarkan Sutradara AI menyusunnya	左であらすじを書いて「ルールでマッチ」を押すか、AI 監督に演出させてください
+待生成	Not generated yet	Belum dibuat	未生成
+英文提示词已复制	English prompt copied	Prompt Inggris disalin	英語プロンプトをコピーしました
+中文提示词已复制	Chinese prompt copied	Prompt Mandarin disalin	中国語プロンプトをコピーしました
+规则	Rules	Aturan	ルール
+这一格：{0}… ← 在这里写台词	This panel: {0}… ← write the line here	Panel ini: {0}… ← tulis dialog di sini	このコマ：{0}… ← ここにセリフを書く
+AI 正在写这一格…	The AI is writing this panel…	AI sedang menulis panel ini…	AI がこのコマを書いています…
+这一格正在生图…（10–60 秒）	Generating this panel’s image… (10–60 s)	Membuat gambar panel ini… (10–60 dtk)	このコマの画像を生成中…（10〜60 秒）
+只写这一格的提示词	Only write this panel’s prompt	Hanya tulis prompt panel ini	このコマのプロンプトだけ書く
+先写一段剧情吧	Write a plot first	Tulis alur cerita dulu	まずあらすじを書きましょう
+AI 正在读剧情、挑版式、排戏…	The AI is reading the plot, picking a layout and staging…	AI sedang membaca alur, memilih tata letak, dan menyusun adegan…	AI があらすじを読み、レイアウトを選んで演出しています…
+调用模型中，通常 3–20 秒…	Calling the model, usually 3–20 s…	Memanggil model, biasanya 3–20 dtk…	モデルを呼び出しています（ふつう 3〜20 秒）…
+AI 路失败（{0}）	AI route failed ({0})	Jalur AI gagal ({0})	AI ルートが失敗しました（{0}）
+规则路结果仍可用：{0}	The rule-based result is still available: {0}	Hasil berbasis aturan tetap bisa dipakai: {0}	ルールでの結果は使えます：{0}
+AI 路失败：{0}	AI route failed: {0}	Jalur AI gagal: {0}	AI ルートが失敗しました：{0}
+AI 路失败：	AI route failed:	Jalur AI gagal:	AI ルートが失敗しました：
+AI 选定：{0}	AI picked: {0}	AI memilih: {0}	AI の選択：{0}
+调用失败	Call failed	Panggilan gagal	呼び出しに失敗しました
+模型给的模板 id 不合法，已自动纠正	The model returned an invalid template id; corrected automatically	Model memberi id templat yang tidak valid; sudah dikoreksi otomatis	モデルが返したテンプレート id が不正だったので自動で直しました
+{#0} 格未排戏，已回落到规则节拍	{0} panels weren’t staged and fell back to rule-based beats	{0} panel tidak disusun dan kembali ke ketukan berbasis aturan	{0} コマは演出されなかったので、ルールのビートに戻しました
+{#0} 个无效 slotId 被丢弃	{0} invalid slotIds were dropped	{0} slotId tidak valid dibuang	無効な slotId を {0} 個捨てました
+备选：{0}	Alternatives: {0}	Alternatif: {0}	候補：{0}
+先写一段剧情吧（哪怕两句话）	Write a plot first (even two sentences)	Tulis alur cerita dulu (dua kalimat pun boleh)	まずあらすじを書きましょう（2 文でも OK）
+匹配中…	Matching…	Mencocokkan…	マッチ中…
+已载入最匹配的分镜：{0}	Loaded the best-matching layout: {0}	Tata letak paling cocok dimuat: {0}	いちばん合うコマ割りを読み込みました：{0}
+匹配失败：{0}	Matching failed: {0}	Pencocokan gagal: {0}	マッチに失敗しました：{0}
+匹配失败：	Matching failed:	Pencocokan gagal:	マッチに失敗しました：
+约 {#0} 格	About {0} panels	Sekitar {0} panel	約 {0} コマ
+慢节奏	Slow pace	Tempo lambat	ゆっくりしたテンポ
+规则引擎·已识别	Rule engine · recognized	Mesin aturan · dikenali	ルールエンジン · 認識済み
+{0} · {#1}格 {2}	{0} · {1} panels {2}	{0} · {1} panel {2}	{0} · {1} コマ {2}
+分镜表生成失败：{0}	Couldn’t build the storyboard sheet: {0}	Gagal membuat lembar papan cerita: {0}	コマ割り表を作れませんでした：{0}
+分镜表生成失败：	Couldn’t build the storyboard sheet:	Gagal membuat lembar papan cerita:	コマ割り表を作れませんでした：
+AI 排戏	AI staging	Penyusunan AI	AI 演出
+规则引擎	Rule engine	Mesin aturan	ルールエンジン
+AI 导演选择：{0}	AI director’s pick: {0}	Pilihan Sutradara AI: {0}	AI 監督の選択：{0}
+建议出图 {0}	Suggested size {0}	Ukuran disarankan {0}	推奨サイズ {0}
+占页 {0}%	{0}% of the page	{0}% halaman	ページの {0}%
+该格提示词已复制	Panel prompt copied	Prompt panel disalin	このコマのプロンプトをコピーしました
+形状开头词已复制	Shape prefix copied	Awalan bentuk disalin	形状プレフィックスをコピーしました
+中文形状词已复制	Chinese shape prefix copied	Awalan bentuk Mandarin disalin	中国語の形状プレフィックスをコピーしました
+已选中第 {#0} 格	Selected panel {0}	Panel {0} dipilih	{0} コマ目を選択しました
+点一下用这张	Click to use this one	Klik untuk memakai yang ini	クリックでこれを使う
+候选 {#0}	Candidate {0}	Kandidat {0}	候補 {0}
+删掉这张	Delete this one	Hapus yang ini	これを削除
+用这张进画布继续画（AI 出稿 → 手改）	Open this in the canvas and keep drawing (AI draft → hand edits)	Buka ini di kanvas dan lanjutkan menggambar (draf AI → sunting manual)	これをキャンバスで描き足す（AI の下絵 → 手直し）
+这张图打不开：{0}	Can’t open this image: {0}	Gambar ini tidak bisa dibuka: {0}	この画像は開けません：{0}
+这张图打不开：	Can’t open this image:	Gambar ini tidak bisa dibuka:	この画像は開けません：
+已换成候选	Switched to the candidate	Diganti ke kandidat	候補に差し替えました
+已换成候选 {0}{1}	Switched to candidate {0}{1}	Diganti ke kandidat {0}{1}	候補 {0} に差し替えました{1}
+这张图读不出来：{0}	Can’t read this image: {0}	Gambar ini tidak terbaca: {0}	この画像は読み込めません：{0}
+这张图读不出来：	Can’t read this image:	Gambar ini tidak terbaca:	この画像は読み込めません：
+给这一页起个名字（比如：开场 / 对峙 / 收束）	Name this page (e.g. Opening / Standoff / Ending)	Beri nama halaman ini (mis. Pembuka / Konfrontasi / Penutup)	このページに名前を付けてください（例：幕開け / 対峙 / 締め）
+页面名字	Page name	Nama halaman	ページ名
+{0} · {1} · 双击改名	{0} · {1} · double-click to rename	{0} · {1} · klik dua kali untuk mengganti nama	{0} · {1} · ダブルクリックで名前を変更
+{#0}图	{0} img	{0} gbr	画像 {0}
+已加一页（同一套版式，空图）	Added a page (same layout, no images)	Halaman ditambahkan (tata letak sama, tanpa gambar)	ページを追加しました（同じレイアウト、画像なし）
+还没有页	No pages yet	Belum ada halaman	まだページがありません
+已导出 {#0} 页	Exported {0} pages	{0} halaman diekspor	{0} ページを書き出しました
+导出中断：{0}	Export interrupted: {0}	Ekspor terhenti: {0}	書き出しが中断されました：{0}
+导出中断：	Export interrupted:	Ekspor terhenti:	書き出しが中断されました：
+这一格没有中文形状词	This panel has no Chinese shape prefix	Panel ini tidak punya awalan bentuk Mandarin	このコマには中国語の形状プレフィックスがありません
+中文形状词已复制，粘到你提示词最前面	Chinese shape prefix copied — paste it at the start of your prompt	Awalan bentuk Mandarin disalin — tempel di awal prompt Anda	中国語の形状プレフィックスをコピーしました。プロンプトの先頭に貼ってください
+先点一个格子	Click a panel first	Klik satu panel dulu	先にコマをクリックしてください
+这一格正在处理，等它出来	This panel is still processing — wait for it	Panel ini masih diproses — tunggu sebentar	このコマは処理中です。終わるまで待ってください
+AI 没返回	The AI returned nothing	AI tidak mengembalikan apa pun	AI から応答がありません
+这一格没拿到提示词	This panel didn’t get a prompt	Panel ini tidak mendapat prompt	このコマのプロンプトを取得できませんでした
+这一格的提示词已由 AI 改写	The AI rewrote this panel’s prompt	AI menulis ulang prompt panel ini	このコマのプロンプトを AI が書き直しました
+提示词已写回原来的那一格	The prompt was written back to the original panel	Prompt ditulis kembali ke panel semula	プロンプトを元のコマに書き戻しました
+写提示词失败：{0}	Couldn’t write the prompt: {0}	Gagal menulis prompt: {0}	プロンプトを書けませんでした：{0}
+写提示词失败：	Couldn’t write the prompt:	Gagal menulis prompt:	プロンプトを書けませんでした：
+先选一套版式	Pick a layout first	Pilih tata letak dulu	先にレイアウトを選んでください
+还没有分镜计划：先按规则匹配或让 AI 排戏	No storyboard plan yet: match by rules first or let the AI stage it	Belum ada rencana papan cerita: cocokkan dengan aturan dulu atau biarkan AI menyusunnya	まだコマ割りの計画がありません。先にルールでマッチするか、AI に演出させてください
+这一页每一格都有句子了	Every panel on this page already has a line	Setiap panel di halaman ini sudah punya kalimat	このページのコマはすべてセリフがあります
+AI 正在写…	The AI is writing…	AI sedang menulis…	AI が書いています…
+模型这次没写出可用的句子	The model didn’t write a usable line this time	Kali ini model tidak menulis kalimat yang bisa dipakai	今回はモデルが使えるセリフを書けませんでした
+，挂了 {#0} 个气泡	, attached {0} bubbles	, {0} balon dipasang	、フキダシを {0} 個付けました
+已给 {#0} 格写好台词（空着的才写）{1}	Wrote lines for {0} panels (only empty ones){1}	Dialog ditulis untuk {0} panel (hanya yang kosong){1}	{0} コマにセリフを書きました（空いているコマだけ）{1}
+已写好：{0}{1}	Written: {0}{1}	Sudah ditulis: {0}{1}	書きました：{0}{1}
+写台词失败{0}	Couldn’t write lines{0}	Gagal menulis dialog{0}	セリフを書けませんでした{0}
+写台词失败	Couldn’t write lines	Gagal menulis dialog	セリフを書けませんでした
+这一格	This panel	Panel ini	このコマ
+{0}正在生成，等它出来	{0} is generating — wait for it	{0} sedang dibuat — tunggu sebentar	{0}は生成中です。終わるまで待ってください
+还没启用角色参考图，生成的图可能每格长得不一样。 建议先去左边「角色参考图」加一张。 仍然继续生图吗？	No character reference is turned on, so characters may look different in each panel. Consider adding one under “Character references” on the left first. Generate anyway?	Belum ada referensi karakter yang aktif, jadi tokoh bisa tampak berbeda di tiap panel. Sebaiknya tambahkan dulu di “Referensi karakter” di kiri. Tetap buat gambar?	キャラの参考画像が有効になっていないので、コマごとに見た目が変わるかもしれません。先に左の「キャラ参考画像」で 1 枚追加するのがおすすめです。それでも生成しますか？
+继续生图	Generate anyway	Tetap buat gambar	このまま生成
+先去加参考图	Add a reference first	Tambah referensi dulu	先に参考画像を追加
+{0}生图	Generate image for {0}	Buat gambar untuk {0}	{0}の画像を生成
+生图失败	Image generation failed	Pembuatan gambar gagal	画像生成に失敗しました
+生图接口没有返回可用的图片	The image API returned no usable image	API gambar tidak mengembalikan gambar yang bisa dipakai	画像 API が使える画像を返しませんでした
+{0}已生成，但 {#1} 张参考图被忽略：当前模型不支持图生图	{0} generated, but {1} reference images were ignored: this model doesn’t support image-to-image	{0} dibuat, tetapi {1} gambar referensi diabaikan: model ini tidak mendukung gambar-ke-gambar	{0}を生成しましたが、参考画像 {1} 枚は無視されました：このモデルは画像からの生成に対応していません
+已生成并填入这一格（候选里还留着，可以换一张）	Generated and placed in this panel (it’s kept in the candidates, so you can switch)	Dibuat dan dimasukkan ke panel ini (tetap ada di kandidat, bisa diganti)	生成してこのコマに入れました（候補にも残っているので差し替えできます）
+{0}已生成（没有跳过去，还停在你现在看的这格）	{0} generated (staying on the panel you’re viewing)	{0} sudah dibuat (tetap di panel yang sedang Anda lihat)	{0}を生成しました（移動せず、今見ているコマのままです）
+生图失败{0} · 已弹出详情	Image generation failed{0} · details shown	Pembuatan gambar gagal{0} · detail ditampilkan	画像生成に失敗しました{0} · 詳細を表示しました
+生图失败：{0}	Image generation failed: {0}	Pembuatan gambar gagal: {0}	画像生成に失敗しました：{0}
+生图失败：	Image generation failed:	Pembuatan gambar gagal:	画像生成に失敗しました：
+这一格没有形状词	This panel has no shape prefix	Panel ini tidak punya awalan bentuk	このコマには形状プレフィックスがありません
+形状开头词已复制，粘到你提示词最前面	Shape prefix copied — paste it at the start of your prompt	Awalan bentuk disalin — tempel di awal prompt Anda	形状プレフィックスをコピーしました。プロンプトの先頭に貼ってください
+{0} · 已切好 {#1}/{#2} 格	{0} · split {1}/{2} panels	{0} · {1}/{2} panel dibagi	{0} · {1}/{2} コマ割り振り済み
+{0} · 已切好 {#1}/{#2} 格{3}{4}	{0} · split {1}/{2} panels{3}{4}	{0} · {1}/{2} panel dibagi{3}{4}	{0} · {1}/{2} コマ割り振り済み{3}{4}
+{#0} 格模型没给（可用「AI 优化提示词」补）	the model skipped {0} panels (fill them with “AI-optimize prompts”)	model melewatkan {0} panel (lengkapi dengan “Optimalkan prompt dengan AI”)	モデルが {0} コマを返しませんでした（「AI でプロンプト最適化」で補えます）
+AI 切原文完成：{#0}/{#1} 格	AI text split done: {0}/{1} panels	Pembagian teks AI selesai: {0}/{1} panel	AI による原文の割り振り完了：{0}/{1} コマ
+切分出错：{0}	Split error: {0}	Kesalahan pembagian: {0}	割り振りでエラー：{0}
+切分出错：	Split error:	Kesalahan pembagian:	割り振りでエラー：
+切分失败：{0}	Split failed: {0}	Pembagian gagal: {0}	割り振りに失敗しました：{0}
+切分失败：	Split failed:	Pembagian gagal:	割り振りに失敗しました：
+还没有版式	No layout yet	Belum ada tata letak	まだレイアウトがありません
+优化中…	Optimizing…	Mengoptimalkan…	最適化中…
+优化失败	Optimization failed	Optimasi gagal	最適化に失敗しました
+{0} · {#1}/{#2} 格已 AI 优化{3}	{0} · {1}/{2} panels AI-optimized{3}	{0} · {1}/{2} panel dioptimalkan AI{3}	{0} · {1}/{2} コマを AI で最適化済み{3}
+{#0}/{#1} 格已 AI 优化	{0}/{1} panels AI-optimized	{0}/{1} panel dioptimalkan AI	{0}/{1} コマを AI で最適化済み
+AI 优化完成：{#0}/{#1} 格	AI optimization done: {0}/{1} panels	Optimasi AI selesai: {0}/{1} panel	AI 最適化完了：{0}/{1} コマ
+优化失败：{0}	Optimization failed: {0}	Optimasi gagal: {0}	最適化に失敗しました：{0}
+SVG 栅格化失败（图片可能跨域）	SVG rasterization failed (images may be cross-origin)	Rasterisasi SVG gagal (gambar mungkin lintas asal)	SVG のラスタライズに失敗しました（画像が別ドメインかもしれません）
+浏览器没能生成 PNG（尺寸太大？）	The browser couldn’t create the PNG (too large?)	Browser tidak bisa membuat PNG (terlalu besar?)	ブラウザが PNG を作れませんでした（サイズが大きすぎる？）
+已导出 PNG {#0}×{#1}	Exported PNG {0}×{1}	PNG {0}×{1} diekspor	PNG {0}×{1} を書き出しました
+导出失败：{0}	Export failed: {0}	Ekspor gagal: {0}	書き出しに失敗しました：{0}
+导出失败：	Export failed:	Ekspor gagal:	書き出しに失敗しました：
+已导出 SVG	Exported SVG	SVG diekspor	SVG を書き出しました
+已导出镂空模板 SVG	Exported outline template SVG	SVG templat kerangka diekspor	枠線だけのテンプレート SVG を書き出しました
+已导出 JSON	Exported JSON	JSON diekspor	JSON を書き出しました
+没有服务端：规则引擎在你的浏览器里跑，AI 直连你填的模型	No server: the rule engine runs in your browser and the AI connects straight to the model you set	Tanpa server: mesin aturan berjalan di browser Anda dan AI langsung terhubung ke model yang Anda isi	サーバーなし：ルールエンジンはブラウザで動き、AI は入力したモデルに直接つながります
+跳到第 {#0} 格（还是空的）	Jumped to panel {0} (still empty)	Lompat ke panel {0} (masih kosong)	{0} コマ目へ移動しました（まだ空です）
+所有格子都填满了	All panels are filled	Semua panel sudah terisi	すべてのコマが埋まっています
+已复制气泡（Ctrl+V 粘贴）	Bubble copied (paste with Ctrl+V)	Balon disalin (tempel dengan Ctrl+V)	フキダシをコピーしました（Ctrl+V で貼り付け）
+已复制图片（选中另一格 Ctrl+V 粘贴）	Image copied (select another panel and press Ctrl+V)	Gambar disalin (pilih panel lain lalu tekan Ctrl+V)	画像をコピーしました（別のコマを選んで Ctrl+V）
+没有选中的图片或气泡	No image or bubble selected	Tidak ada gambar atau balon yang dipilih	画像もフキダシも選択されていません
+已剪切	Cut	Dipotong	切り取りました
+剪贴板里没有东西	The clipboard is empty	Papan klip kosong	クリップボードは空です
+先点一个格子再粘贴	Click a panel before pasting	Klik satu panel sebelum menempel	貼り付ける前にコマをクリックしてください
+已粘贴到该格	Pasted into the panel	Ditempel ke panel	コマに貼り付けました
+已粘贴气泡	Bubble pasted	Balon ditempel	フキダシを貼り付けました
+样式换成「{0}」	Style changed to “{0}”	Gaya diganti ke “{0}”	スタイルを「{0}」に変えました
+已加入「{0}」	Added “{0}”	“{0}” ditambahkan	「{0}」を追加しました
+GitHub 仓库	GitHub repository	Repositori GitHub	GitHub リポジトリ
+AI 思路	AI idea	Ide AI	AI のアイデア
+已填图	Has image	Bergambar	画像あり
+提示词已手改	Prompt edited by hand	Prompt disunting manual	プロンプトは手直し済み
+初始化失败：{0}	Startup failed: {0}	Gagal memulai: {0}	起動に失敗しました：{0}
+初始化失败：	Startup failed:	Gagal memulai:	起動に失敗しました：
+- 模板 ID：`{0}`	- Template ID: `{0}`	- ID templat: `{0}`	- テンプレート ID：`{0}`
+- 画风：{0}（{1}）	- Art style: {0} ({1})	- Gaya gambar: {0} ({1})	- 画風：{0}（{1}）
+- 页幅：{0}×{1}（{2}）	- Page size: {0}×{1} ({2})	- Ukuran halaman: {0}×{1} ({2})	- ページサイズ：{0}×{1}（{2}）
+- 阅读顺序：{0}	- Reading order: {0}	- Urutan baca: {0}	- 読む順：{0}
+- 格数：{0}	- Panels: {0}	- Jumlah panel: {0}	- コマ数：{0}
+| 格 | 景别 | 形状 | 叙事节拍 | 画幅 | 建议出图 |	| Panel | Shot | Shape | Beat | Format | Suggested size |	| Panel | Bidikan | Bentuk | Ketukan | Format | Ukuran disarankan |	| コマ | ショット | 形 | ビート | 画面比 | 推奨サイズ |
+- 画面：{0}	- Picture: {0}	- Gambar: {0}	- 画面：{0}
+- 构图：{0}	- Composition: {0}	- Komposisi: {0}	- 構図：{0}
+无	None	Tidak ada	なし
+- 台词：{0}	- Line: {0}	- Dialog: {0}	- セリフ：{0}
+- 形状开头词：`{0}`	- Shape prefix: `{0}`	- Awalan bentuk: `{0}`	- 形状プレフィックス：`{0}`
+- 提示词：`{0}`	- Prompt: `{0}`	- Prompt: `{0}`	- プロンプト：`{0}`
+- 精简版：`{0}`	- Short version: `{0}`	- Versi ringkas: `{0}`	- 短縮版：`{0}`
+- 负面词：`{0}`	- Negative: `{0}`	- Negatif: `{0}`	- ネガティブ：`{0}`
+（空）	(empty)	(kosong)	（空）
+- {0}｜{1}｜不透明度 {#2}%	- {0} | {1} | opacity {2}%	- {0} | {1} | opasitas {2}%	- {0}｜{1}｜不透明度 {2}%
+图片读不出来	Can’t read the image	Gambar tidak terbaca	画像を読み込めません
+请确认	Please confirm	Mohon konfirmasi	確認
+确定	OK	OK	OK
+请输入	Please enter	Silakan isi	入力してください
+还没启用角色参考图	No character reference turned on	Belum ada referensi karakter yang aktif	キャラ参考画像が未設定です
+每格的人可能长得不一样，建议先在左边「角色参考图」加一张	characters may look different in each panel; consider adding one under “Character references” on the left first	tokoh bisa tampak berbeda di tiap panel; sebaiknya tambahkan dulu di “Referensi karakter” di kiri	コマごとに人物の見た目が変わるかもしれません。先に左の「キャラ参考画像」で 1 枚追加するのがおすすめです
+先把全文粘进来	Paste the full text first	Tempel teks lengkap dulu	先に全文を貼り付けてください
+真正全自动	True full auto	Benar-benar otomatis penuh	完全な全自動
+从分镜、提示词、出图到台词与气泡全由 AI 完成，全程前台可见、随时可停	The AI does everything — layout, prompts, images, lines and bubbles — visibly, and you can stop at any time	AI mengerjakan semuanya — tata letak, prompt, gambar, dialog, dan balon — terlihat jelas, dan bisa dihentikan kapan saja	コマ割り・プロンプト・画像・セリフ・フキダシまですべて AI が行います。途中経過はすべて見え、いつでも止められます
+这一页每格都有图了	Every panel on this page already has an image	Semua panel di halaman ini sudah bergambar	このページのコマはすべて画像があります
+生成这一页的 {#0} 张图	Generate {0} images for this page	Buat {0} gambar untuk halaman ini	このページの画像を {0} 枚生成
+一键生成该页	Generate this page	Buat halaman ini	このページを一括生成
+把这一页每个还没图的分镜依次生成	generates every panel on this page that has no image yet, one by one	membuat satu per satu setiap panel di halaman ini yang belum bergambar	このページでまだ画像のないコマを順番に生成します
+用的就是每格现在的提示词	Uses each panel’s current prompt	Memakai prompt tiap panel saat ini	各コマの今のプロンプトをそのまま使います
+你手改过的、规则生成的，都按原样发出去，不会先做 AI 优化（要 AI 优化请用顶栏「全自动」）	whether you edited it or the rules wrote it, it’s sent as is, with no AI optimization first (for AI optimization use “Full auto” in the top bar)	baik yang Anda sunting maupun yang dibuat aturan, dikirim apa adanya tanpa optimasi AI dulu (untuk optimasi AI pakai “Otomatis penuh” di bilah atas)	手直ししたものもルールが書いたものもそのまま送り、先に AI 最適化はしません（AI 最適化は上部の「全自動」で）
+点了就会一路做完，中途不会停（关掉页面会中断，但已发出的请求照样扣费）	Once clicked it runs to the end without stopping (closing the page interrupts it, but requests already sent are still billed)	Setelah diklik akan berjalan sampai selesai (menutup halaman menghentikannya, tetapi permintaan yang sudah terkirim tetap ditagih)	押すと最後まで止まらずに進みます（ページを閉じると中断しますが、送信済みのリクエストは課金されます）
+每张图都会进候选，不满意的可以单独换	Every image goes into the candidates, so you can swap any you don’t like	Setiap gambar masuk ke kandidat, jadi yang kurang cocok bisa diganti	生成した画像はすべて候補に入るので、気に入らないものは個別に替えられます
+所有页面都有图了	Every page already has images	Semua halaman sudah bergambar	すべてのページに画像があります
+生成全部 {#0} 张图（跨 {#1} 页）	Generate all {0} images (across {1} pages)	Buat semua {0} gambar (di {1} halaman)	全 {0} 枚の画像を生成（{1} ページ分）
+一键生成全部分镜	Generate all panels	Buat semua panel	すべてのコマを一括生成
+共 {#0} 页，其中 {#1} 页缺图，共 {#2} 张	{0} pages in total, {1} of them missing images, {2} images in all	Total {0} halaman, {1} di antaranya belum bergambar, total {2} gambar	全 {0} ページのうち {1} ページに画像がなく、合計 {2} 枚
+用的是每格现有提示词	Uses each panel’s current prompt	Memakai prompt tiap panel yang ada	各コマの今のプロンプトを使います
+含你手改过的，不会先做 AI 优化	including your edits, with no AI optimization first	termasuk suntingan Anda, tanpa optimasi AI dulu	手直し分も含め、先に AI 最適化はしません
+开始后不会停	Won’t stop once started	Tidak akan berhenti setelah dimulai	始めたら止まりません
+直到这 {#0} 张全部跑完	until all {0} images are done	sampai semua {0} gambar selesai	{0} 枚すべて終わるまで続きます
+会花掉大量 token / 额度，这是本项目里最贵的一个按钮	It uses a lot of tokens / credit — this is the most expensive button in the app	Ini memakai banyak token / kuota — tombol termahal di aplikasi ini	大量のトークン / 利用枠を使います。このアプリでいちばん高くつくボタンです
+你真的确定吗？	Are you really sure?	Anda benar-benar yakin?	本当によろしいですか？
+{#0} 页 · {#1} 张图	{0} pages · {1} images	{0} halaman · {1} gambar	{0} ページ · 画像 {1} 枚
+这是最终确认，点「继续」后立刻开始扣费	This is the final confirmation — billing starts as soon as you click “Continue”	Ini konfirmasi terakhir — tagihan dimulai begitu Anda klik “Lanjut”	これが最後の確認です。「続ける」を押すとすぐに課金が始まります
+想反悔只有「停止」按钮（当前这张会跑完，后面的不再发）	The only way back is the “Stop” button (the current image finishes, the rest aren’t sent)	Satu-satunya cara membatalkan adalah tombol “Berhenti” (gambar saat ini diselesaikan, sisanya tidak dikirim)	取り消せるのは「停止」ボタンだけです（今の 1 枚は最後まで進み、残りは送りません）
+全部页	all pages	semua halaman	全ページ
+{#0} 页	{0} pages	{0} halaman	{0} ページ
+{#0} 张	{0} images	{0} gambar	{0} 枚
+男主：{0}	Male lead: {0}	Tokoh pria: {0}	男性主人公：{0}
+女主：{0}	Female lead: {0}	Tokoh wanita: {0}	女性主人公：{0}
+参考图 {#0} 张	{0} reference images	{0} gambar referensi	参考画像 {0} 枚
+没有参考图	No reference images	Tidak ada gambar referensi	参考画像なし
+未启用	Off	Nonaktif	無効
+⚠ 启用了但没有参考图，脸会飘	⚠ Turned on but no reference images — faces will drift	⚠ Aktif tetapi tanpa gambar referensi — wajah akan berubah-ubah	⚠ 有効ですが参考画像がないので、顔がぶれます
+还没有角色卡。这一话的人物形象只靠下面的文字设定 —— 建议至少给主角加一张参考图。	No character cards yet. This episode’s characters rely only on the text below — add at least one reference image for the lead.	Belum ada kartu karakter. Tokoh di episode ini hanya mengandalkan teks di bawah — tambahkan setidaknya satu gambar referensi untuk tokoh utama.	まだキャラカードがありません。この話の人物像は下の文字設定だけが頼りです。せめて主人公に 1 枚参考画像を付けましょう。
+先确认角色形象	Confirm the characters’ looks first	Pastikan tampilan tokoh dulu	先にキャラの見た目を確認
+这一步不花钱，但少了它后面几十张图的脸会不一致	This step is free, but without it faces won’t match across dozens of images	Langkah ini gratis, tetapi tanpanya wajah tidak akan konsisten di puluhan gambar	このステップは無料ですが、これを飛ばすと後の何十枚もの画像で顔がそろいません
+要做 {#0} 页 · 约 {#1} 个分镜、{#2} 张图	{0} pages to make · about {1} panels, {2} images	{0} halaman · sekitar {1} panel, {2} gambar	{0} ページ · 約 {1} コマ、画像 {2} 枚
+角色设定：{0}	Characters: {0}	Tokoh: {0}	キャラ設定：{0}
+先去补角色	Fix the characters first	Lengkapi tokoh dulu	先にキャラを整える
+角色没问题，开始生成	Characters look fine — start	Tokoh sudah oke — mulai	キャラは大丈夫、生成開始
+先去补角色：加参考图或改设定，再从「全自动」重新开始	Fix the characters first: add reference images or edit the descriptions, then start “Full auto” again	Lengkapi tokoh dulu: tambah gambar referensi atau ubah deskripsi, lalu mulai ulang “Otomatis penuh”	先にキャラを整えてください：参考画像を足すか設定を直してから、「全自動」をやり直してください
+真正全自动：全部交给 AI	True full auto: hand everything to the AI	Otomatis penuh: serahkan semuanya ke AI	完全な全自動：すべて AI に任せる
+分镜全自动：只做分镜与提示词	Full-auto storyboard: layout and prompts only	Papan cerita otomatis: hanya tata letak dan prompt	コマ割り全自動：コマ割りとプロンプトだけ
+{#0} 个分镜	{0} panels	{0} panel	{0} コマ
+共 {#0} 个步骤，每一步都打进下面的日志，你能看见内容是怎么一步步出来的	{0} steps in all; each one is written to the log below so you can see how the content comes together	Total {0} langkah; tiap langkah dicatat di log bawah sehingga Anda bisa melihat isinya terbentuk	全 {0} ステップ。各ステップは下のログに書き出されるので、内容ができていく様子が見えます
+分 {#0} 页	{0} pages	{0} halaman	{0} ページに分割
+约 {#0} 个分镜	about {0} panels	sekitar {0} panel	約 {0} コマ
+约 {#0} 张图	about {0} images	sekitar {0} gambar	約 {0} 枚
+约 {#0} 句台词	about {0} lines	sekitar {0} dialog	セリフ約 {0} 個
+台词/旁白/内心由 AI 决定，气泡也由它布置	the AI decides lines / narration / inner voice and places the bubbles	AI menentukan dialog / narasi / suara hati dan menata balonnya	セリフ / ナレーション / 心の声は AI が決め、フキダシも配置します
+台词与出图不自动做（之后可用右下角悬浮按钮单独触发）	lines and images aren’t automatic (trigger them later with the floating button at bottom right)	dialog dan gambar tidak otomatis (picu nanti dengan tombol mengambang di kanan bawah)	セリフと画像は自動では作りません（あとで右下のフローティングボタンから個別に実行できます）
+{#0} 张图	{0} images	{0} gambar	画像 {0} 枚
+{#0} 句台词	{0} lines	{0} dialog	セリフ {0} 個
+可以随时点「停止」	You can click “Stop” at any time	Anda bisa klik “Berhenti” kapan saja	いつでも「停止」を押せます
+（已发出的请求会跑完，之后的不再发）	(requests already sent will finish; no more are sent)	(permintaan yang sudah terkirim tetap selesai; tidak ada lagi yang dikirim)	（送信済みのリクエストは最後まで進み、以降は送りません）
+提示词用 AI 优化过的版本，不是规则模板	Prompts use the AI-optimized version, not the rule template	Prompt memakai versi yang dioptimalkan AI, bukan templat aturan	プロンプトはルールのひな形ではなく、AI で最適化した版を使います
+已取消：先确认角色形象	Cancelled: confirm the characters’ looks first	Dibatalkan: pastikan tampilan tokoh dulu	キャンセルしました：先にキャラの見た目を確認してください
+▶ 开始生成{0}：{#1} 张	▶ Generating {0}: {1} images	▶ Membuat {0}: {1} gambar	▶ {0}の生成開始：{1} 枚
+■ 已停止（已发出的请求会跑完）	■ Stopped (requests already sent will finish)	■ Dihentikan (permintaan yang sudah terkirim tetap selesai)	■ 停止しました（送信済みのリクエストは最後まで進みます）
+{0}：请求中…	{0}: requesting…	{0}: meminta…	{0}：リクエスト中…
+请求中…	Requesting…	Meminta…	リクエスト中…
+✓ {0} 完成（{#1}/{#2}）	✓ {0} done ({1}/{2})	✓ {0} selesai ({1}/{2})	✓ {0} 完了（{1}/{2}）
+… {0} 失败（{1}），重试 1 次	… {0} failed ({1}), retrying once	… {0} gagal ({1}), mencoba ulang sekali	… {0} 失敗（{1}）、1 回リトライします
+没有返回图	no image returned	tidak ada gambar	画像が返ってきません
+✓ {0} 重试成功（{#1}/{#2}）	✓ {0} succeeded on retry ({1}/{2})	✓ {0} berhasil saat diulang ({1}/{2})	✓ {0} リトライ成功（{1}/{2}）
+✗ {0} 仍然失败：{1}	✗ {0} still failed: {1}	✗ {0} tetap gagal: {1}	✗ {0} はまた失敗：{1}
+完成：成功 {#0} 张 · 失败 {#1} 张 · 用时 {2}	Done: {0} succeeded · {1} failed · took {2}	Selesai: {0} berhasil · {1} gagal · waktu {2}	完了：成功 {0} 枚 · 失敗 {1} 枚 · 所要 {2}
+成功 {#0} 张	{0} succeeded	{0} berhasil	成功 {0} 枚
+失败 {#0} 张	{0} failed	{0} gagal	失敗 {0} 枚
+用时 {0}	took {0}	waktu {0}	所要 {0}
+批量出图结束：成功 {#0}{1}	Batch done: {0} succeeded{1}	Batch selesai: {0} berhasil{1}	一括生成が終わりました：成功 {0}{1}
+批量出图结束：成功 {#0}	Batch done: {0} succeeded	Batch selesai: {0} berhasil	一括生成が終わりました：成功 {0}
+/ 失败 {#0}	/ {0} failed	/ {0} gagal	/ 失敗 {0}
+▶ 全自动开始（{0}）：{#1} 页	▶ Full auto started ({0}): {1} pages	▶ Otomatis penuh dimulai ({0}): {1} halaman	▶ 全自動を開始（{0}）：{1} ページ
+① 全文 {#0} 字 → 切成 {#1} 页（每页约 {#2} 字）	① {0} characters → split into {1} pages (about {2} per page)	① {0} karakter → dibagi jadi {1} halaman (sekitar {2} per halaman)	① 全文 {0} 字 → {1} ページに分割（1 ページ約 {2} 字）
+② 第 {#0} 页：挑版式 + 切格…	② Page {0}: picking a layout + splitting panels…	② Halaman {0}: memilih tata letak + membagi panel…	② {0} ページ目：レイアウト選び＋コマ割り…
+选到「{0}」 ({#1} panels)	Picked “{0}” ({1} panels)	Dipilih “{0}” ({1} panel)	「{0}」を選択（{1} コマ）
+选到「{0}」（{#1} 格）	Picked “{0}” ({1} panels)	Dipilih “{0}” ({1} panel)	「{0}」を選択（{1} コマ）
+还没有可用的版式	No usable layout yet	Belum ada tata letak yang bisa dipakai	使えるレイアウトがまだありません
+③ 第 {#0} 页：把这一页的原文切成每格…	③ Page {0}: splitting this page’s text into panels…	③ Halaman {0}: membagi teks halaman ini ke tiap panel…	③ {0} ページ目：このページの原文を各コマに割り振り中…
+AI 切分完成	AI split done	Pembagian AI selesai	AI の割り振り完了
+AI 切分没成（{0}），改用规则切分	AI split didn’t work ({0}); using the rule-based split	Pembagian AI gagal ({0}); memakai pembagian berbasis aturan	AI の割り振りに失敗（{0}）。ルールでの割り振りに切り替えます
+④ 第 {#0} 页：AI 优化逐格提示词…	④ Page {0}: AI-optimizing each panel’s prompt…	④ Halaman {0}: AI mengoptimalkan prompt tiap panel…	④ {0} ページ目：各コマのプロンプトを AI で最適化中…
+提示词已用 AI 优化过	Prompts AI-optimized	Prompt sudah dioptimalkan AI	プロンプトを AI で最適化しました
+提示词优化失败（保留规则版）：{0}	Prompt optimization failed (keeping the rule version): {0}	Optimasi prompt gagal (versi aturan dipertahankan): {0}	プロンプトの最適化に失敗（ルール版のまま）：{0}
+⑤ 第 {#0} 页：写台词/旁白并挂气泡…	⑤ Page {0}: writing lines / narration and adding bubbles…	⑤ Halaman {0}: menulis dialog / narasi dan memasang balon…	⑤ {0} ページ目：セリフ / ナレーションを書いてフキダシを付け中…
+台词与气泡布置完成	Lines and bubbles placed	Dialog dan balon sudah ditata	セリフとフキダシの配置完了
+台词失败：{0}	Lines failed: {0}	Dialog gagal: {0}	セリフに失敗：{0}
+⑥ 第 {#0} 页：逐格生成图片…	⑥ Page {0}: generating images panel by panel…	⑥ Halaman {0}: membuat gambar panel demi panel…	⑥ {0} ページ目：コマごとに画像を生成中…
+— 第 {#0} 页完成 —	— Page {0} done —	— Halaman {0} selesai —	— {0} ページ目完了 —
+✗ 中断：{0}	✗ Interrupted: {0}	✗ Terhenti: {0}	✗ 中断：{0}
+全自动中断：{0}	Full auto interrupted: {0}	Otomatis penuh terhenti: {0}	全自動が中断しました：{0}
+■ 已停止 · 用时 {0}	■ Stopped · took {0}	■ Dihentikan · waktu {0}	■ 停止 · 所要 {0}
+✓ 全自动结束 · 用时 {0}	✓ Full auto finished · took {0}	✓ Otomatis penuh selesai · waktu {0}	✓ 全自動が終わりました · 所要 {0}
+已读入：{0}	Loaded: {0}	Dimuat: {0}	読み込みました：{0}
+文件读不出来（换 .txt 试试）	Can’t read the file (try a .txt)	Berkas tidak terbaca (coba .txt)	ファイルを読み込めません（.txt で試してください）
+… 收到停止指令：当前请求会跑完，后面的不再发	… Stop received: the current request will finish and no more will be sent	… Perintah berhenti diterima: permintaan saat ini diselesaikan dan tidak ada lagi yang dikirim	… 停止を受け付けました：今のリクエストは最後まで進み、以降は送りません
+已加入 {#0} 张角色参考图	Added {0} character reference images	{0} gambar referensi karakter ditambahkan	キャラ参考画像を {0} 枚追加しました
+（还剩 {#0} 张没地方放）	({0} left over with no free panel)	({0} tersisa tanpa panel kosong)	（{0} 枚は入る場所がありませんでした）
+已按阅读顺序填入 {#0} 格{1}	Filled {0} panels in reading order{1}	{0} panel diisi sesuai urutan baca{1}	読む順に {0} コマへ入れました{1}
+先点一个格子，再拖图进来	Click a panel first, then drag the image in	Klik satu panel dulu, lalu seret gambarnya ke sini	先にコマをクリックしてから画像をドラッグしてください
+已填入第 {#0} 格	Placed in panel {0}	Dimasukkan ke panel {0}	{0} コマ目に入れました
+这个格式读不了：请另存为 .txt / .md 再拖进来（docx 在浏览器里需要额外依赖）	Can’t read this format: save it as .txt / .md and drag it in again (.docx needs extra libraries in the browser)	Format ini tidak terbaca: simpan sebagai .txt / .md lalu seret lagi (.docx perlu pustaka tambahan di browser)	この形式は読み込めません。.txt / .md で保存し直してドラッグしてください（docx はブラウザで追加ライブラリが必要です）
+这个文件是空的	This file is empty	Berkas ini kosong	このファイルは空です
+，已估算页数	, pages estimated	, halaman diperkirakan	、ページ数を見積もりました
+已读入「{0}」：{#1} 字{2}	Loaded “{0}”: {1} characters{2}	“{0}” dimuat: {1} karakter{2}	「{0}」を読み込みました：{1} 字{2}
+读文件失败：{0}	Couldn’t read the file: {0}	Gagal membaca berkas: {0}	ファイルを読み込めませんでした：{0}
+读文件失败：	Couldn’t read the file:	Gagal membaca berkas:	ファイルを読み込めませんでした：
+放入原文文件	Drop the text file	Letakkan berkas teks	原文ファイルを入れる
+放入气泡	Drop the bubble	Letakkan balon	フキダシを入れる
+松手就放到画面上	Release to place it on the canvas	Lepas untuk meletakkannya di kanvas	離すと画面に置きます
+已把「{0}」放到画面上，拖它调位置	Placed “{0}” on the canvas — drag it to reposition	“{0}” diletakkan di kanvas — seret untuk memindahkan	「{0}」を画面に置きました。ドラッグで位置を調整できます
+已把剪贴板里的图片放进当前格子	Put the clipboard image into the current panel	Gambar dari papan klip dimasukkan ke panel saat ini	クリップボードの画像を今のコマに入れました
+← → 切换 · Esc 关闭 · 滚轮缩放	← → switch · Esc close · scroll to zoom	← → ganti · Esc tutup · gulir untuk zoom	← → 切り替え · Esc 閉じる · ホイールで拡大縮小
+上一张	Previous	Sebelumnya	前の画像
+下一张	Next	Berikutnya	次の画像
+候选图预览	Candidate preview	Pratinjau kandidat	候補のプレビュー
+用这张	Use this one	Pakai yang ini	これを使う
+用这张进画布改	Edit this one in the canvas	Sunting ini di kanvas	これをキャンバスで直す
+第 {#0} / {#1} 张	{0} / {1}	{0} / {1}	{0} / {1} 枚目
+靠左	Align left	Rata kiri	左寄せ
+水平居中	Center horizontally	Tengah horizontal	左右中央
+靠右	Align right	Rata kanan	右寄せ
+靠上	Align top	Rata atas	上寄せ
+垂直居中	Center vertically	Tengah vertikal	上下中央
+靠下	Align bottom	Rata bawah	下寄せ
+完整显示（可能留白）	Fit (may leave margins)	Tampilkan utuh (bisa ada margin)	全体を表示（余白が出ることも）
+文本	Text	Teks	テキスト
+用 Ctrl+V 粘贴（浏览器不允许脚本代按）	Paste with Ctrl+V (browsers don’t let scripts do it for you)	Tempel dengan Ctrl+V (browser tidak mengizinkan skrip melakukannya)	Ctrl+V で貼り付けてください（ブラウザはスクリプトからの貼り付けを許可していません）
+全选	Select all	Pilih semua	すべて選択
+候选图	Candidates	Kandidat	候補
+放大看细节	Zoom in for detail	Perbesar untuk detail	拡大して細部を見る
+看大图	View large	Lihat besar	大きく表示
+替换图片…	Replace image…	Ganti gambar…	画像を差し替え…
+导出这一格	Export this panel	Ekspor panel ini	このコマを書き出す
+清空这一格的图	Clear this panel’s image	Hapus gambar panel ini	このコマの画像を外す
+已清空这一格的图	Cleared this panel’s image	Gambar panel ini dihapus	このコマの画像を外しました
+选图片填入这一格	Choose an image for this panel	Pilih gambar untuk panel ini	画像を選んでこのコマに入れる
+AI 生成这一格	Generate this panel with AI	Buat panel ini dengan AI	AI でこのコマを生成
+换样式	Change style	Ganti gaya	スタイルを変える
+编辑文字	Edit text	Edit teks	文字を編集
+复制一个	Duplicate	Duplikat	複製
+导出这一页 PNG	Export this page as PNG	Ekspor halaman ini sebagai PNG	このページを PNG で書き出す
+操作失败：{0}	Action failed: {0}	Tindakan gagal: {0}	操作に失敗しました：{0}
+操作失败：	Action failed:	Tindakan gagal:	操作に失敗しました：
+已清除本机 AI 配置	Cleared the local AI settings	Pengaturan AI lokal dihapus	この端末の AI 設定を消しました
+本机已填 Key · {0} · {1}	Key saved on this device · {0} · {1}	Kunci tersimpan di perangkat ini · {0} · {1}	この端末にキー保存済み · {0} · {1}
+服务端环境变量已配置 · {0} · {1}	Set via server environment variables · {0} · {1}	Diatur lewat variabel lingkungan server · {0} · {1}	サーバーの環境変数で設定済み · {0} · {1}
+测试中…	Testing…	Menguji…	テスト中…
+连接成功 · {0} · {#1}ms	Connected · {0} · {1} ms	Terhubung · {0} · {1} ms	接続成功 · {0} · {1}ms
+连接成功 {#0}ms	Connected {0} ms	Terhubung {0} ms	接続成功 {0}ms
+失败	Failed	Gagal	失敗
+连接失败：{0}	Connection failed: {0}	Koneksi gagal: {0}	接続に失敗しました：{0}
+连接失败：	Connection failed:	Koneksi gagal:	接続に失敗しました：
+Model ID 从方舟「模型广场」复制（带日期后缀，如 doubao-seedream-5-0-pro-260628）；生图不需要对话模型，想用 AI 排戏/切分再填一个对话模型的 ID	Copy the Model ID from Ark “Model Square” (with the date suffix, e.g. doubao-seedream-5-0-pro-260628); image generation doesn’t need a chat model — add a chat model ID only if you want AI staging / splitting	Salin Model ID dari “Model Square” Ark (dengan akhiran tanggal, mis. doubao-seedream-5-0-pro-260628); pembuatan gambar tidak butuh model chat — isi ID model chat hanya jika ingin penyusunan / pembagian AI	Model ID は方舟の「モデル広場」からコピーしてください（日付付き、例：doubao-seedream-5-0-pro-260628）。画像生成にチャットモデルは不要です。AI の演出 / 割り振りを使うときだけチャットモデルの ID も入れてください
+Model ID 从方舟「模型广场」复制（带日期后缀，如 doubao-seedream-5-0-pro-260628）；	Copy the Model ID from Ark “Model Square” (with the date suffix, e.g. doubao-seedream-5-0-pro-260628);	Salin Model ID dari “Model Square” Ark (dengan akhiran tanggal, mis. doubao-seedream-5-0-pro-260628);	Model ID は方舟の「モデル広場」からコピーしてください（日付付き、例：doubao-seedream-5-0-pro-260628）；
+生图不需要对话模型，想用 AI 排戏/切分再填一个对话模型的 ID	image generation doesn’t need a chat model — add a chat model ID only if you want AI staging / splitting	pembuatan gambar tidak butuh model chat — isi ID model chat hanya jika ingin penyusunan / pembagian AI	画像生成にチャットモデルは不要です。AI の演出 / 割り振りを使うときだけチャットモデルの ID も入れてください
+百炼兼容模式：文本 qwen-plus；生图用 wanx2.1-t2i-turbo（异步任务在部分模型上不支持，失败就换 wanx2.1-t2i-plus）	Bailian compatible mode: text qwen-plus; images wanx2.1-t2i-turbo (async tasks aren’t supported on some models — if it fails, use wanx2.1-t2i-plus)	Mode kompatibel Bailian: teks qwen-plus; gambar wanx2.1-t2i-turbo (tugas asinkron tidak didukung di sebagian model — jika gagal, pakai wanx2.1-t2i-plus)	百煉の互換モード：テキストは qwen-plus、画像は wanx2.1-t2i-turbo（一部のモデルは非同期タスクに非対応。失敗したら wanx2.1-t2i-plus に）
+自定义	Custom	Kustom	カスタム
+我的服务商	My provider	Penyedia saya	マイ サービス
+已配置	Configured	Terkonfigurasi	設定済み
+已验证	Verified	Terverifikasi	確認済み
+未验证	Not verified	Belum diverifikasi	未確認
+{0} · {1} · {#2} 个 Key	{0} · {1} · {2} keys	{0} · {1} · {2} kunci	{0} · {1} · キー {2} 個
+管理 Key	Manage keys	Kelola kunci	キーを管理
+还没有保存的 Key。在右边填一个，点「保存并使用」。	No saved keys yet. Fill one in on the right and click “Save & use”.	Belum ada kunci tersimpan. Isi satu di kanan lalu klik “Simpan & pakai”.	保存済みのキーはまだありません。右側に入力して「保存して使う」を押してください。
+删	Delete	Hapus	削除
+无 Key	No key	Tanpa kunci	キーなし
+当前	Current	Saat ini	使用中
+使用	Use	Pakai	使う
+生图专用 Key	Image-only key	Kunci khusus gambar	画像専用キー
+共用上面的 Key	Shares the key above	Memakai kunci di atas	上のキーを共用
+（注意：上面那把 Key 可能属于另一家，测试对话失败也不影响这里）	(Note: the key above may belong to another provider; a failed chat test doesn’t affect this)	(Catatan: kunci di atas mungkin milik penyedia lain; uji chat yang gagal tidak memengaruhi ini)	（注意：上のキーは別のサービスのものかもしれません。チャットのテストに失敗してもここには影響しません）
+生图就绪：{0} · {1} · {2} · {3} ****{4}{5}	Images ready: {0} · {1} · {2} · {3} ****{4}{5}	Gambar siap: {0} · {1} · {2} · {3} ****{4}{5}	画像生成の準備完了：{0} · {1} · {2} · {3} ****{4}{5}
+这个服务商的版本段在 /api/v3，不是 /v1	This provider’s version segment is /api/v3, not /v1	Segmen versi penyedia ini /api/v3, bukan /v1	このサービスのバージョン部分は /v1 ではなく /api/v3 です
+Base URL 填到 OpenAI 兼容的版本段为止（如 https://host/v1），模型填真实 model id	Enter the Base URL up to the OpenAI-compatible version segment (e.g. https://host/v1), and use a real model ID	Isi Base URL sampai segmen versi kompatibel OpenAI (mis. https://host/v1), dan pakai ID model asli	Base URL は OpenAI 互換のバージョン部分まで（例：https://host/v1）、モデルは実際の model id を入れてください
+已切换到 {0}	Switched to {0}	Beralih ke {0}	{0} に切り替えました
+正在编辑「{0}」，改完点保存	Editing “{0}” — click Save when you’re done	Sedang mengedit “{0}” — klik Simpan setelah selesai	「{0}」を編集中。終わったら保存を押してください
+删掉「{0}」的 Key？	Delete the key for “{0}”?	Hapus kunci untuk “{0}”?	「{0}」のキーを削除しますか？
+删掉	Delete	Hapus	削除する
+正在请求对话模型…	Contacting the chat model…	Menghubungi model chat…	チャットモデルに問い合わせ中…
+✅ 对话模型通了 · {0} · {#1}ms	✅ Chat model works · {0} · {1} ms	✅ Model chat berfungsi · {0} · {1} ms	✅ チャットモデルにつながりました · {0} · {1}ms
+❌ 对话模型失败（不影响生图）：{0}{1}{2}	❌ Chat model failed (images unaffected): {0}{1}{2}	❌ Model chat gagal (gambar tidak terpengaruh): {0}{1}{2}	❌ チャットモデルに失敗（画像生成には影響なし）：{0}{1}{2}
+❌ 对话模型失败：{0}	❌ Chat model failed: {0}	❌ Model chat gagal: {0}	❌ チャットモデルに失敗：{0}
+(未填生图模型)	(no image model set)	(model gambar belum diisi)	（画像モデル未入力）
+会用生图模型 {0} 真实生成一张小图（约 0.02 元），继续吗？	This will really generate one small image with {0} (about ¥0.02). Continue?	Ini akan benar-benar membuat satu gambar kecil dengan {0} (sekitar ¥0,02). Lanjutkan?	画像モデル {0} で実際に小さな画像を 1 枚生成します（約 0.02 元）。続けますか？
+正在调用生图接口…	Calling the image API…	Memanggil API gambar…	画像 API を呼び出し中…
+✅ 生图通了 · {0} · {1} · 请求尺寸 {2} · {#3}ms{4}	✅ Image generation works · {0} · {1} · size {2} · {3} ms{4}	✅ Pembuatan gambar berfungsi · {0} · {1} · ukuran {2} · {3} ms{4}	✅ 画像生成につながりました · {0} · {1} · 要求サイズ {2} · {3}ms{4}
+✅ 生图通了 · {0} · {1} · 请求尺寸 {2} · {#3}ms	✅ Image generation works · {0} · {1} · size {2} · {3} ms	✅ Pembuatan gambar berfungsi · {0} · {1} · ukuran {2} · {3} ms	✅ 画像生成につながりました · {0} · {1} · 要求サイズ {2} · {3}ms
+带 {#0} 张参考图	with {0} reference images	dengan {0} gambar referensi	参考画像 {0} 枚付き
+❌ 生图失败：{0}{1}	❌ Image generation failed: {0}{1}	❌ Pembuatan gambar gagal: {0}{1}	❌ 画像生成に失敗：{0}{1}
+❌ 生图失败：{0}	❌ Image generation failed: {0}	❌ Pembuatan gambar gagal: {0}	❌ 画像生成に失敗：{0}
+至少配一条：对话（Base URL + API Key）或生图（生图模型 + Key）	Set up at least one: chat (Base URL + API key) or images (image model + key)	Atur minimal satu: chat (Base URL + kunci API) atau gambar (model gambar + kunci)	少なくとも 1 つ設定してください：チャット（Base URL＋API キー）か画像（画像モデル＋キー）
+已保存并验证，可以开始用了	Saved and verified — you’re ready to go	Tersimpan dan terverifikasi — siap dipakai	保存して確認しました。使い始められます
+已保存（对话未验证，可以点「测试对话」）	Saved (chat not verified — you can click “Test chat”)	Tersimpan (chat belum diverifikasi — Anda bisa klik “Uji chat”)	保存しました（チャットは未確認。「チャットをテスト」を押せます）
+已保存 Key：{0}	Key saved: {0}	Kunci tersimpan: {0}	キーを保存しました：{0}
+绘画引擎加载超时	The drawing engine took too long to load	Mesin gambar terlalu lama dimuat	お絵かきエンジンの読み込みがタイムアウトしました
+绘画引擎加载失败	The drawing engine failed to load	Mesin gambar gagal dimuat	お絵かきエンジンを読み込めませんでした
+引擎还没就绪	The engine isn’t ready yet	Mesin belum siap	エンジンの準備ができていません
+纸	Paper	Kertas	紙
+底稿	Base sketch	Sketsa dasar	下絵
+先选一个格子	Select a panel first	Pilih satu panel dulu	先にコマを選んでください
+竖屏窄，建议横屏	Narrow in portrait — try landscape	Sempit di mode potret — coba lanskap	縦向きだと狭いので横向きがおすすめ
+这一格还没有图	This panel has no image yet	Panel ini belum bergambar	このコマにはまだ画像がありません
+{0}-第{#1}格.{2}	{0}-panel{1}.{2}	{0}-panel{1}.{2}	{0}-{1}コマ目.{2}
+已导出这一格的图	Exported this panel’s image	Gambar panel ini diekspor	このコマの画像を書き出しました
+{0}-第{1}格-底图.png	{0}-panel{1}-base.png	{0}-panel{1}-dasar.png	{0}-{1}コマ目-下絵.png
+导出底图失败：{0}	Couldn’t export the base image: {0}	Gagal mengekspor gambar dasar: {0}	下絵を書き出せませんでした：{0}
+还没有可导出的内容	Nothing to export yet	Belum ada yang bisa diekspor	書き出せる内容がまだありません
+{0}-第{1}格-绘制.png	{0}-panel{1}-drawing.png	{0}-panel{1}-gambar.png	{0}-{1}コマ目-作画.png
+已导出这一格的绘制图	Exported this panel’s drawing	Gambar buatan panel ini diekspor	このコマの作画を書き出しました
+取图…	Getting the image…	Mengambil gambar…	画像を取得中…
+已画好并贴回这一格	Drawn and placed back in this panel	Selesai digambar dan dimasukkan kembali ke panel ini	描き終えてこのコマに戻しました
+取图失败：{0}	Couldn’t get the image: {0}	Gagal mengambil gambar: {0}	画像を取得できませんでした：{0}
+取图失败：	Couldn’t get the image:	Gagal mengambil gambar:	画像を取得できませんでした：
+笔迹已清空	Strokes cleared	Goresan dihapus	描いた線を消しました
+上移	Move up	Naikkan	上へ移動
+下移	Move down	Turunkan	下へ移動
+已启用 AI 功能	AI features turned on	Fitur AI diaktifkan	AI 機能を有効にしました
+AI 功能已收起（随时可以再打开）	AI features hidden (you can bring them back any time)	Fitur AI disembunyikan (bisa dibuka lagi kapan saja)	AI 機能をしまいました（いつでも戻せます）
+已恢复默认面板布局	Restored the default panel layout	Tata letak panel bawaan dipulihkan	パネル配置を既定に戻しました
+收起 / 展开全部功能	Collapse / expand all tools	Ciutkan / bentangkan semua alat	すべての機能をたたむ / 広げる
+收起或展开全部功能	Collapse or expand all tools	Ciutkan atau bentangkan semua alat	すべての機能をたたむ・広げる
+展开 / 收起	Expand / collapse	Bentangkan / ciutkan	広げる / たたむ
+展开或收起	Expand or collapse	Bentangkan atau ciutkan	広げる・たたむ
+停用	Turn off	Nonaktifkan	無効にする
+启用	Turn on	Aktifkan	有効にする
+角色	Character	Karakter	キャラ
+角色 {#0}{1}	Character {0}{1}	Karakter {0}{1}	キャラ {0}{1}
+这几张图读不出来，换一张试试	Some of these images can’t be read — try others	Beberapa gambar ini tidak terbaca — coba yang lain	読み込めない画像があります。別の画像を試してください
+已保存角色「{0}」并启用	Saved character “{0}” and turned it on	Karakter “{0}” disimpan dan diaktifkan	キャラ「{0}」を保存して有効にしました
+还没有角色卡可导出	No character cards to export yet	Belum ada kartu karakter untuk diekspor	書き出せるキャラカードがまだありません
+角色卡-{0}.json	character-cards-{0}.json	kartu-karakter-{0}.json	キャラカード-{0}.json
+已导出 {#0} 张角色卡	Exported {0} character cards	{0} kartu karakter diekspor	キャラカードを {0} 枚書き出しました
+这个文件太大了（超过 24MB），拆成两份再导	This file is too large (over 24 MB); split it in two and import again	Berkas ini terlalu besar (lebih dari 24 MB); bagi menjadi dua lalu impor lagi	ファイルが大きすぎます（24MB 超）。2 つに分けて読み込んでください
+这个文件不是合法的 JSON	This file isn’t valid JSON	Berkas ini bukan JSON yang valid	このファイルは正しい JSON ではありません
+JSON 里没找到角色卡，请用「导出角色卡」生成的那份文件	No character cards found in the JSON — use a file made with “Export character cards”	Tidak ada kartu karakter di JSON — gunakan berkas dari “Ekspor kartu karakter”	JSON にキャラカードがありません。「キャラカードを書き出す」で作ったファイルを使ってください
+角色卡最多 {#0} 张，先删几张再导入	Up to {0} character cards — delete some before importing	Maksimal {0} kartu karakter — hapus beberapa sebelum mengimpor	キャラカードは最大 {0} 枚です。何枚か消してから読み込んでください
+导入的角色都没有参考图，没法用	None of the imported characters has a reference image, so they can’t be used	Tidak satu pun karakter yang diimpor punya gambar referensi, jadi tidak bisa dipakai	読み込んだキャラにはどれも参考画像がないので使えません
+这些角色卡本机已经有了	These character cards are already on this device	Kartu karakter ini sudah ada di perangkat ini	これらのキャラカードはこの端末にもうあります
+{#0} 张重复	{0} duplicates	{0} duplikat	重複 {0} 枚
+{#0} 张缺参考图	{0} missing reference images	{0} tanpa gambar referensi	参考画像なし {0} 枚
+（跳过 {0}）	(skipped {0})	(dilewati {0})	（{0} をスキップ）
+导入 {#0} 张角色卡{1}	Imported {0} character cards{1}	{0} kartu karakter diimpor{1}	キャラカードを {0} 枚読み込みました{1}
+跟角色参考图	Follows the character references	Mengikuti referensi karakter	キャラ参考画像に合わせる
+跟样图的画风	Follows the samples’ art style	Mengikuti gaya contoh	見本画像の画風に合わせる
+人设图 + 样图都参考	Uses both the character sheet and samples	Memakai lembar karakter dan contoh	キャラ設定画と見本画像の両方を参考にする
+不参考任何图	Uses no reference images	Tanpa gambar referensi	どの画像も参考にしない
+样图 {#0}	Sample {0}	Contoh {0}	見本 {0}
+加样图（也可以直接拖进来 / Ctrl+V）	Add samples (or drag them in / Ctrl+V)	Tambah contoh (atau seret ke sini / Ctrl+V)	見本画像を追加（ドラッグや Ctrl+V でも可）
+样图最多 {#0} 张	Up to {0} samples	Maksimal {0} contoh	見本画像は最大 {0} 枚です
+已加入 {#0} 张样图（共 {#1} 张）	Added {0} samples ({1} in total)	{0} contoh ditambahkan (total {1})	見本画像を {0} 枚追加しました（合計 {1} 枚）
+生图会跟人设图	Images will follow the character sheet	Gambar akan mengikuti lembar karakter	生成画像はキャラ設定画に合わせます
+生图会跟样图的画风	Images will follow the samples’ art style	Gambar akan mengikuti gaya contoh	生成画像は見本画像の画風に合わせます
+人设图 + 样图都会参考	Both the character sheet and samples are used	Lembar karakter dan contoh sama-sama dipakai	キャラ設定画と見本画像の両方を参考にします
+生图不参考任何图（每格可能长得不一样）	Images use no references (characters may look different per panel)	Gambar tanpa referensi (tokoh bisa berbeda tiap panel)	生成画像はどの画像も参考にしません（コマごとに見た目が変わるかも）
+清空所有角色卡？参考图会一起删掉。	Clear all character cards? Their reference images will be deleted too.	Hapus semua kartu karakter? Gambar referensinya juga akan terhapus.	すべてのキャラカードを消しますか？参考画像も一緒に削除されます。
+读图片失败	Couldn’t read the image	Gagal membaca gambar	画像を読み込めませんでした
+已存到相册：{0}	Saved to photos: {0}	Disimpan ke galeri: {0}	写真に保存しました：{0}
+存相册失败：{0}	Couldn’t save to photos: {0}	Gagal menyimpan ke galeri: {0}	写真に保存できませんでした：{0}
+存相册失败：	Couldn’t save to photos:	Gagal menyimpan ke galeri:	写真に保存できませんでした：
+这个环境不支持直跳，用「分享」面板	Direct handoff isn’t supported here — use the “Share” sheet	Pengiriman langsung tidak didukung di sini — gunakan menu “Bagikan”	ここでは直接の受け渡しに対応していません。「共有」メニューを使ってください
+直跳失败：{0}	Direct handoff failed: {0}	Pengiriman langsung gagal: {0}	直接の受け渡しに失敗しました：{0}
+PanelForge 分镜	PanelForge storyboard	Papan cerita PanelForge	PanelForge コマ割り
+分享没成功（{0}），已改存相册	Sharing didn’t work ({0}); saved to photos instead	Berbagi gagal ({0}); disimpan ke galeri sebagai gantinya	共有できませんでした（{0}）。代わりに写真に保存しました
+当前环境既不支持分享也不支持下载：请用「导出」	This environment supports neither sharing nor downloads — use “Export”	Lingkungan ini tidak mendukung berbagi maupun unduhan — gunakan “Ekspor”	この環境は共有もダウンロードもできません。「書き出し」を使ってください
+已下载	Downloaded	Diunduh	ダウンロードしました
+没有可撤销的操作	Nothing to undo	Tidak ada yang bisa dibatalkan	元に戻す操作がありません
+已撤销	Undone	Dibatalkan	元に戻しました
+没有可重做的操作	Nothing to redo	Tidak ada yang bisa diulang	やり直す操作がありません
+已重做	Redone	Diulang	やり直しました
+靛蓝	Indigo	Nila	インディゴ
+紫色	Purple	Ungu	パープル
+粉色	Pink	Merah muda	ピンク
+红色	Red	Merah	レッド
+橙色	Orange	Oranye	オレンジ
+黄色	Yellow	Kuning	イエロー
+绿色	Green	Hijau	グリーン
+青色	Teal	Toska	ティール
+石墨	Graphite	Grafit	グラファイト
+请求	Request	Permintaan	リクエスト
+{0}超时（{#1}s 没有响应），已放弃	{0} timed out (no response for {1} s) and was abandoned	{0} kehabisan waktu (tidak ada respons {1} dtk) dan dibatalkan	{0}がタイムアウトしました（{1} 秒応答なし）。中止しました
+# 分镜表 · {0}	# Storyboard sheet · {0}	# Lembar papan cerita · {0}	# コマ割り表 · {0}
+## 逐格分镜	## Panel by panel	## Panel demi panel	## コマごとの割り
+## 气泡（{#0} 个）	## Bubbles ({0})	## Balon ({0})	## フキダシ（{0} 個）
+PanelForge 分镜坊 · 中·日·韩 漫画分镜模板库	PanelForge · Manga storyboard template library	PanelForge · Perpustakaan template papan cerita	PanelForge · 漫画コマ割りテンプレート集
+可选：文本和生图不是同一家时才需要	Optional: only needed when text and images come from different providers	Opsional: hanya perlu bila teks dan gambar dari penyedia berbeda	任意：テキストと画像が別のサービスのときだけ必要です
+第 {#0} 页：挑版式 + 切成格	Page {0}: pick a layout + split into panels	Halaman {0}: pilih tata letak + bagi jadi panel	{0} ページ目：レイアウト選び＋コマ割り
+第 {#0} 页：逐格写生图提示词（AI 优化过的）	Page {0}: write each panel’s image prompt (AI-optimized)	Halaman {0}: tulis prompt gambar tiap panel (dioptimalkan AI)	{0} ページ目：コマごとに画像プロンプトを書く（AI 最適化済み）
+第 {#0} 页：写台词/旁白 + 挂气泡	Page {0}: write lines / narration + add bubbles	Halaman {0}: tulis dialog / narasi + pasang balon	{0} ページ目：セリフ / ナレーションを書いてフキダシを付ける
+斜切格：地平线可以歪，人物沿斜线摆。正面对称构图会把它压平。	Diagonal panel: let the horizon tilt and place figures along the slant. A frontal symmetric composition flattens it.	Panel diagonal: biarkan cakrawala miring dan letakkan tokoh di sepanjang garis miring. Komposisi simetris dari depan membuatnya datar.	斜めゴマ：地平線は傾けてよく、人物は斜線に沿って置きます。正面の対称構図だと平板になります。
+插入格：只放一个细节（眼、手、刀锋、物件），背景几乎去掉。	Insert panel: just one detail (eyes, hands, a blade, an object), with almost no background.	Panel sisipan: hanya satu detail (mata, tangan, mata pisau, benda), latar hampir dihilangkan.	差し込みゴマ：細部を 1 つだけ（目・手・刃・物）。背景はほぼ消します。
+竖长格：只放一个人或一条街景，别塞两个人的全身。	Tall panel: one person or one street view — don’t squeeze in two full bodies.	Panel tinggi: satu orang atau satu pemandangan jalan — jangan jejalkan dua tubuh penuh.	縦長ゴマ：1 人か街並み 1 本だけ。2 人の全身を詰め込まないこと。
+横幅格：适合两人对话或横向动作，左右两端留出气口。	Wide panel: good for two people talking or sideways action; leave breathing room at both ends.	Panel lebar: cocok untuk dua orang bercakap atau aksi menyamping; sisakan ruang di kedua ujung.	横長ゴマ：2 人の会話や横方向の動きに向きます。左右の端に余裕を残します。
+小格：只放一个动作或一个表情。这个尺寸读者看不清细节。	Small panel: one action or one expression only. Readers can’t see detail at this size.	Panel kecil: satu aksi atau satu ekspresi saja. Pembaca tak bisa melihat detail di ukuran ini.	小ゴマ：動作 1 つか表情 1 つだけ。このサイズだと読者には細部が見えません。
+近方格：最稳的叙事格，主体居中即可。	Near-square panel: the steadiest storytelling panel; just center the subject.	Panel hampir persegi: panel cerita paling stabil; cukup letakkan subjek di tengah.	正方形に近いコマ：いちばん安定した語りのコマ。主体は中央でかまいません。
+常规格：按景别正常构图。	Regular panel: compose normally for the shot.	Panel biasa: komposisi seperti biasa sesuai bidikan.	通常のコマ：ショットに合わせてふつうに構図を取ります。
+通用/跨界	Universal / crossover	Umum / lintas gaya	汎用 / ジャンル横断
+iframe 没起来	The iframe didn’t start	Iframe tidak mulai	iframe が起動しませんでした
+embed.html 不是预期版本（缺 __pfKlecksReady）	embed.html isn’t the expected version (missing __pfKlecksReady)	embed.html bukan versi yang diharapkan (tanpa __pfKlecksReady)	embed.html が想定のバージョンではありません（__pfKlecksReady がありません）
+这一页	this page	halaman ini	このページ
+收束情绪	Settle the emotion	Meredakan emosi	感情を締める
+关	Off	Mati	オフ
+格子里的数字就是阅读顺序	the numbers in the panels are the reading order	angka di panel adalah urutan baca	コマの数字が読む順です
+← 回到编辑器	← Back to the editor	← Kembali ke editor	← エディターに戻る
+这是静态版的一览页（服务器版有同样的页面，路径 /api/sheet）。点开任意一套即可在编辑器里使用。	This is the static build’s overview (the server version has the same page at /api/sheet). Click any template to use it in the editor.	Ini halaman ikhtisar edisi statis (versi server punya halaman yang sama di /api/sheet). Klik templat mana pun untuk memakainya di editor.	これは静的版の一覧ページです（サーバー版にも /api/sheet に同じページがあります）。どれかを押すとエディターで使えます。
+这是静态版的一览页（服务器版有同样的页面，路径	This is the static build’s overview (the server version has the same page at	Ini halaman ikhtisar edisi statis (versi server punya halaman yang sama di	これは静的版の一覧ページです（サーバー版にも同じページがあります：
+）。点开任意一套即可在编辑器里使用。	). Click any template to use it in the editor.	). Klik templat mana pun untuk memakainya di editor.	）。どれかを押すとエディターで使えます。
+PanelForge 分镜坊	PanelForge	PanelForge	PanelForge

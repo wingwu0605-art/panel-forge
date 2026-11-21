@@ -21,10 +21,28 @@
     .top-overlay--inner{padding-top:2px !important;padding-bottom:2px !important}
   }
 </style>
+<script>
+/* 跟着主界面的语言走：Klecks 自己的界面读 localStorage「klecks-language」（它自带 zh-CN / en / ja / id 语言包），
+   我们这页上的几句字（加载提示、标题）在这里换。必须在 embed.js 之前跑。 */
+(function () {
+  var lang = new URLSearchParams(location.search).get('lang') || 'zh';
+  var KL = { zh: 'zh-CN', en: 'en', ja: 'ja', id: 'id' };
+  try { localStorage.setItem('klecks-language', KL[lang] || 'en'); } catch (e) { /* 隐私模式 */ }
+  var T = {
+    en: { load: 'Getting the brushes ready…', title: 'Klecks · Draw' },
+    ja: { load: 'ブラシを準備しています…', title: 'Klecks · 描画' },
+    id: { load: 'Menyiapkan kuas…', title: 'Klecks · Gambar' },
+  }[lang];
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
+  window.__pfLoadText = T ? T.load : '';
+  if (T) document.title = T.title;
+})();
+</script>
 <script type="module" src="./embed.js"></script>
 </head>
 <body>
 <div id="pf-load">正在准备画笔…</div>
+<script>if (window.__pfLoadText) document.getElementById('pf-load').textContent = window.__pfLoadText;</script>
 <script type="module">
 /**
  * Klecks 的引导页（跑在同源 iframe 里，一个 iframe = 一个全新实例）
@@ -58,7 +76,11 @@ window.__pfKlecksReady = ready();
  * - 笔迹和底稿分开，撤销才不会把底稿一起擦掉
  * - 关掉白纸（透明底）：传 paper: false
  */
-window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '底稿', paper = true, guide = null } = {}) => {
+// 图层名会显示在 Klecks 的图层面板里：父页面按界面语言传进来（names.paper / base / ink）
+let paperName = '纸';
+window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '底稿', paper = true, guide = null, names = {} } = {}) => {
+  paperName = names.paper || '纸';
+  if (names.base) baseLayerName = names.base;
   await ready();
   if (window.__pfKlecks) throw new Error('这一份文档已经建过实例了');
   const layers = [];
@@ -89,7 +111,7 @@ window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '�
       sg.stroke();
       sg.setLineDash([]);
     }
-    layers.push({ name: '纸', opacity: 1, isVisible: true, image: sheet });
+    layers.push({ name: paperName, opacity: 1, isVisible: true, image: sheet });
   }
   if (baseUrl) {
     const img = await new Promise((res, rej) => {
@@ -103,7 +125,7 @@ window.__pfKlecksBoot = async ({ width, height, baseUrl = '', baseLayerName = '�
   const blank = document.createElement('canvas');
   blank.width = Math.max(1, width);
   blank.height = Math.max(1, height);
-  layers.push({ name: '绘制', opacity: 1, isVisible: true, image: blank });
+  layers.push({ name: names.ink || '绘制', opacity: 1, isVisible: true, image: blank });
 
   window.__pfKlecks = new window.Klecks({
     project: { width, height, layers },
@@ -185,7 +207,7 @@ window.__pfKlecksPaper = (on) => {
   try {
     const kl = window.__pfKlecks?.embed?.klApp?.klCanvas;
     if (!kl) return null;
-    const find = () => (kl.getLayers?.() || []).find((l) => l.name === '纸') || null;
+    const find = () => (kl.getLayers?.() || []).find((l) => l.name === paperName) || null;
     const paper = find();
     if (!paper) return null;
     kl.setLayerIsVisible?.(paper.id, !!on);

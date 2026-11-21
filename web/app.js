@@ -10,14 +10,14 @@ import { params, DBG, FRESH, STATIC, ARTIST, SHELL, REPO_URL } from './env.mjs';
 import { store, KEYS } from './storage.mjs';
 import { app } from './ctx.mjs';
 import { fx, settled, staggerIn, setFold } from './motion.mjs';
-import { openModal, closeModal, sheet } from './dialogs.mjs';
-import { toast, copyText, setRange, setBusy, initSegIndicators, initRanges, initCollapsibles, initPlatformKeys, initMoreMenu } from './ui.mjs';
+import { openModal, closeModal, sheet, ask, askText } from './dialogs.mjs';
+import { toast, copyText, setRange, setBusy, busyLabel, initSegIndicators, initRanges, initCollapsibles, initPlatformKeys, initMoreMenu } from './ui.mjs';
 import { state, commit, undo, redo, resetHistory } from './state.mjs';
 import { imageAsset, rehydrateImages, exportImageMap, loadImgEl, blobUrlOf } from './assets.mjs';
 import { effectivePrompt, buildImagePrompt, setPromptEdit } from './prompt.mjs';
 import { setView, initViews, setEditMod, syncEditHead, syncEditZoom, goCanvasOnCompact } from './mobile.mjs';
 import { installRails } from './rails.mjs';
-import { installI18n } from './i18n.mjs';
+import { installI18n, getLang, t as tr } from './i18n.mjs';
 import { initAppearance, currentTint } from './theme.mjs';
 import { downloadText, exportBlob } from './share.mjs';
 import { openPaint, exportSlotImage, initPaint } from './paint-ui.mjs';
@@ -35,7 +35,23 @@ import { bindInboxUI } from './inbox.mjs';
  *  - 静态：GitHub Pages 等纯静态托管，规则引擎在浏览器里跑（window.PF_STATIC）
  */
 let api = null;
+/**
+ * AI 这几条路把界面语言一起带上：模型写的节拍 / 画面 / 台词跟着界面语言走
+ * （英文界面的人不会收到一屏中文台词）。语言放在 llm 配置里，服务端和浏览器直连都认。
+ */
+const AI_CALLS = ['aiDecide', 'prompts', 'aiSplit', 'aiLines'];
+function withUiLang(a) {
+  for (const k of AI_CALLS) {
+    const fn = a[k];
+    if (typeof fn !== 'function') continue;
+    a[k] = (body = {}) => fn({ ...body, llm: { ...(body.llm || {}), lang: getLang() } });
+  }
+  return a;
+}
 async function makeApi() {
+  return withUiLang(await makeApiRaw());
+}
+async function makeApiRaw() {
   if (STATIC) {
     const mod = await import('./api-static.js');
     return mod.createStaticApi();
@@ -122,7 +138,7 @@ async function directFirst(name, body) {
 async function init() {
   // 语言必须最先装：initChrome 里的外观面板会读 getLang()，
   // 那时若 i18n 还没装，读到的默认值 'zh' 会把已存的语言偏好写回成 null（刷新后记不住）。
-  installI18n(params.get('lang') || store.get(KEYS.lang) || 'zh');
+  await installI18n(params.get('lang') || store.get(KEYS.lang) || 'zh');
   initChrome();
   if (PERF) import('./perf-hud.mjs').then((m) => m.initPerfHud());
   bindUI();
@@ -271,8 +287,17 @@ function intentZh(id) {
  * 138 张卡的缩略图只在第一次生成；之后搜索 / 筛选 / 换选中只切 hidden 和 .on。
  * 以前每敲一个字就把 138 个缩略图 SVG 重新拼一遍再 innerHTML（40–90ms），整排入场动画也跟着重放。 */
 const tplCards = new Map();   // 模板 id → 卡片元素
-const tplHay = (t) => (t._hay ??= (t.id + t.name + t.desc + t.tags.join('') + t.intents.map(intentZh).join('')
-  + intentZh(t.ratio) + ratioName(t.ratio) + t.panels + '格 ' + CULTURE_ZH[t.culture]).toLowerCase());
+const tplHay = (t) => {
+  const lang = getLang();
+  const memo = (t._hay ??= {});
+  if (memo[lang]) return memo[lang];
+  const zh = t.id + t.name + t.desc + t.tags.join('') + t.intents.map(intentZh).join('')
+    + intentZh(t.ratio) + ratioName(t.ratio) + t.panels + '格 ' + CULTURE_ZH[t.culture];
+  // 非中文界面：把卡片上看得见的字（名字、标签、戏路、画风）的译文也放进去，用户用自己的语言搜得到
+  const local = lang === 'zh' ? '' : ' ' + [...String(t.name).split('·'), ...t.tags, ...t.intents.map(intentZh), CULTURE_ZH[t.culture], ratioName(t.ratio)]
+    .map((x) => tr(String(x || '').trim())).join(' ');
+  return (memo[lang] = (zh + local).toLowerCase());
+};
 
 function tplCard(t) {
   let el = tplCards.get(t.id);
@@ -834,7 +859,7 @@ function renderStage() {
           + `<p class="muted">模板 ${escapeHtml(tpl.id)} · 换一套版式，或把这句话发给我</p>`;
         const btn = document.createElement('button');
         btn.className = 'btn tiny';
-        btn.textContent = '复错误信息';
+        btn.textContent = '复制错误信息';
         btn.addEventListener('click', () => copyText(`${tpl.id}: ${err.message}`, '错误信息已复制'));
         box.appendChild(btn);
         holder.appendChild(box);
@@ -1397,7 +1422,7 @@ function bindUI() {
   $('#btnAiLineReroll')?.addEventListener('click', () => aiWriteLines('again'));
   $('#btnAiLinesPage')?.addEventListener('click', () => aiWriteLines('page'));
   $('#btnResetDraft')?.addEventListener('click', async () => {
-    if (!confirm('清空本机草稿？所有页的图片、气泡和句子都会删掉，不能恢复。')) return;
+    if (!(await ask('清空本机草稿？所有页的图片、气泡和句子都会删掉，不能恢复。', { ok: '清空', danger: true }))) return;
     // 图片 / 底图 / 候选图是分页单独存的，要连它们一起删，否则几 MB 会一直占着
     await clearDrafts();
     state.pages = [{ id: newPageId(), tplId: state.tpl?.id || 'ref-4band-2col', name: '第 1 页', images: {}, bubbles: [], lines: {} }];
@@ -1663,7 +1688,7 @@ async function putImage(slotId, file, opts = {}) {
 
 async function importByUrl() {
   if (!state.selectedId) return;
-  const url = prompt('图片链接（http/https，或用 data:image/... 开头）：');
+  const url = await askText('图片链接（http/https，或用 data:image/... 开头）：', { title: '用图片链接', placeholder: 'https://…' });
   if (!url) return;
   try {
     let src = url.trim();
@@ -1888,9 +1913,9 @@ function renderSlotPanel() {
   renderCands();
   state._suggest = panel?.suggest || slotSuggest(slot.id) || '';
   state._suggestAi = !!panel?.suggestAi;
-  $('#shapeTip').innerHTML = shape
-    ? `已自动放在生图提示词<b>最前面</b>；用别的工具出图时也可单独复制。${escapeHtml(shape.hintZh || '')}`
-    : '已自动放在生图提示词<b>最前面</b>。';
+  // 两句分开放：固定说明 + 这种形状的构图提示（各自是完整一句，翻译时才不会被拆碎）
+  $('#shapeTip').innerHTML = '<span>已经自动放在上面生图提示词的最前面；自己用别的工具出图时也可以单独复制。</span>'
+    + (shape?.hintZh ? ` <span>${escapeHtml(shape.hintZh)}</span>` : '');
 
   setRange($('#zoom'), Math.round((img?.zoom || 1) * 100));
   $('#zoomVal').textContent = Math.round((img?.zoom || 1) * 100) + '%';
@@ -1946,7 +1971,7 @@ async function runAiDecide() {
   if (!plot) { toast('先写一段剧情吧'); $('#plot').focus(); return; }
   saveLlm();
   const btn = $('#btnAiDecide');
-  const old = btn.textContent;
+  const restore = busyLabel(btn);
   setBusy(btn, true);
   btn.textContent = 'AI 正在读剧情、挑版式、排戏…';
   const box = $('#aiResult');
@@ -1992,7 +2017,7 @@ async function runAiDecide() {
     box.innerHTML = `<b class="err-title">调用失败</b><div class="rs">${escapeHtml(e.message)}</div>`;
   } finally {
     setBusy(btn, false);
-    btn.textContent = old;
+    restore();
   }
 }
 
@@ -2051,7 +2076,7 @@ function renderIntentChips(a) {
   const box = $('#intentChips');
   if (!a) { box.innerHTML = ''; return; }
   const bits = a.intents.slice(0, 4).map((it, i) =>
-    `<span class="chip ${i === 0 ? 'hot' : ''}">${it.zh} ${(it.conf * 100).toFixed(0)}%</span>`);
+    `<span class="chip ${i === 0 ? 'hot' : ''}"><span>${it.zh}</span> ${(it.conf * 100).toFixed(0)}%</span>`);
   bits.push(`<span class="chip">约 ${a.panelTarget} 格</span>`);
   if (a.cultureHint) bits.push(`<span class="chip">${CULTURE_ZH[a.cultureHint]}</span>`);
   if (a.pace === 'fast') bits.push('<span class="chip">快节奏</span>');
@@ -2134,9 +2159,9 @@ function renderScript() {
       </div>
       <div class="asp">${p.aspectLabel} · 建议出图 ${p.genSize} · 占页 ${p.areaPct}%</div>
       ${p.content ? `<div class="ct">${escapeHtml(p.content)}</div>` : ''}
-      ${p.dialogue ? `<div class="dl">「${escapeHtml(p.dialogue)}」</div>` : ''}
+      ${p.dialogue ? `<div class="dl" translate="no">「${escapeHtml(p.dialogue)}」</div>` : ''}
       <div class="pr">${escapeHtml(effectivePrompt(p.id).prompt)}</div>
-      ${p.promptZh ? `<div class="pr zh">${escapeHtml(p.promptZh)}</div>` : ''}
+      ${p.promptZh ? `<div class="pr zh" translate="no">${escapeHtml(p.promptZh)}</div>` : ''}
       <div class="act">
         <button class="btn tiny" data-act="copy">复制提示词</button>
         <button class="btn tiny" data-act="prefix">复制形状词</button>
@@ -2259,7 +2284,7 @@ async function renamePage(i) {
   const pg = state.pages[i];
   if (!pg) return;
   const cur = pg.name || '';
-  const name = prompt('给这一页起个名字（比如：开场 / 对峙 / 收束）', cur || pageLabel(pg, i));
+  const name = await askText('给这一页起个名字（比如：开场 / 对峙 / 收束）', { title: '页面名字', value: cur || pageLabel(pg, i) });
   if (name === null) return;
   pg.name = String(name).trim().slice(0, 24);
   renderPageTabs();
@@ -2359,7 +2384,7 @@ async function exportAllPages() {
   if (!state.pages.length) { toast('还没有页'); return; }
   savePage();
   const btn = $('#btnExportAll');
-  const old = btn.textContent;
+  const restore = busyLabel(btn);
   setBusy(btn, true);
   let n = 0;
   try {
@@ -2384,7 +2409,7 @@ async function exportAllPages() {
     toast('导出中断：' + e.message);
   } finally {
     setBusy(btn, false);
-    btn.textContent = old;
+    restore();
   }
 }
 
@@ -2563,7 +2588,7 @@ async function generateSlotImage(targetId = state.selectedId, { askChars = true,
     // 取消时直接 return：finally 会清掉作业标记、复原按钮（以前这里引用了不存在的 btn/old，
     // 一取消就抛 ReferenceError，被下面的 catch 当成「生图失败」弹出错误面板）
     if (askChars && !charPayload.block
-      && !confirm('还没启用角色参考图，生成的图可能每格长得不一样。\n\n建议先去左边「角色参考图」加一张。\n\n仍然继续生图吗？')) return;
+      && !(await ask('还没启用角色参考图，生成的图可能每格长得不一样。\n建议先去左边「角色参考图」加一张。\n仍然继续生图吗？', { ok: '继续生图', cancel: '先去加参考图' }))) return;
     const res = await withTimeout(api.imageGenerate({
       prompt: built.full,
       refs: charPayload.refs,
@@ -2628,7 +2653,7 @@ async function runAiSplit() {
   const plot = $('#plot').value.trim();
   if (!plot) { toast('先在左栏粘贴源文本'); return; }
   const btn = $('#btnAiSplit');
-  const old = btn.textContent;
+  const restore = busyLabel(btn);
   setBusy(btn, true);
   btn.textContent = '切分中…';
   $('#scriptHint').textContent = 'AI 正在把源文本切成每格…';
@@ -2662,7 +2687,7 @@ async function runAiSplit() {
     toast('切分失败：' + e.message);
   } finally {
     setBusy(btn, false);
-    btn.textContent = old;
+    restore();
   }
 }
 
@@ -2676,7 +2701,7 @@ async function runAiPrompts({ silent = false } = {}) {
   const plot = $('#plot').value.trim();
   saveLlm();
   const btn = $('#btnAiPrompts');
-  const old = btn.textContent;
+  const restore = busyLabel(btn);
   setBusy(btn, true);
   btn.textContent = '优化中…';
   try {
@@ -2710,7 +2735,7 @@ async function runAiPrompts({ silent = false } = {}) {
     return null;
   } finally {
     setBusy(btn, false);
-    btn.textContent = old;
+    restore();
   }
 }
 
@@ -2729,12 +2754,12 @@ function scriptMarkdown() {
     '',
     '| 格 | 景别 | 形状 | 叙事节拍 | 画幅 | 建议出图 |',
     '| --- | --- | --- | --- | --- | --- |',
-    ...page.panels.map((p) => `| ${p.order} | ${p.roleZh} | ${p.shape?.zh || '常规格'} | ${p.beat || '通用镜头'} | ${p.aspectLabel} | ${p.genSize} |`),
+    ...page.panels.map((p) => `| ${p.order} | ${tr(p.roleZh)} | ${tr(p.shape?.zh || '常规格')} | ${tr(p.beat || '通用镜头')} | ${p.aspectLabel} | ${p.genSize} |`),
     '',
     '## 逐格分镜',
     ...page.panels.map((p) => [
       '',
-      `### ${p.order}. ${p.roleZh} · ${p.shape?.zh || '常规格'} · ${p.beat || '通用镜头'}`,
+      `### ${p.order}. ${tr(p.roleZh)} · ${tr(p.shape?.zh || '常规格')} · ${tr(p.beat || '通用镜头')}`,
       p.content ? `- 画面：${p.content}` : `- 构图：${p.beatHint}`,
       `- 台词：${(state.lines[p.id] ?? p.dialogue) ? '「' + (state.lines[p.id] ?? p.dialogue) + '」' : '无'}`,
       `- 形状开头词：\`${p.shape?.prefixEn || ''}\``,
@@ -2744,10 +2769,11 @@ function scriptMarkdown() {
     ].join('\n')),
     '',
     state.bubbles.length ? `## 气泡（${state.bubbles.length} 个）` : '',
-    ...state.bubbles.map((b) => `- ${BUBBLES[b.type]?.zh || b.type}｜${b.text ? '「' + b.text + '」' : '（空）'}｜不透明度 ${Math.round((b.opacity ?? 1) * 100)}%`),
+    ...state.bubbles.map((b) => `- ${tr(BUBBLES[b.type]?.zh || b.type)}｜${b.text ? '「' + b.text + '」' : tr('（空）')}｜不透明度 ${Math.round((b.opacity ?? 1) * 100)}%`),
     '',
   ].filter((x) => x !== undefined);
-  return lines.join('\n');
+  // 复制出去的表也跟着界面语言（中文界面 tr 原样返回）
+  return lines.map((l) => tr(l)).join('\n');
 }
 
 /* ================================================================== *

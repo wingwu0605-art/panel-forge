@@ -442,6 +442,14 @@
 :root[data-accent="teal"]    {--accent-l:#00728a;--accent-d:#40c8e0}
 :root[data-accent="graphite"]{--accent-l:#515154;--accent-d:#98989d}
 
+/* ---------------- 日语界面用日文字形（同一个汉字中日写法不同） ---------------- */
+:root[lang="ja"]{
+  --font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",
+         "Meiryo","Noto Sans JP","Noto Sans CJK JP","Segoe UI",system-ui,sans-serif;
+}
+/* 非中文：词典下载好、整页翻完之前先不显示（启动脚本挂标记，i18n.mjs 摘掉；2.5 秒兜底） */
+:root[data-i18n-pending] body{visibility:hidden}
+
 /* ---------------- 主色解析（全站只此一处） ---------------- */
 :root{
   --tint-l:var(--accent-l,var(--style-tint-l));
@@ -519,7 +527,10 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.tpl:focus-visible{
   color:#fff;padding:5px;
 }
 .brand .name{font-weight:600;letter-spacing:-.015em;font-size:15px}
-.brand .sub{font-size:12px;color:var(--label-3);font-weight:500;white-space:nowrap}
+.brand .name{flex:0 0 auto}
+.brand .sub{font-size:12px;color:var(--label-3);font-weight:500;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* 「分镜坊」是中文产品名：别的语言只留 PanelForge（翻成长句会把顶栏挤爆） */
+:root:not(:lang(zh)) .brand .sub{display:none}
 .top-mid{display:flex;gap:6px;align-items:center;margin-left:auto}
 .top-actions{display:flex;gap:2px;align-items:center}
 .pill{
@@ -616,6 +627,9 @@ input[type=search]{
 }
 input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+/* 两列按钮：译文比中文长时让它在按钮里折行，不要把右边那个挤出侧栏 */
+.row2>*{min-width:0}
+.row2>.btn{white-space:normal;line-height:1.25;text-wrap:balance}
 .field{display:block;margin-top:10px}
 .row2 .field{margin-top:0}
 .field>span{display:flex;justify-content:space-between;font-size:12px;color:var(--label-2);margin:0 0 5px 2px;font-weight:500}
@@ -995,6 +1009,8 @@ kbd{
 .stage-tools .btn.tiny{background:var(--fill-2)}
 .stage-tools .sep-v{width:.5px;height:20px;background:var(--sep-strong);margin:0 4px}
 .stage-tools .switch{padding:0 4px}
+/* 译文比中文长：中等宽度下画布工具栏的带图标按钮只留图标（有 title 提示），开关文字照常显示 */
+@media (max-width:1600px){:root:not(:lang(zh)) .stage-tools .lbl{display:none}}
 
 .stage{
   flex:1 1 auto;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;
@@ -2447,6 +2463,24 @@ dialog.sheet:not([open])::backdrop{opacity:0}
 [data-style="minimal"] > .style-chip{border-radius:3px;background:linear-gradient(135deg,#fafafb 0 50%,#46508a 50%)}
 [data-style="cute"] > .style-chip{border-radius:50%;background:linear-gradient(135deg,#fff0f5 0 50%,#d6457f 50%)}
 .swatches{grid-template-columns:repeat(6,1fr) !important;gap:9px 8px !important}
+/* 语言：常用三种一排；其它语言收在「其他语言」里 */
+.lang-more{margin-top:8px}
+.lang-more > summary{
+  display:flex;align-items:center;gap:6px;width:max-content;padding:4px 2px;cursor:pointer;list-style:none;
+  font-size:12px;color:var(--label-2);border-radius:6px;
+}
+.lang-more > summary::-webkit-details-marker{display:none}
+.lang-more > summary::after{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg);transition:transform .3s var(--spring)}
+.lang-more[open] > summary::after{transform:rotate(45deg)}
+.lang-more > summary:hover{color:var(--label)}
+.lang-more-list{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0 2px}
+.lang-more-list button{
+  height:28px;padding:0 12px;border:0;border-radius:var(--r-btn-sm);cursor:pointer;
+  background:var(--fill-2);color:var(--label);font:inherit;font-size:12.5px;
+  transition:background .2s var(--ease),box-shadow .2s var(--ease);
+}
+.lang-more-list button:hover{background:var(--fill)}
+.lang-more-list button.on{background:var(--tint-soft);box-shadow:inset 0 0 0 1.5px var(--tint);font-weight:600}
 .swatch-default{--sw-l:var(--style-tint-l);--sw-d:var(--style-tint-d)}
 .swatch-default::before{
   content:"";position:absolute;inset:5px;border-radius:50%;pointer-events:none;
@@ -2491,3 +2525,11 @@ dialog.sheet:not([open])::backdrop{opacity:0}
 /* ---------------- 灵动可爱：分隔线带一点品牌色 ---------------- */
 :root[data-style="cute"] .topbar{border-bottom-color:var(--card-border)}
 :root[data-style="cute"] .brand .name{letter-spacing:.2px}
+
+/* 确认框 / 输入框（代替浏览器自带的 confirm / prompt） */
+.ask-msg{margin:0 0 14px;font-size:14px;line-height:1.6;color:var(--label)}
+.ask-form{display:flex;flex-direction:column}
+.ask-input{margin:0 0 14px}
+.ask-sheet .row2{margin:0}
+.btn.danger-fill{background:var(--red-ink);color:#fff;font-weight:600}
+.btn.danger-fill:hover{filter:brightness(1.08)}
