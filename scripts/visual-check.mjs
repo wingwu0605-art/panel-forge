@@ -1465,7 +1465,7 @@ const scenarios = [
 
   {
     name: 'i18n-coverage',
-    title: '⑭b 英文 / 日文 / 印尼语界面里没有漏翻的中文（含确认框、Key 管理、快捷键、全自动、导出）',
+    title: '⑭b 英文 / 日文 / 印尼语界面里没有漏翻的中文（含确认框、Key 管理、快捷键、全自动、导出、画师版绘制页）',
     async run(page, shot, { check }) {
       await page.viewport(1440, 900);
       for (const lang of ['en', 'ja', 'id']) {
@@ -1529,6 +1529,30 @@ const scenarios = [
         await shot('i18n-coverage-' + lang);
         check(`${lang}：界面上没有漏翻的中文`, res.length === 0, res.length ? res.slice(0, 8).join(' / ') : '0 条');
       }
+
+      // 画师版（painter.html 同一份代码 + PF_PAINTER）：绘制页、Klecks 也要跟着语言走
+      await page.goto('/?fresh=1&mode=artist&tpl=ref-4band-2col&slot=p1&lang=en');
+      await page.ready();
+      await sleep(400);
+      await page.evaluate(`window.__pfI18nMiss = new Set(); window.__pfI18nLang = 'en';`);
+      await page.evaluate(`(async () => { const w = (ms) => new Promise((r) => setTimeout(r, ms));
+        document.querySelector('#langSeg [data-lang="zh"]').click(); await w(250);
+        document.querySelector('#langSeg [data-lang="en"]').click(); await w(700);
+        document.querySelector('#btnPaintTop, #btnPaint').click(); })()`);
+      await page.waitFor("!!document.querySelector('iframe')?.contentWindow?.__pfKlecks", { label: '画师版英文界面打开绘制', timeout: 30000 });
+      await sleep(600);
+      const painter = await page.evaluate(`(() => {
+        const WORD = /[\\u3040-\\u30ff\\u3400-\\u9fff]/;
+        const out = new Set(window.__pfI18nMiss);
+        const skip = (el) => !el || !!el.closest('textarea, pre, code, script, style, [translate="no"]');
+        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        while (w.nextNode()) { const t = w.currentNode.nodeValue.trim(); if (t && WORD.test(t) && !skip(w.currentNode.parentElement)) out.add(t); }
+        const doc = document.querySelector('iframe').contentDocument;
+        return { miss: [...out], title: document.title, klecks: doc.documentElement.lang, sample: (doc.body.innerText || '').replace(/\\s+/g, ' ').slice(0, 60) };
+      })()`);
+      check('画师版英文：标题、绘制页都翻了，Klecks 也是英文', painter.miss.length === 0 && /for artists/.test(painter.title) && painter.klecks === 'en',
+        painter.miss.length ? painter.miss.slice(0, 6).join(' / ') : `${painter.title} · Klecks「${painter.sample}」`);
+      await shot('i18n-coverage-painter-en');
       await page.evaluate("localStorage.removeItem('pf.lang.v1')");
     },
   },

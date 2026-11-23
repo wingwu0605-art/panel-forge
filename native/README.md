@@ -34,10 +34,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File native/scripts/install-sdk.p
 powershell -NoProfile -ExecutionPolicy Bypass -File native/scripts/build-android.ps1
 ```
 
+> **网页版每次更新后，App 要重新出一次包才会跟上**：APK 里装的是出包那一刻的网页快照，
+> 不会自己从线上更新。`sync-site.mjs` 现在每次都会先重新构建 `site/`，所以重跑上面这条命令就是最新的。
+
 脚本自己的做的事：
 
 - 找 JDK（Microsoft / Adoptium / Studio JBR）与 SDK，找不到给人话提示
-- `node scripts/sync-site.mjs` → `npx cap sync android`
+- `node scripts/sync-site.mjs`（先重新构建 `site/`，再拷进 `www/`）→ `npx cap sync android`
 - 写 `android/local.properties`（gradle 认这个，**不需要设 ANDROID_HOME**）
 - `gradlew assembleDebug`，失败时不需要你去猜路径问题
 

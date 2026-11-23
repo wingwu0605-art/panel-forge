@@ -1779,5 +1779,16 @@ export default {
 "这是静态版的一览页（服务器版有同样的页面，路径 /api/sheet）。点开任意一套即可在编辑器里使用。":"Ini halaman ikhtisar edisi statis (versi server punya halaman yang sama di /api/sheet). Klik templat mana pun untuk memakainya di editor.",
 "这是静态版的一览页（服务器版有同样的页面，路径":"Ini halaman ikhtisar edisi statis (versi server punya halaman yang sama di",
 "）。点开任意一套即可在编辑器里使用。":"). Klik templat mana pun untuk memakainya di editor.",
-"PanelForge 分镜坊":"PanelForge"
+"PanelForge 分镜坊":"PanelForge",
+"缺少图片数据":"Data gambar tidak ada",
+"图片数据解析失败：{0}":"Gagal membaca data gambar: {0}",
+"相册写入失败（拿不到 URI）":"Gagal menyimpan ke galeri (URI tidak didapat)",
+"相册写入失败（打不开输出流）":"Gagal menyimpan ke galeri (aliran keluaran tak bisa dibuka)",
+"建目录失败":"Gagal membuat folder",
+"保存失败：{0}":"Gagal menyimpan: {0}",
+"读不到分享的图片":"Gambar yang dibagikan tidak terbaca",
+"读分享图片失败：{0}":"Gagal membaca gambar yang dibagikan: {0}",
+"列出分享目标失败：{0}":"Gagal menampilkan daftar tujuan berbagi: {0}",
+"缺少 package 或 uri":"package atau uri tidak ada",
+"直跳失败（该 App 可能不接受图片分享）：{0}":"Pengiriman langsung gagal (aplikasi itu mungkin tidak menerima gambar): {0}"
 };

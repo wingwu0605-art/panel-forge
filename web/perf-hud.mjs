@@ -23,6 +23,7 @@ export function initPerfHud() {
   const el = document.createElement('div');
   el.className = 'perf-hud';
   el.id = 'perfHud';
+  el.setAttribute('translate', 'no');   // 开发用的性能面板（?perf=1），不进界面翻译
   el.textContent = 'perf…';
   document.body.appendChild(el);
 

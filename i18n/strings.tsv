@@ -1779,3 +1779,14 @@ embed.html 不是预期版本（缺 __pfKlecksReady）	embed.html isn’t the ex
 这是静态版的一览页（服务器版有同样的页面，路径	This is the static build’s overview (the server version has the same page at	Ini halaman ikhtisar edisi statis (versi server punya halaman yang sama di	これは静的版の一覧ページです（サーバー版にも同じページがあります：
 ）。点开任意一套即可在编辑器里使用。	). Click any template to use it in the editor.	). Klik templat mana pun untuk memakainya di editor.	）。どれかを押すとエディターで使えます。
 PanelForge 分镜坊	PanelForge	PanelForge	PanelForge
+缺少图片数据	No image data	Data gambar tidak ada	画像データがありません
+图片数据解析失败：{0}	Couldn’t decode the image data: {0}	Gagal membaca data gambar: {0}	画像データを解析できませんでした：{0}
+相册写入失败（拿不到 URI）	Couldn’t write to the photo library (no URI)	Gagal menyimpan ke galeri (URI tidak didapat)	写真への書き込みに失敗しました（URI を取得できません）
+相册写入失败（打不开输出流）	Couldn’t write to the photo library (can’t open the output stream)	Gagal menyimpan ke galeri (aliran keluaran tak bisa dibuka)	写真への書き込みに失敗しました（出力ストリームを開けません）
+建目录失败	Couldn’t create the folder	Gagal membuat folder	フォルダーを作成できませんでした
+保存失败：{0}	Save failed: {0}	Gagal menyimpan: {0}	保存に失敗しました：{0}
+读不到分享的图片	Can’t read the shared image	Gambar yang dibagikan tidak terbaca	共有された画像を読み込めません
+读分享图片失败：{0}	Couldn’t read the shared image: {0}	Gagal membaca gambar yang dibagikan: {0}	共有された画像の読み込みに失敗しました：{0}
+列出分享目标失败：{0}	Couldn’t list share targets: {0}	Gagal menampilkan daftar tujuan berbagi: {0}	共有先の一覧を取得できませんでした：{0}
+缺少 package 或 uri	Missing package or uri	package atau uri tidak ada	package か uri がありません
+直跳失败（该 App 可能不接受图片分享）：{0}	Direct handoff failed (that app may not accept shared images): {0}	Pengiriman langsung gagal (aplikasi itu mungkin tidak menerima gambar): {0}	直接の受け渡しに失敗しました（そのアプリは画像の共有を受け付けないかもしれません）：{0}

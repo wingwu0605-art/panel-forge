@@ -9,16 +9,17 @@ import { execFileSync } from 'node:child_process';
  *
  * WebView 里跑的就是这份构建产物 —— 和网页版完全同一套代码，
  * 只有 shell 检测（?shell=android / Capacitor.isNativePlatform）会让界面走性能档。
+ *
+ * **每次都重新构建 site/**：以前只在 site/ 不存在时才构建，本机留着旧的 site/ 就会把旧网页打进 APK
+ * （网页版更新了、App 里还是老样子）。构建只要几秒。
  */
 const here = path.dirname(fileURLToPath(import.meta.url));   // 路径含中文/空格时要 URL 解码
 const root = path.resolve(here, '..', '..');
 const site = path.join(root, 'site');
 const www = path.resolve(here, '..', 'www');
 
-if (!existsSync(site)) {
-  console.log('site/ 不存在，先构建：');
-  execFileSync(process.execPath, [path.join(root, 'scripts', 'build-static.mjs')], { stdio: 'inherit' });
-}
+console.log('重新构建 site/（保证 App 里是最新的网页）：');
+execFileSync(process.execPath, [path.join(root, 'scripts', 'build-static.mjs')], { stdio: 'inherit' });
 if (!existsSync(site)) throw new Error('构建没产出 site/，检查 scripts/build-static.mjs');
 
 await rm(www, { recursive: true, force: true });

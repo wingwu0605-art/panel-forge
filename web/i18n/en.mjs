@@ -1779,5 +1779,16 @@ export default {
 "这是静态版的一览页（服务器版有同样的页面，路径 /api/sheet）。点开任意一套即可在编辑器里使用。":"This is the static build’s overview (the server version has the same page at /api/sheet). Click any template to use it in the editor.",
 "这是静态版的一览页（服务器版有同样的页面，路径":"This is the static build’s overview (the server version has the same page at",
 "）。点开任意一套即可在编辑器里使用。":"). Click any template to use it in the editor.",
-"PanelForge 分镜坊":"PanelForge"
+"PanelForge 分镜坊":"PanelForge",
+"缺少图片数据":"No image data",
+"图片数据解析失败：{0}":"Couldn’t decode the image data: {0}",
+"相册写入失败（拿不到 URI）":"Couldn’t write to the photo library (no URI)",
+"相册写入失败（打不开输出流）":"Couldn’t write to the photo library (can’t open the output stream)",
+"建目录失败":"Couldn’t create the folder",
+"保存失败：{0}":"Save failed: {0}",
+"读不到分享的图片":"Can’t read the shared image",
+"读分享图片失败：{0}":"Couldn’t read the shared image: {0}",
+"列出分享目标失败：{0}":"Couldn’t list share targets: {0}",
+"缺少 package 或 uri":"Missing package or uri",
+"直跳失败（该 App 可能不接受图片分享）：{0}":"Direct handoff failed (that app may not accept shared images): {0}"
 };
