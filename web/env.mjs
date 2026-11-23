@@ -12,15 +12,16 @@ export const FRESH = params.get('fresh') === '1';
 export const STATIC = window.PF_STATIC === true;
 
 /**
- * 纯粹版：一点 AI 都没有 —— AI 的界面全部拿掉，代码层也锁死（发不出任何 AI 请求、不读不存 Key）。
- * 入口 `pure.html`（构建时注入 `window.PF_PURE`），本地预览 `?mode=pure`。
+ * 纯粹版：没有 AI 作画 —— 生图、提示词、候选图、角色参考图、风格跟随、真正全自动、批量出图
+ * 的界面全部拿掉，生图和写提示词的接口在代码层锁死。AI 分镜保留（AI 排戏 / 切原文 / 分镜自动 / 写台词），
+ * 面板管理里一个开关就能把它也关掉。入口 `pure.html`（构建时注入 `window.PF_PURE`），本地预览 `?mode=pure`。
  */
 export const PURE = window.PF_PURE === true || params.get('mode') === 'pure';
 
 /**
  * 画师版入口：`?mode=artist`，或构建时注入 `window.PF_PAINTER`（site/painter.html）。
  * 同一份源码产出三个网页：AI 版（index.html）、画师版（painter.html，AI 界面收起、可以再打开）、
- * 纯粹版（pure.html，没有 AI）。纯粹版的画布手感跟画师版一样（双击格子直接进画布等）。
+ * 纯粹版（pure.html，不含 AI 作画、保留 AI 分镜）。纯粹版的画布手感跟画师版一样（双击格子直接进画布等）。
  */
 export const ARTIST = PURE || window.PF_PAINTER === true || params.get('mode') === 'artist';
 

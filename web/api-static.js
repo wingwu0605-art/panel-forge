@@ -272,6 +272,7 @@ export function createStaticApi() {
           plot, plan, cfg,
           characterSheet: body.characterSheet ? String(body.characterSheet).slice(0, 600) : '',
           note: body.note ? String(body.note).slice(0, 400) : '',
+          textOnly: body.textOnly === true,   // 纯粹版：只切分镜，不写生图提示词
         });
         let applied = 0;
         for (const p of plan.panels) {

@@ -307,6 +307,10 @@ ok('分页不切在句子中间（每页都以句末标点或为空）', (() => 
   return out.length === 3 && out.slice(0, -1).every((t) => !t || /[。！？]$/.test(t));
 })());
 ok('story 模式不包含出图步骤', !buildAutoSteps({ mode: 'story', pages: 1 }).some((x) => x.cost === 'image'));
+ok('纯粹版的分镜自动：不排「写生图提示词」这一步', (() => {
+  const st = buildAutoSteps({ mode: 'story', pages: 3, prompts: false });
+  return !st.some((x) => /^prompt-/.test(x.key)) && st.filter((x) => x.cost === 'llm').length === 3;
+})());
 ok('full 模式包含出图步骤且排在最后', (() => {
   const st = buildAutoSteps({ mode: 'full', pages: 2 });
   return st[st.length - 1].cost === 'image' && st.some((x) => x.key === 'line-1');

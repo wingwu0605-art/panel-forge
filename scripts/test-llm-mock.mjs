@@ -167,6 +167,25 @@ try {
   check('提示词仍以形状开头词起头', sp.every((p) => p.promptEn.startsWith(p.shape.prefixEn)));
   check('保留规则版提示词原文（可对照/回滚）', sp.every((p) => p.promptEnRule && p.promptEnRule !== p.promptEn));
   check('台词按切分落到格子里', sp[0].dialogue === 'mock 切分台词' && sp[0].beat.startsWith('切分'));
+  // 5b. 纯粹版（没有 AI 作画）：textOnly 只切分镜，不让模型写生图提示词
+  const splitText = await fetch(PF + '/api/ai/split', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      plot: '第一幕：雨夜屋顶，他缓缓拔出刀。第二幕：敌人从背后偷袭。第三幕：他反手斩断刀锋。',
+      templateId: 'jp-triangle-impact', llm, textOnly: true,
+    }),
+  }).then((r) => r.json());
+  const sys = String(seenBody?.messages?.[0]?.content || '');
+  let briefT = {};
+  try { briefT = JSON.parse(seenBody?.messages?.[1]?.content || '{}'); } catch { /* ignore */ }
+  const st = splitText.plan?.panels || [];
+  check('textOnly：系统提示词里没有「写生图提示词」那条、输出格式里也没有 prompt',
+    !/文生图|"prompt"/.test(sys) && /"dialogue"/.test(sys));
+  check('textOnly：发给模型的格清单不带形状开头词 / 出图尺寸',
+    Array.isArray(briefT['格']) && briefT['格'].every((g) => !('shapePrefix' in g) && !('建议出图' in g)));
+  check('textOnly：分镜内容照样落到每一格', splitText.ok === true && st.length > 0 && st.every((p) => (p.content || '').includes('mock 切分内容')));
+  check('textOnly：不拿模型给的提示词覆盖（还是规则版）', st.every((p) => !String(p.promptEn || '').includes('mock split subject') && (!p.promptEnRule || p.promptEn === p.promptEnRule)));
+
   check('缺 templateId 时明确报错', (await fetch(PF + '/api/ai/split', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ plot: 'x', llm }),

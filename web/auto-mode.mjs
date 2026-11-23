@@ -4,6 +4,9 @@
  *   story  分镜全自动：粘贴全文 → 我们决定页数 / 切格 / 提示词
  *   full   真正全自动：再加上台词、气泡、以及批量出图
  *
+ * 纯粹版（没有 AI 作画）：只有 off / story，story 也不做「AI 写生图提示词」那一步；
+ * 「AI 分镜」开关关着时只能是 off。
+ *
  * 三条铁律（用户明确要求）：
  *   1. 花钱的动作必须先弹确认，勾选「我已知晓」才能继续；全部页还要二次确认
  *   2. 确认里必须写明「一旦开始就不会中途停」以及大概多少钱
@@ -17,6 +20,7 @@ import { openModal, sheet } from './dialogs.mjs';
 import { activeCharPayload } from './refs.mjs';
 import { estimateLayout, splitTextIntoPages, buildAutoSteps, imageQueueForPage, imageQueueAll, estimateCostHint } from './lib/auto.mjs';
 import { app } from './ctx.mjs';
+import { PURE } from './env.mjs';
 
 const AUTO_KEY = KEYS.auto;
 
@@ -84,7 +88,9 @@ export function autoEstimate() {
 
 /** 切换全自动模式：换左栏内容 + 显示悬浮按钮 */
 export function setAutoMode(mode, opts = {}) {
-  const m = ['off', 'story', 'full'].includes(mode) ? mode : 'off';
+  const modes = PURE ? ['off', 'story'] : ['off', 'story', 'full'];
+  let m = modes.includes(mode) ? mode : 'off';
+  if (PURE && document.body.dataset.ai === 'off') m = 'off';
   state.autoMode = m;
   const root = document.documentElement;
   if (m === 'off') delete root.dataset.auto; else root.dataset.auto = m;
@@ -105,7 +111,8 @@ export function setAutoMode(mode, opts = {}) {
   if (desc) {
     desc.textContent = m === 'full'
       ? '从分镜、提示词、出图到台词与气泡全由 AI 完成，全程前台可见、随时可停'
-      : '决定画几页、每页怎么切；你只改提示词和男女主形象';
+      : PURE ? '决定画几页、每页怎么切、每格画什么；画由你自己来'
+        : '决定画几页、每页怎么切；你只改提示词和男女主形象';
   }
   const stack = $('#fabStack');
   if (stack) stack.classList.toggle('hidden', m === 'off');
@@ -293,14 +300,16 @@ async function autoRun() {
     state.charSheet = (el?.value || sheet).trim();
   }
 
-  const steps = buildAutoSteps({ mode, pages: est.pages, panelsPerPage: est.panelsPerPage });
+  const steps = buildAutoSteps({ mode, pages: est.pages, panelsPerPage: est.panelsPerPage, prompts: !PURE });
   const imgCount = mode === 'full' ? est.panels : 0;
   const ok = await confirmDanger({
-    title: mode === 'full' ? '真正全自动：全部交给 AI' : '分镜全自动：只做分镜与提示词',
+    title: mode === 'full' ? '真正全自动：全部交给 AI' : PURE ? '分镜自动：整篇交给 AI 分镜' : '分镜全自动：只做分镜与提示词',
     body: '<ul class="danger-list">'
       + (mode === 'full'
         ? '<li><b>分 ' + est.pages + ' 页 · 约 ' + est.panels + ' 个分镜 · 约 ' + est.panels + ' 张图 · 约 ' + est.panels + ' 句台词</b>：台词/旁白/内心由 AI 决定，气泡也由它布置</li>'
-        : '<li><b>分 ' + est.pages + ' 页 · 约 ' + est.panels + ' 个分镜</b>：台词与出图不自动做（之后可用右下角悬浮按钮单独触发）</li>')
+        : PURE
+          ? '<li><b>分 ' + est.pages + ' 页 · 约 ' + est.panels + ' 个分镜</b>：只排分镜，不出图；台词之后可以在每一格里让 AI 写</li>'
+          : '<li><b>分 ' + est.pages + ' 页 · 约 ' + est.panels + ' 个分镜</b>：台词与出图不自动做（之后可用右下角悬浮按钮单独触发）</li>')
       + '<li>共 ' + steps.length + ' 个步骤，每一步都打进下面的日志，你能看见内容是怎么一步步出来的</li>'
       + '<li><b>可以随时点「停止」</b>（已发出的请求会跑完，之后的不再发）</li>'
       + (mode === 'full' ? '<li>提示词用 AI 优化过的版本，不是规则模板</li>' : '')
@@ -322,7 +331,9 @@ async function autoRun() {
   if (btnStart) btnStart.disabled = true;
   if (btnStop) btnStop.disabled = false;
   const t0 = Date.now();
-  autoLog('▶ 全自动开始（' + (mode === 'full' ? '真正全自动' : '分镜自动') + '）：' + est.pages + ' 页', 'start');
+  // 纯粹版只有分镜自动：日志里也别说「全自动」
+  autoLog(PURE ? '▶ 分镜自动开始：' + est.pages + ' 页'
+    : '▶ 全自动开始（' + (mode === 'full' ? '真正全自动' : '分镜自动') + '）：' + est.pages + ' 页', 'start');
 
   try {
     const pageTexts = splitTextIntoPages(text, est.pages);
@@ -372,12 +383,15 @@ async function autoRun() {
         } catch { /* ignore */ }
       }
 
-      autoLog('④ 第 ' + (i + 1) + ' 页：AI 优化逐格提示词…');
-      try {
-        await app.runAiPrompts({ silent: true });
-        autoLog('   · 提示词已用 AI 优化过', 'ok');
-      } catch (e) {
-        autoLog('   · 提示词优化失败（保留规则版）：' + String(e.message).slice(0, 160), 'bad');
+      // 纯粹版没有 AI 作画：不写生图提示词
+      if (!PURE) {
+        autoLog('④ 第 ' + (i + 1) + ' 页：AI 优化逐格提示词…');
+        try {
+          await app.runAiPrompts({ silent: true });
+          autoLog('   · 提示词已用 AI 优化过', 'ok');
+        } catch (e) {
+          autoLog('   · 提示词优化失败（保留规则版）：' + String(e.message).slice(0, 160), 'bad');
+        }
       }
 
       if (mode === 'full') {
@@ -396,12 +410,12 @@ async function autoRun() {
     }
   } catch (e) {
     autoLog('✗ 中断：' + e.message, 'bad');
-    toast('全自动中断：' + e.message);
+    toast((PURE ? '分镜自动中断：' : '全自动中断：') + e.message);
   } finally {
     if (btnStart) btnStart.disabled = false;
     if (btnStop) btnStop.disabled = true;
     const secs = Math.round((Date.now() - t0) / 1000);
-    autoLog(state.autoStop ? '■ 已停止 · 用时 ' + secs + 's' : '✓ 全自动结束 · 用时 ' + secs + 's', state.autoStop ? 'stop' : 'ok');
+    autoLog(state.autoStop ? '■ 已停止 · 用时 ' + secs + 's' : (PURE ? '✓ 分镜自动结束 · 用时 ' : '✓ 全自动结束 · 用时 ') + secs + 's', state.autoStop ? 'stop' : 'ok');
   }
 }
 

@@ -48,15 +48,20 @@ function withUiLang(a) {
   }
   return a;
 }
-/** 纯粹版：API 上所有 AI 的口子都封死 —— 就算有人在控制台里手动调，也发不出任何 AI 请求 */
-const AI_METHODS = ['aiDecide', 'prompts', 'aiSplit', 'aiLines', 'llmStatus', 'llmTest', 'imageGenerate'];
-function withoutAi(a) {
-  for (const k of AI_METHODS) a[k] = async () => { throw new Error('纯粹版没有 AI 功能'); };
+/**
+ * 纯粹版：没有 AI 作画 —— 生图和「AI 写生图提示词」两个口子封死（就算在控制台里手动调也发不出去）；
+ * AI 分镜照常（排戏 / 切原文 / 写台词 / 测试连接），切原文时也不让模型写生图提示词（省 token）。
+ */
+const DRAW_METHODS = ['prompts', 'imageGenerate'];
+function withoutDrawing(a) {
+  for (const k of DRAW_METHODS) a[k] = async () => { throw new Error('纯粹版不含 AI 作画'); };
+  const split = a.aiSplit;
+  if (typeof split === 'function') a.aiSplit = (body = {}) => split({ ...body, textOnly: true });
   return a;
 }
 async function makeApi() {
-  const raw = await makeApiRaw();
-  return PURE ? withoutAi(raw) : withUiLang(raw);
+  const a = withUiLang(await makeApiRaw());
+  return PURE ? withoutDrawing(a) : a;
 }
 async function makeApiRaw() {
   if (STATIC) {
@@ -102,6 +107,24 @@ async function makeApiRaw() {
 
 const CULTURE_LABEL = { jp: '日', cn: '中', kr: '韩', core: '通' };
 const CULTURE_ZH = { jp: '日式页漫', cn: '中式漫画', kr: '韩式条漫', core: '通用/跨界' };
+
+/**
+ * 纯粹版的几处措辞：同一个控件在纯粹版里只做 AI 分镜，说明别还在讲生图。
+ * （整段换掉的说明放在 HTML 的 data-pure-only 里；这里只改单个标题 / 属性）
+ */
+function pureCopy() {
+  const card = $('#autoCard');
+  if (card) {
+    card.dataset.panelName = '分镜自动';
+    const h = card.querySelector('.card-head h2');
+    if (h) h.textContent = '分镜自动';
+  }
+  $('#autoSeg')?.setAttribute('aria-label', '分镜自动');
+  const split = $('#btnAiSplit');
+  if (split) split.title = '版式已经定死：让 AI 把源文本切成每格（长剧本 / 小说也切得准）';
+  const cs = $('#charSheet')?.closest('label')?.querySelector('span');
+  if (cs) cs.textContent = '角色设定（可选，AI 写画面和台词时照着它）';
+}
 
 if (PURE) {
   document.documentElement.dataset.pure = '1';
@@ -154,12 +177,11 @@ async function init() {
   if (PERF) import('./perf-hud.mjs').then((m) => m.initPerfHud());
   bindUI();
   // 各功能模块自己绑自己的界面（以前全塞在 bindUI 里，一千多行）
-  // 纯粹版：角色参考图 / Key / 全自动都是给 AI 用的，不绑（?keys=1 也打不开 Key 面板）
-  if (!PURE) {
-    bindRefs();
-    bindKeys();
-    bindAutoUI();
-  }
+  // 纯粹版：角色参考图 / 风格跟随只给生图用，不绑；Key 和分镜自动是 AI 分镜要用的，照绑
+  if (!PURE) bindRefs();
+  bindKeys();
+  bindAutoUI();
+  if (PURE) pureCopy();
   bindInboxUI();
   bindSlotZoom();
   initPaint();
@@ -185,10 +207,8 @@ async function init() {
   }
   renderList();
 
-  if (!PURE) {
-    loadLlm();
-    syncLlmStatus();
-  }
+  loadLlm();
+  syncLlmStatus();
 
   const want = new URLSearchParams(location.hash.slice(1)).get('tpl') || params.get('tpl');
   const first = want || 'ref-4band-2col';
@@ -223,10 +243,8 @@ async function init() {
     state.pageIdx = 0;
   }
   renderPageTabs();
-  if (!PURE) {   // 纯粹版不读也不碰存着的 Key 和角色参考图
-    loadKeyStore();
-    await loadChars();
-  }
+  loadKeyStore();
+  if (!PURE) await loadChars();   // 角色参考图只给生图用，纯粹版不读
 
   // 再尝试恢复草稿：IndexedDB 不可用 / 被策略卡住时 loadDraft 1.5s 内返回 null，不会拖死启动
   // ?fresh=1 跳过恢复（自动化测试要干净的初始状态，否则上一个用例的草稿会换掉模板）
@@ -259,7 +277,8 @@ async function init() {
   if (params.get('keyselftest') === '1') await (await import('./selftest.mjs')).runKeySelfTest();
   if (params.get('aiselftest') === '1') await (await import('./selftest.mjs')).runAiSelfTest();
   if (params.get('shortcuts') === '1') toggleShortcuts(true);
-  if (params.get('keys') === '1') openKeySheet();
+  // AI 关着的时候 Key 面板是藏起来的：别把一个看不见的模态框打开（整页会点不动）
+  if (params.get('keys') === '1' && document.body.dataset.ai !== 'off') openKeySheet();
   if (params.get('tab')) activateTab(params.get('tab'));
   if (params.get('plot')) {
     $('#plot').value = params.get('plot');
@@ -1135,7 +1154,7 @@ function bindUI() {
     const lower = k.length === 1 ? k.toLowerCase() : k;
 
     // Ctrl+Shift+Enter：AI 导演（先判断带 Shift 的组合，否则会被下面的规则匹配吃掉）
-    if (mod && ev.shiftKey && k === 'Enter') { ev.preventDefault(); if (!PURE) runAiDecide(); return; }
+    if (mod && ev.shiftKey && k === 'Enter') { ev.preventDefault(); if (!(PURE && document.body.dataset.ai === 'off')) runAiDecide(); return; }
     // Ctrl+Enter：按规则匹配（输入框里也能用）
     if (mod && k === 'Enter') { ev.preventDefault(); runMatch(); return; }
 
@@ -1837,12 +1856,22 @@ function syncPromptMeta() {
  * 把原来「分镜表」里这一格的信息渲染进小框的「这一格的分镜」段。
  * 由 renderSlotPanel() 统一调用 —— 换格子、重新匹配、AI 排戏之后都会自动跟着变。
  */
+/**
+ * 这一格的构图提示。AI 切原文会把画面内容写进 beatHint（两处一模一样），那时就不再重复一遍。
+ */
+function compHint(p) {
+  if (!p) return '';
+  return (p.beatHint && p.beatHint !== p.content ? p.beatHint : '') || p.composition || '';
+}
+
 function renderSlotBoard(panel) {
   const box = document.querySelector('#slotBoard');
   const pr = document.querySelector('#slotBoardPrompts');
   if (!box) return;
+  // AI 关着（画师版默认、纯粹版关掉 AI 分镜）就别再叫人「让 AI 排戏」
+  const aiOff = document.body.dataset.ai === 'off';
   if (!panel) {
-    box.innerHTML = PURE ? '<b>状态</b><span>先在左边写剧情并点「按规则匹配」</span>'
+    box.innerHTML = aiOff ? '<b>状态</b><span>先在左边写剧情并点「按规则匹配」</span>'
       : '<b>状态</b><span>先在左边写剧情并点「按规则匹配」，或让 AI 导演排一次戏</span>';
     if (pr) pr.innerHTML = '';
     const sum = document.querySelector('#secBoardSum');
@@ -1853,9 +1882,9 @@ function renderSlotBoard(panel) {
   const rows = [
     ['景别', `${panel.roleZh || ''} ｜ ${panel.shot || ''}`],
     ['节拍', panel.beat || '通用镜头'],
-    ['画面', panel.content || (PURE ? '（未填，写一段剧情再按规则匹配）' : '（未填，写剧情或让 AI 排戏）')],
+    ['画面', panel.content || (aiOff ? '（未填，写一段剧情再按规则匹配）' : '（未填，写剧情或让 AI 排戏）')],
     ['台词', panel.dialogue ? '「' + panel.dialogue + '」' : '（无）'],
-    ['构图', panel.beatHint || panel.composition || '—'],
+    ['构图', compHint(panel) || '—'],
   ];
   box.innerHTML = rows.map(([k, v]) => `<b>${k}</b><span>${escapeHtml(String(v))}</span>`).join('');
 
@@ -2179,7 +2208,7 @@ function renderScript() {
       <div class="asp">${PURE ? `${p.aspectLabel} · 占页 ${p.areaPct}%` : `${p.aspectLabel} · 建议出图 ${p.genSize} · 占页 ${p.areaPct}%`}</div>
       ${p.content ? `<div class="ct">${escapeHtml(p.content)}</div>` : ''}
       ${p.dialogue ? `<div class="dl" translate="no">「${escapeHtml(p.dialogue)}」</div>` : ''}
-      ${PURE ? ((p.beatHint || p.composition) ? `<div class="hint">${escapeHtml(p.beatHint || p.composition)}</div>` : '') : `<div class="pr">${escapeHtml(effectivePrompt(p.id).prompt)}</div>
+      ${PURE ? (compHint(p) ? `<div class="hint">${escapeHtml(compHint(p))}</div>` : '') : `<div class="pr">${escapeHtml(effectivePrompt(p.id).prompt)}</div>
       ${p.promptZh ? `<div class="pr zh" translate="no">${escapeHtml(p.promptZh)}</div>` : ''}`}
       <div class="act">
         ${PURE ? '' : `<button class="btn tiny" data-act="copy">复制提示词</button>
@@ -2698,7 +2727,7 @@ async function runAiSplit() {
     renderSlotPanel();
     const miss = res.quality?.missing?.length || 0;
     $('#scriptHint').textContent = `${state.tpl.name} · 已切好 ${res.applied}/${res.total} 格`
-      + (miss ? ` · ${miss} 格模型没给（可用「AI 优化提示词」补）` : '')
+      + (miss ? (PURE ? ` · ${miss} 格模型没给（先用规则节拍顶上）` : ` · ${miss} 格模型没给（可用「AI 优化提示词」补）`) : '')
       + (res.globalNotes ? ` · ${res.globalNotes}` : '');
     toast(`AI 切原文完成：${res.applied}/${res.total} 格`);
   } catch (e) {
@@ -2781,7 +2810,7 @@ function scriptMarkdown() {
       '',
       `### ${p.order}. ${tr(p.roleZh)} · ${tr(p.shape?.zh || '常规格')} · ${tr(p.beat || '通用镜头')}`,
       p.content ? `- 画面：${p.content}` : `- 构图：${p.beatHint}`,
-      ...(PURE && p.content && p.beatHint ? [`- 构图：${p.beatHint}`] : []),
+      ...(PURE && p.content && compHint(p) ? [`- 构图：${compHint(p)}`] : []),
       `- 台词：${(state.lines[p.id] ?? p.dialogue) ? '「' + (state.lines[p.id] ?? p.dialogue) + '」' : '无'}`,
       ...(PURE ? [] : [
         `- 形状开头词：\`${p.shape?.prefixEn || ''}\``,
@@ -2916,7 +2945,7 @@ function adaptTopLinksForStatic() {
   const chip = $('#statApi');
   if (chip) {
     chip.textContent = '静态版';
-    chip.title = PURE ? '没有服务端：规则引擎在你的浏览器里跑' : '没有服务端：规则引擎在你的浏览器里跑，AI 直连你填的模型';
+    chip.title = '没有服务端：规则引擎在你的浏览器里跑，AI 直连你填的模型';
     chip.style.opacity = '.8';
   }
 }

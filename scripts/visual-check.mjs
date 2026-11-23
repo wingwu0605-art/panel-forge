@@ -17,6 +17,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync, readdirSync, statSync, mkdtempSync } from 'node:fs';
 import { createServer } from 'node:net';
+import http from 'node:http';
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -1012,107 +1013,233 @@ const scenarios = [
 
   {
     name: 'pure-mode',
-    title: '⑨b 纯粹版（pure.html / ?mode=pure）：看不到任何 AI、发不出 AI 请求，规则匹配和绘制照常',
+    title: '⑨b 纯粹版（pure.html / ?mode=pure）：没有 AI 作画；AI 分镜照常（假模型实跑），一个开关关掉就一点 AI 都不剩',
     async run(page, shot, { check }) {
       await page.viewport(1280, 900);
-      // ?keys=1：AI 版会弹 Key 面板；纯粹版必须不理它
-      await page.goto('/?perf=1&fresh=1&mode=pure&tpl=ref-4band-2col&slot=p1&keys=1');
-      await page.ready();
-      await sleep(500);
-      // 记下之后所有的网络请求
-      await page.evaluate(`(() => {
-        window.__pfReq = [];
-        const f = window.fetch;
-        window.fetch = (u, o) => { window.__pfReq.push(String(u && u.url || u)); return f(u, o); };
-        const open = XMLHttpRequest.prototype.open;
-        XMLHttpRequest.prototype.open = function (m, u) { window.__pfReq.push(String(u)); return open.apply(this, arguments); };
-      })()`);
-
-      const st = await page.evaluate(`(() => {
-        const vis = (sel) => [...document.querySelectorAll(sel)].some((el) => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
-        const AI = ['.auto-switch', '#autoCard', '#btnMatchAi', '.card.ai', '#styleFollow', '.card.chars', '.line-ai-row',
-          '[data-sec="ai"]', '#slotBoardPrompts', '#btnAiSplit', '#btnAiPrompts', '#fabStack', '#lnkDocs', '#lnkTools', '.ai-gen', '#candStrip'];
-        return {
-          mode: document.body.dataset.mode, pureRoot: document.documentElement.dataset.pure, title: document.title,
-          shown: AI.filter(vis), keySheetOpen: !!document.querySelector('#keySheet')?.open,
-          canvas: vis('#canvas svg'), match: vis('#btnMatch'), paint: vis('#btnPaintTop'),
+      // 本地假模型（带 CORS）：纯粹版线上是静态页，AI 分镜走浏览器直连 —— 用它把这条路实打实跑一遍
+      const seen = [];
+      const mock = http.createServer(async (req, res) => {
+        const cors = {
+          'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST, OPTIONS',
+          'access-control-allow-headers': req.headers['access-control-request-headers'] || 'content-type, authorization',
         };
-      })()`);
-      check('进入纯粹版（标题、模式）', st.mode === 'pure' && st.pureRoot === '1' && /纯粹版/.test(st.title), st.title);
-      check('AI 的入口一个都看不到', st.shown.length === 0, st.shown.length ? '还看得到：' + st.shown.join(' ') : '全部收掉');
-      check('?keys=1 也打不开 Key 面板', !st.keySheetOpen, st.keySheetOpen ? 'Key 面板开了' : '没开');
-      check('画布 / 按规则匹配 / 绘制都在', st.canvas && st.match && st.paint, JSON.stringify({ canvas: st.canvas, match: st.match, paint: st.paint }));
-
-      // 规则匹配照常（本机规则引擎，不走 AI）
-      await page.evaluate(`(() => {
-        const t = document.querySelector('#plot');
-        t.value = '雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋，两人在积水里僵持。';
-        t.dispatchEvent(new Event('input', { bubbles: true }));
-        document.querySelector('#btnMatch').click();
-      })()`);
-      await page.waitFor("document.querySelectorAll('#matchResults .result, #matchResults .tpl, #matchResults > *').length > 0", { label: '纯粹版规则匹配', timeout: 8000 });
-      await sleep(600);
-      // 打开分镜表、帮助，把会显示的文字都扫一遍：不能出现「AI」「提示词」
-      await page.evaluate(`(() => {
-        document.querySelector('#tabs [data-tab="script"]')?.click();
-        const help = document.querySelector('details.help'); if (help) help.open = true;
-      })()`);
-      await sleep(500);
-      const words = await page.evaluate(`(() => {
+        if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
+        let raw = '';
+        for await (const c of req) raw += c;
+        let body = {};
+        try { body = JSON.parse(raw || '{}'); } catch { /* ignore */ }
+        const sys = String(body.messages?.[0]?.content || '');
+        let brief = {};
+        try { brief = JSON.parse(body.messages?.[1]?.content || '{}'); } catch { /* ignore */ }
+        seen.push({ url: req.url, origin: req.headers.origin || '', sys, brief });
+        let out;
+        if (Array.isArray(brief['格'])) {   // AI 切原文
+          out = { globalNotes: 'mock 一致性', panels: brief['格'].map((g) => ({
+            slotId: g.slotId, beat: '切' + g.order, content: `第 ${g.order} 格：mock 切分画面`, dialogue: g.order === 1 ? 'mock 切分台词' : '',
+          })) };
+        } else if (Array.isArray(brief['候选模板'])) {   // AI 排戏
+          const pick = brief['候选模板'][0];
+          out = { pick: pick.id, confidence: 0.9, reason: 'mock：节奏贴剧情', alternatives: [], panels: (pick.slots || []).map((sl) => ({
+            slotId: sl.id, beat: sl.order === 1 ? '开场定调' : '推进', content: `第 ${sl.order} 格：mock 排戏画面`, dialogue: sl.order === 1 ? 'mock 台词' : '', say: '『先立住气氛』',
+          })) };
+        } else out = { lines: [] };
+        res.writeHead(200, { 'content-type': 'application/json', ...cors });
+        res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(out) } }], usage: { total_tokens: 300 } }));
+      });
+      await new Promise((r) => mock.listen(0, '127.0.0.1', r));
+      const port = mock.address().port;
+      const vis = `const vis = (sel) => [...document.querySelectorAll(sel)].some((el) => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');`;
+      const DRAW = ['#styleFollow', '.card.chars', '[data-sec="ai"]', '#slotBoardPrompts', '#btnAiPrompts', '#fabStack', '#lnkDocs', '#lnkTools',
+        '.ai-gen', '#candStrip', '#autoSeg [data-auto="full"]', '#autoHero'];
+      const STORY = ['.auto-switch', '#btnMatchAi', '.card.ai', '.line-ai-row'];
+      // 界面上能看到的字里不能有作画的词（AI 本身可以有：AI 分镜是保留的）
+      const scanWords = (banned, allow = '^$') => `(() => {
+        const BAN = ${banned}, OK = new RegExp(${JSON.stringify(allow)});
         const bad = [];
         const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
         while (w.nextNode()) {
           const n = w.currentNode, el = n.parentElement;
           if (!el || el.closest('script, style, #perfHud, #plot, textarea') || !el.getClientRects().length) continue;
           const t = n.nodeValue.trim();
-          // 「纯粹版不连接任何 AI 服务」是说明没有 AI 的那句，不算
-          if (t && /\\bAI\\b|提示词|生图/.test(t) && !/不连接任何 AI/.test(t)) bad.push(t.slice(0, 40));
+          if (t && BAN.test(t) && !OK.test(t)) bad.push(t.slice(0, 40));
         }
         for (const el of document.querySelectorAll('[title],[aria-label]')) {
           if (!el.getClientRects().length) continue;
-          for (const a of ['title', 'aria-label']) { const v = el.getAttribute(a) || ''; if (/\\bAI\\b|提示词|生图/.test(v)) bad.push(a + ':' + v.slice(0, 40)); }
+          for (const a of ['title', 'aria-label']) { const v = el.getAttribute(a) || ''; if (BAN.test(v) && !OK.test(v)) bad.push(a + ':' + v.slice(0, 40)); }
         }
         return [...new Set(bad)];
-      })()`);
-      check('界面上看不到「AI / 提示词 / 生图」这些字', words.length === 0, words.slice(0, 6).join(' / ') || '一处都没有');
-      await shot('pure-mode');
+      })()`;
+      try {
+        // 先清掉之前留下的纯粹版面板布局（别被上一轮关掉的 AI 开关影响）
+        await page.goto('/?fresh=1&mode=pure&tpl=ref-4band-2col');
+        await page.ready();
+        await page.evaluate(`(() => { const k = 'pf.layout.v2'; try { const all = JSON.parse(localStorage.getItem(k) || '{}'); delete all.pure2; localStorage.setItem(k, JSON.stringify(all)); localStorage.removeItem('pf.auto'); } catch {} })()`);
+        // ?keys=1：AI 分镜默认开着，Key 面板该打开（只剩对话模型那一半）
+        await page.goto('/?perf=1&fresh=1&mode=pure&tpl=ref-4band-2col&slot=p1&keys=1');
+        await page.ready();
+        await sleep(500);
+        await page.evaluate(`(() => {
+          window.__pfReq = [];
+          const f = window.fetch;
+          window.fetch = (u, o) => { window.__pfReq.push(String(u && u.url || u)); return f(u, o); };
+          const open = XMLHttpRequest.prototype.open;
+          XMLHttpRequest.prototype.open = function (m, u) { window.__pfReq.push(String(u)); return open.apply(this, arguments); };
+        })()`);
+        const st = await page.evaluate(`(() => { ${vis}
+          const DRAW = ${JSON.stringify(DRAW)}, STORY = ${JSON.stringify(STORY)};
+          const ks = { open: !!document.querySelector('#keySheet')?.open, chat: vis('#ksKey') && vis('#ksModel') && vis('#ksTest'),
+            img: ['#ksImgProvider', '#ksImgModel', '#ksTestImg', '.ks-more', '#ksImgReady'].filter(vis) };
+          document.querySelector('#btnKeySheetClose')?.click();
+          return { mode: document.body.dataset.mode, ai: document.body.dataset.ai, title: document.title, ks,
+            draw: DRAW.filter(vis), story: STORY.filter((x) => !vis(x)), canvas: vis('#canvas svg'), match: vis('#btnMatch'), paint: vis('#btnPaintTop') };
+        })()`);
+        check('进入纯粹版（标题、模式），AI 分镜默认开着', st.mode === 'pure' && st.ai === 'on' && /纯粹版/.test(st.title), `${st.title} · ai=${st.ai}`);
+        check('?keys=1 打开 Key 面板，只有对话模型（生图那几项一个都没有）', st.ks.open && st.ks.chat && st.ks.img.length === 0,
+          st.ks.img.length ? '还看得到：' + st.ks.img.join(' ') : `open=${st.ks.open} chat=${st.ks.chat}`);
+        check('作画的入口一个都看不到（生图 / 提示词 / 候选 / 参考图 / 风格跟随 / 真正全自动 / 批量出图）', st.draw.length === 0,
+          st.draw.length ? '还看得到：' + st.draw.join(' ') : '全部收掉');
+        check('AI 分镜的入口都在（让 AI 排戏 / AI 导演 / 自动切换 / AI 写台词）', st.story.length === 0, st.story.length ? '缺：' + st.story.join(' ') : '都在');
+        check('画布 / 按规则匹配 / 绘制都在', st.canvas && st.match && st.paint, JSON.stringify({ canvas: st.canvas, match: st.match, paint: st.paint }));
 
-      // 第二道锁：就算在控制台里直接调，AI 的接口也全部拒绝
-      const locked = await page.evaluate(`(async () => {
-        const api = window.__pfApi(); const out = {};
-        for (const k of ['aiDecide', 'prompts', 'aiSplit', 'aiLines', 'llmStatus', 'llmTest', 'imageGenerate']) {
-          try { await api[k]({}); out[k] = 'ok'; } catch (e) { out[k] = String(e.message || e); }
-        }
-        return out;
-      })()`);
-      check('AI 接口全部封死（调了直接拒绝）', Object.values(locked).every((v) => /纯粹版没有 AI 功能/.test(v)), JSON.stringify(locked));
+        // AI 排戏：浏览器直连假模型
+        await page.evaluate(`(() => {
+          const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+          set('llmBase', 'http://127.0.0.1:${port}/v1'); set('llmKey', 'sk-mock'); set('llmModel', 'mock-1');
+          const t = document.querySelector('#plot');
+          t.value = '雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋，两人在积水里僵持。';
+          t.dispatchEvent(new Event('input', { bubbles: true }));
+          document.querySelector('#btnMatchAi').click();
+        })()`);
+        await page.waitFor("!!document.querySelector('#aiResult .pick')", { label: '纯粹版 AI 排戏', timeout: 15000 });
+        await sleep(500);
+        const dec = await page.evaluate(`(() => {
+          const cards = [...document.querySelectorAll('#scriptList .sc-card')];
+          return { pick: document.querySelector('#aiResult .pick')?.textContent || '', n: cards.length,
+            ai: cards.filter((c) => /mock 排戏画面/.test(c.textContent)).length,
+            pr: document.querySelectorAll('#scriptList .pr').length,
+            copyPrompt: [...document.querySelectorAll('#scriptList button')].some((b) => /提示词/.test(b.textContent)) };
+        })()`);
+        check('AI 排戏跑通：模型挑了版式、逐格排戏写进分镜表', dec.n > 0 && dec.ai === dec.n, `${dec.pick} · ${dec.ai}/${dec.n} 格`);
+        check('分镜表里没有提示词（也没有「复制提示词」）', dec.pr === 0 && !dec.copyPrompt, `pr=${dec.pr}`);
 
-      // 右键菜单里没有「AI 生成这一格」；面板管理里没有 AI 的面板和开关
-      const menus = await page.evaluate(`(() => {
-        const b = document.querySelector('#canvas svg').getBoundingClientRect();
-        const x = b.left + b.width * 0.3, y = b.top + b.height * 0.2;   // 第 1 格里面
-        const spec = window.__pfContextMenu({ target: document.elementFromPoint(x, y), clientX: x, clientY: y, preventDefault() {} });
-        document.querySelector('#btnPanels').click();
-        const rows = [...document.querySelectorAll('#panelList .panel-name')].map((x) => x.textContent.trim());
-        const chk = document.querySelector('#chkAi')?.closest('label');
-        const chkShown = !!(chk && chk.getClientRects().length);
-        document.querySelector('#btnPanelClose')?.click();
-        return { items: (spec?.items || []).map((x) => x.label || x.text || '').filter(Boolean), rows, chkShown };
-      })()`);
-      check('右键菜单没有 AI 项', !menus.items.some((x) => /AI/.test(x)), menus.items.join(' / '));
-      check('面板管理里没有 AI 的面板、也没有「启用 AI」开关',
-        !menus.chkShown && !menus.rows.some((x) => /AI|角色参考图|风格跟随|全自动/.test(x)), menus.rows.join(' / '));
+        // AI 切原文：不让模型写生图提示词
+        const before = seen.length;
+        await page.evaluate("document.querySelector('#tabs [data-tab=\"script\"]')?.click()");
+        await sleep(300);
+        await page.evaluate("document.querySelector('#btnAiSplit').click()");
+        await page.waitFor("/已切好/.test(document.querySelector('#scriptHint').textContent)", { label: '纯粹版 AI 切原文', timeout: 15000 });
+        await sleep(400);
+        const sp = seen.slice(before).find((x) => Array.isArray(x.brief['格'])) || null;
+        const spUi = await page.evaluate(`(() => {
+          const cards = [...document.querySelectorAll('#scriptList .sc-card')];
+          return { n: cards.length, got: cards.filter((c) => /mock 切分画面/.test(c.textContent)).length,
+            dup: cards.filter((c) => { const h = c.querySelector('.hint'); return h && /mock 切分画面/.test(h.textContent); }).length };
+        })()`);
+        check('AI 切原文跑通，每格拿到模型切的内容', spUi.n > 0 && spUi.got === spUi.n, `${spUi.got}/${spUi.n}`);
+        check('切原文不让模型写生图提示词（系统提示里没有、格清单里也没有形状开头词）',
+          !!sp && !/文生图|"prompt"/.test(sp.sys) && sp.brief['格'].every((g) => !('shapePrefix' in g) && !('建议出图' in g)),
+          sp ? `格 ${sp.brief['格'].length} 个` : '没收到切分请求');
+        check('卡片里画面内容不会再当「构图」重复一遍', spUi.dup === 0, `${spUi.dup} 张重复`);
+        check('AI 请求是浏览器直连模型（线上静态页就是这条路）', seen.length >= 2 && seen.every((x) => /^http:\/\/127\.0\.0\.1:/.test(x.origin)), `${seen.length} 次`);
 
-      // 绘制照常
-      await page.evaluate("document.querySelector('#btnPaintTop').click()");
-      await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '纯粹版打开绘制', timeout: 30000 });
-      const info = await page.evaluate('window.__pfPaint.info()');
-      check('纯粹版里能画（Klecks 挂上）', info.engine === 'klecks' && info.sheetOpen, `engine=${info.engine}`);
-      await page.evaluate('window.__pfPaint.close()');
+        // 分镜自动：只有「关 / 分镜自动」，跑一整篇（不写生图提示词）
+        await page.evaluate("document.querySelector('#autoSeg [data-auto=\"story\"]').click()");
+        await sleep(300);
+        const auto = await page.evaluate(`(() => { ${vis}
+          document.querySelector('#autoText').value = '第一幕：雨夜屋顶，他缓缓拔出刀。第二幕：敌人从背后偷袭。第三幕：他反手斩断刀锋，两人在积水里僵持。';
+          return { h2: document.querySelector('#autoCard h2')?.textContent || '', card: vis('#autoCard'), hero: vis('#autoHero'),
+            desc: document.querySelector('#autoModeDesc')?.textContent || '' };
+        })()`);
+        check('分镜自动卡：叫「分镜自动」，没有男女主形象（那是给生图保持长相的）', auto.card && auto.h2 === '分镜自动' && !auto.hero, `${auto.h2} · ${auto.desc}`);
+        await page.evaluate("document.querySelector('#btnAutoStart').click()");
+        await page.waitFor("!!document.querySelector('#dangerSheet')?.open", { label: '分镜自动的确认框', timeout: 5000 });
+        const dlg = await page.evaluate(`({ title: document.querySelector('#dangerTitle').textContent, body: document.querySelector('#dangerBody').textContent })`);
+        check('确认框说的是「整篇交给 AI 分镜」，不提提示词', /整篇交给 AI 分镜/.test(dlg.title) && !/提示词|生图|候选/.test(dlg.body), dlg.title);
+        await page.evaluate(`(() => { const a = document.querySelector('#dangerAck'); a.checked = true; a.dispatchEvent(new Event('change')); document.querySelector('#dangerGo').click(); })()`);
+        await page.waitFor("[...document.querySelectorAll('#autoLog .al-row')].some((r) => /分镜自动结束|已停止|中断/.test(r.textContent))", { label: '分镜自动跑完', timeout: 30000 });
+        const log = await page.evaluate("[...document.querySelectorAll('#autoLog .al-row')].map((r) => r.textContent)");
+        check('分镜自动跑完：AI 切分完成，没有「AI 优化提示词」那一步', log.some((x) => /AI 切分完成/.test(x)) && !log.some((x) => /提示词|④/.test(x)) && log.some((x) => /分镜自动结束/.test(x)),
+          log.slice(-3).join(' / '));
+        await page.evaluate("document.querySelector('#autoSeg [data-auto=\"off\"]').click()");
+        await sleep(300);
 
-      const req = await page.evaluate('window.__pfReq');
-      const aiReq = req.filter((u) => /\/api\/(ai|llm)\b|openai|anthropic|volces|siliconflow|dashscope|stability|deepseek/i.test(u));
-      check('整个过程没有发出任何 AI 请求', aiReq.length === 0, aiReq.length ? aiReq.slice(0, 4).join(' / ') : `共 ${req.length} 个请求，没有 AI 的`);
+        // 帮助、分镜表都打开，扫一遍看得到的字
+        await page.evaluate(`(() => { const help = document.querySelector('details.help'); if (help) help.open = true; })()`);
+        await sleep(300);
+        const words = await page.evaluate(scanWords('/提示词|生图|出图|候选|角色参考图|风格跟随|全自动|形状开头词|AI 生成|生成.{0,4}图/'));
+        check('界面上看不到作画的字（提示词 / 生图 / 出图 / 候选 / 角色参考图 / 风格跟随 / 全自动）', words.length === 0, words.slice(0, 6).join(' / ') || '一处都没有');
+        await shot('pure-mode');
+
+        // 代码层的锁：生图和写提示词直接拒绝；AI 分镜的口子是通的
+        const locked = await page.evaluate(`(async () => {
+          const api = window.__pfApi(); const out = {};
+          for (const k of ['imageGenerate', 'prompts', 'aiDecide', 'aiSplit', 'aiLines']) {
+            try { const r = await api[k]({}); out[k] = 'ok:' + (r && (r.code || r.ok)); } catch (e) { out[k] = String(e.message || e); }
+          }
+          return out;
+        })()`);
+        check('生图 / 写提示词的接口封死（调了直接拒绝）', /纯粹版不含 AI 作画/.test(locked.imageGenerate) && /纯粹版不含 AI 作画/.test(locked.prompts), JSON.stringify(locked));
+        check('AI 分镜的接口没被封（排戏 / 切原文 / 写台词照常响应）', ['aiDecide', 'aiSplit', 'aiLines'].every((k) => !/纯粹版不含 AI 作画/.test(locked[k])),
+          ['aiDecide', 'aiSplit', 'aiLines'].map((k) => `${k}=${locked[k]}`).join(' '));
+
+        // 右键菜单没有「AI 生成这一格」；面板管理：AI 分镜开关在、没有作画的面板
+        const menus = await page.evaluate(`(() => { ${vis}
+          document.querySelector('#tabs [data-tab="slot"]')?.click();
+          const b = document.querySelector('#canvas svg').getBoundingClientRect();
+          const x = b.left + b.width * 0.3, y = b.top + b.height * 0.2;   // 第 1 格里面
+          const spec = window.__pfContextMenu({ target: document.elementFromPoint(x, y), clientX: x, clientY: y, preventDefault() {} });
+          document.querySelector('#btnPanels').click();
+          const rows = [...document.querySelectorAll('#panelList .panel-name')].map((el) => el.textContent.trim());
+          const chk = document.querySelector('#chkAi');
+          return { items: (spec?.items || []).map((it) => it.label || it.text || '').filter(Boolean), rows,
+            chkShown: vis('#chkAi'), chkOn: !!chk?.checked, label: chk?.closest('label')?.innerText.trim() || '' };
+        })()`);
+        check('右键菜单没有「AI 生成这一格」', !menus.items.some((x) => /生成|生图/.test(x)), menus.items.join(' / '));
+        check('面板管理：「AI 分镜」开关在且开着，没有作画的面板', menus.chkShown && menus.chkOn && /AI 分镜/.test(menus.label) && !/生图/.test(menus.label)
+          && menus.rows.includes('AI 导演') && !menus.rows.some((x) => /角色参考图|风格跟随|全自动/.test(x)), `${menus.label} · ${menus.rows.join(' / ')}`);
+
+        // 关掉 AI 分镜：一点 AI 都不剩，刷新后还记得
+        await page.evaluate(`(() => { const c = document.querySelector('#chkAi'); c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+        await sleep(300);
+        const off = await page.evaluate(`(() => { ${vis}
+          const rows = [...document.querySelectorAll('#panelList .panel-name')].map((el) => el.textContent.trim());
+          document.querySelector('#btnPanelClose')?.click();
+          return { ai: document.body.dataset.ai, rows, shown: ${JSON.stringify([...STORY, '#autoCard', '.ai-chip'])}.filter(vis) };
+        })()`);
+        check('关掉 AI 分镜：入口和面板都收起', off.ai === 'off' && off.shown.length === 0 && !off.rows.some((x) => /AI|分镜自动/.test(x)),
+          off.shown.length ? '还看得到：' + off.shown.join(' ') : off.rows.join(' / '));
+        // 刷新：还是关着；干净的一页上（没有刚才 AI 排过的戏）界面上一个「AI」都没有
+        await page.goto('/?perf=1&fresh=1&mode=pure&tpl=ref-4band-2col&slot=p1');
+        await page.ready();
+        await page.evaluate(`(() => { const help = document.querySelector('details.help'); if (help) help.open = true; })()`);
+        await sleep(300);
+        const off2 = await page.evaluate(`(() => { ${vis} return { ai: document.body.dataset.ai, seg: vis('.auto-switch'), card: vis('.card.ai') }; })()`);
+        const offWords = await page.evaluate(scanWords('/\\bAI\\b/', '不用 AI 作画'));
+        check('刷新后还是关着（记住了），界面上一个「AI」都没有', off2.ai === 'off' && !off2.seg && !off2.card && offWords.length === 0,
+          offWords.length ? offWords.slice(0, 4).join(' / ') : JSON.stringify(off2));
+        // 恢复默认（打开），别影响后面的用例
+        await page.evaluate(`(() => { const c = document.querySelector('#chkAi'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+
+        // 绘制照常
+        await page.evaluate(`(() => {
+          window.__pfReq = window.__pfReq || [];
+          const f = window.fetch;
+          window.fetch = (u, o) => { window.__pfReq.push(String(u && u.url || u)); return f(u, o); };
+        })()`);
+        await page.evaluate("document.querySelector('#btnPaintTop').click()");
+        await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '纯粹版打开绘制', timeout: 30000 });
+        const info = await page.evaluate('window.__pfPaint.info()');
+        check('纯粹版里能画（Klecks 挂上）', info.engine === 'klecks' && info.sheetOpen, `engine=${info.engine}`);
+        await page.evaluate('window.__pfPaint.close()');
+
+        const imgReq = seen.filter((x) => /image|generation/i.test(x.url)).map((x) => x.url);
+        const req = await page.evaluate('window.__pfReq || []');
+        const pageImg = req.filter((u) => /\/api\/ai\/(image|prompts)|images\/generations|seedream|stability/i.test(u));
+        check('整个过程没有发出任何生图 / 写提示词的请求', imgReq.length === 0 && pageImg.length === 0,
+          [...imgReq, ...pageImg].slice(0, 4).join(' / ') || `模型收到 ${seen.length} 次，都是分镜`);
+      } finally {
+        await new Promise((r) => mock.close(r));
+      }
     },
   },
 

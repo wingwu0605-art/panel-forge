@@ -19,7 +19,7 @@ import { openPaint, exportSlotImage } from './paint-ui.mjs';
 import { app } from './ctx.mjs';
 import { PURE } from './env.mjs';
 
-/** AI 现在能不能用：纯粹版永远不能；其他版本看「AI 总开关」 */
+/** 右键菜单里的「AI 生成这一格」（生图）能不能出现：纯粹版没有 AI 作画，永远不能；其他版本看「AI 总开关」 */
 const aiOn = () => !PURE && document.body.dataset.ai !== 'off';
 
 let inboxArea = 'slot';   // 'slot' | 'char' | 'sample'：粘贴时往哪儿放

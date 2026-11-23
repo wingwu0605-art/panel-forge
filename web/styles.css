@@ -1148,20 +1148,26 @@ body[data-ai="off"] #keySheet{display:none !important}
 .rail.left [data-panel][hidden]{display:none !important}
 
 /* ---------------------------------------------------------------- 纯粹版（pure.html / ?mode=pure） */
-/* 一点 AI 都不出现：HTML 里标了 data-ai-only 的块、每格的生图区和候选图、分镜表里的提示词。
+/* 没有 AI 作画：标了 data-no-pure 的块（生图 / 提示词 / 候选图 / 形状开头词 / 风格跟随 / 角色参考图 /
+   真正全自动 / 批量出图 / 开发者链接）在纯粹版里永远不出现。
+   AI 分镜（data-ai-only 里剩下的：AI 排戏 / AI 切原文 / 分镜自动 / AI 写台词 / Key）照常有，
+   跟着面板管理里的「AI 分镜」开关走：关掉就一点 AI 都不剩。
    只给纯粹版看的说明标 data-pure-only，其他版本里不出现。 */
-/* :root[data-pure] 由 <head> 里的启动脚本先打上（首帧就不会闪出 AI 的块），body[data-mode] 是 app.js 打的 */
+/* :root[data-pure] 由 <head> 里的启动脚本先打上（首帧就不会闪出作画的块），body[data-mode] 是 app.js 打的 */
 [data-pure-only]{display:none !important}
 :root[data-pure] [data-pure-only],
 body[data-mode="pure"] [data-pure-only]{display:revert !important}
-:root[data-pure] [data-ai-only],
+:root[data-pure] [data-no-pure],
 :root[data-pure] .ai-gen,
 :root[data-pure] #candStrip,
-:root[data-pure] .ai-chip,
-body[data-mode="pure"] [data-ai-only],
+body[data-mode="pure"] [data-no-pure],
 body[data-mode="pure"] .ai-gen,
 body[data-mode="pure"] #candStrip,
-body[data-mode="pure"] .ai-chip{display:none !important}
+body[data-mode="pure"][data-ai="off"] [data-ai-only],
+body[data-mode="pure"][data-ai="off"] .ai-chip{display:none !important}
+/* 纯粹版只有一种自动（分镜自动），卡片标题已经写了，卡里的模式名就不再重复两遍 */
+:root[data-pure] #autoModeName,
+:root[data-pure] #autoModeTitle{display:none}
 
 /* 面板管理列表 */
 .panel-list{display:flex;flex-direction:column;gap:6px;margin:10px 0}
@@ -2432,6 +2438,10 @@ dialog.sheet:not([open])::backdrop{opacity:0}
 .sheet-title{font-size:17px;letter-spacing:-.02em;white-space:nowrap}
 .sheet-sub{flex:1 1 auto;min-width:0;font-size:12px;color:var(--label-2)}
 .sheet-head > .btn{margin-left:auto}
+/* 危险确认的标题是动态的、常常很长（英文 / 印尼语更长）：说明换到第二行，别被挤成一字一行 */
+.danger-sheet .sheet-head{flex-wrap:wrap;row-gap:2px}
+.danger-sheet .sheet-title{white-space:normal;min-width:0;flex:1 1 0}
+.danger-sheet .sheet-sub{order:3;flex:1 1 100%}
 .sheet-body{padding:18px 20px 20px}
 .sheet-note{margin:6px 0 0}
 #keySheet .sheet-body{display:grid;grid-template-columns:1fr 1.05fr;gap:20px}

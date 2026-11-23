@@ -105,9 +105,9 @@ const entry = (flag, title) => {
 };
 /** 纯粹版的页面简介：不提生图提示词 */
 const pureMeta = (page) => page.replace(/<meta name="description" content="[^"]*">/,
-  '<meta name="description" content="138 套中·日·韩漫画分镜模板：镂空填充编辑器、剧情匹配、逐格手绘。纯粹版，不含任何 AI 功能。">');
+  '<meta name="description" content="138 套中·日·韩漫画分镜模板：镂空填充编辑器、规则 / AI 分镜、逐格手绘。纯粹版，不含 AI 作画。">');
 await writeFile(path.join(site, 'painter.html'), entry('window.PF_PAINTER = true;', 'PanelForge 画师版 · 分镜与绘制'), 'utf8');
-/* ---------------- 纯粹版：没有任何 AI（界面拿掉 + 代码层锁死，见 web/env.mjs 的 PURE） ---------------- */
+/* ---------------- 纯粹版：没有 AI 作画、保留 AI 分镜（界面拿掉 + 生图接口锁死，见 web/env.mjs 的 PURE） ---------------- */
 await writeFile(path.join(site, 'pure.html'),
   pureMeta(entry("window.PF_PURE = true; document.documentElement.dataset.pure = '1';", 'PanelForge 纯粹版 · 分镜与绘制')), 'utf8');
 await writeFile(path.join(site, '.nojekyll'), '', 'utf8');

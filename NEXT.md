@@ -12,18 +12,23 @@
 | --- | --- | --- |
 | AI 版 | `index.html` → `https://…/panel-forge/` | 原来的完整版（AI 导演 / 生图 / 候选图都在）|
 | 画师版 | `painter.html` → `https://…/panel-forge/painter.html` | 同一份源码，AI 界面默认收起，只留分镜 + 绘制（面板管理里还能开回 AI）|
-| 纯粹版 | `pure.html` → `https://…/panel-forge/pure.html` | 同一份源码，**删掉一切 AI**：界面没有、开关没有、接口在代码层锁死 |
+| 纯粹版 | `pure.html` → `https://…/panel-forge/pure.html` | 同一份源码，**没有 AI 作画、保留 AI 分镜**：作画的界面拿掉 + 生图接口锁死；AI 分镜默认开着，可一键关掉 |
 
 - 本地预览：画师版 `?mode=artist`，纯粹版 `?mode=pure`（`painter.html` / `pure.html` 只是构建时预先注入
   `window.PF_PAINTER` / `window.PF_PURE` 的同一页）。`PURE` 隐含 `ARTIST`，画师版有的改动纯粹版自动有。
-- 纯粹版怎么做到「没有 AI」（改代码时别破坏）：
-  - 标记：AI 专属元素加 `data-ai-only`，纯粹版专用的替代说明加 `data-pure-only`；CSS 认 `:root[data-pure]`
-    （启动脚本最先写，避免闪一下）和 `body[data-mode="pure"]`。**新加 AI 界面必须带 `data-ai-only`**，否则会漏进纯粹版。
-  - 代码：`app.js` 的 `withoutAi()` 把 `aiDecide / prompts / aiSplit / aiLines / llmStatus / llmTest / imageGenerate`
-    换成直接抛错；`bindRefs / bindKeys / bindAutoUI / loadLlm / loadKeyStore / loadChars` 在纯粹版不调用；
-    `panels.mjs` 的面板管理不列 AI 面板、没有 AI 总开关；右键菜单没有「AI 生成这一格」。
+- 纯粹版 = **没有 AI 作画、保留 AI 分镜**（K 的原话：不要任何 AI 作画的功能；保留让 AI 分镜的能力）。改代码时别破坏：
+  - 两个标记：`data-ai-only` = 任何 AI 功能（画师版 / 纯粹版的 AI 开关管它）；`data-no-pure` = **作画相关**
+    （生图 / 提示词 / 候选 / 形状开头词 / 风格跟随 / 角色参考图 / 真正全自动 / 批量出图 / Key 面板里生图那几项 / 开发者链接），
+    纯粹版里永远不出现。纯粹版专用的替代说明加 `data-pure-only`。CSS 认 `:root[data-pure]`（启动脚本最先写）和
+    `body[data-mode="pure"]`；纯粹版关掉 AI 分镜时 `body[data-ai="off"]` 把剩下的 `data-ai-only` 也收掉。
+    **新加作画界面必须带 `data-no-pure`**，新加 AI 分镜界面带 `data-ai-only`，否则会漏进 / 漏出纯粹版。
+  - 代码：`app.js` 的 `withoutDrawing()` 把 `prompts / imageGenerate` 换成直接抛错（`纯粹版不含 AI 作画`），
+    并给 `aiSplit` 带上 `textOnly: true`（`lib/llm-core.mjs` 的 `SYSTEM_SPLITTER_TEXT`：不让模型写生图提示词）；
+    纯粹版不调 `bindRefs / loadChars`（角色参考图只给生图用）；`auto-mode.mjs` 只有 off / story，story 跳过「AI 优化提示词」；
+    `panels.mjs` 纯粹版默认 AI 开、存在 `pure2` 下（第一版纯粹版存过 ai:false）；`keys.mjs` 不提生图；右键菜单没有「AI 生成这一格」。
   - 分镜表 / 导出 Markdown：纯粹版没有「建议出图」列和提示词，换成构图提示。
-  - 视觉测试 `pure-mode`（⑨b）逐条验：看不见 AI 界面、`?keys=1` 打不开 Key、7 个 AI 接口全部拒绝、没有 AI 网络请求。
+  - 视觉测试 `pure-mode`（⑨b）用一个带 CORS 的本地假模型实跑浏览器直连：AI 排戏 / AI 切原文 / 分镜自动都通、
+    切原文请求里没有生图提示词、作画入口和字都看不到、生图接口拒绝、关掉 AI 分镜后一个「AI」都不剩且刷新后记得。
 - `scripts/build-static.mjs` **一次产出三个入口**（`sheet.html?ed=pure|painter` 的返回链接也回对应版本），
   别手工改 HTML，改 `web/index.html` + 构建即可。
 - **许可**：仓库根的 `LICENSE` 是「源码可见、非商业」自订条款 —— 软件本身不可商用，

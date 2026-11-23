@@ -3,6 +3,7 @@
  *
  * Key 只存在本机浏览器（localStorage），勾「仅本次会话」就不落盘。
  * 对话和生图是两条独立链路：可以只配生图、也可以两家各用一把 Key。
+ * 纯粹版没有 AI 作画：面板里只有对话模型那一半（生图的几项标了 data-no-pure），提示也不提生图。
  */
 import { $, escapeHtml, debounce } from './util.mjs';
 import { state } from './state.mjs';
@@ -10,6 +11,7 @@ import { store, KEYS } from './storage.mjs';
 import { toast, setBusy, busyLabel } from './ui.mjs';
 import { openModal, closeModal, ask } from './dialogs.mjs';
 import { app } from './ctx.mjs';
+import { PURE } from './env.mjs';
 
 /* ================================================================== *
  * AI 导演
@@ -141,6 +143,7 @@ const KEY_PRESETS = {
     imgModel: 'doubao-seedream-5-0-pro-260628',
     imgHint: 'Model ID 从方舟「模型广场」复制（带日期后缀，如 doubao-seedream-5-0-pro-260628）；'
       + '生图不需要对话模型，想用 AI 排戏/切分再填一个对话模型的 ID',
+    chatHint: '对话模型填你在方舟控制台开通的模型 ID（或接入点 ep-xxxx）',
   },
   dashscope: {
     name: '通义百炼', protocol: 'openai',
@@ -336,7 +339,9 @@ export function bindKeys() {
     if (baseHint) {
       const hints = [];
       if (/\/api\/v\d/.test(p.baseUrl)) hints.push('这个服务商的版本段在 /api/v3，不是 /v1');
-      if (p.imgHint) hints.push(p.imgHint);
+      // 纯粹版没有生图：只给对话模型的提示
+      const extra = PURE ? p.chatHint : p.imgHint;
+      if (extra) hints.push(extra);
       if (p.name === '自定义') hints.push('Base URL 填到 OpenAI 兼容的版本段为止（如 https://host/v1），模型填真实 model id');
       baseHint.textContent = hints.join('；');
       baseHint.classList.toggle('hidden', !hints.length);
@@ -381,7 +386,7 @@ export function bindKeys() {
       } else {
         const where = r?.endpoint ? ` · POST ${String(r.endpoint).replace(/^https?:\/\//, '')} · model=${r.model || '?'}` : '';
         // 明确说这是「对话」失败 —— 生图是另一条链路，用另一把 Key，不受影响
-        $('#ksMsg').textContent = '❌ 对话模型失败（不影响生图）：' + (r?.error || '失败') + where + (r?.hint ? ' · ' + r.hint : '');
+        $('#ksMsg').textContent = (PURE ? '❌ 对话模型失败：' : '❌ 对话模型失败（不影响生图）：') + (r?.error || '失败') + where + (r?.hint ? ' · ' + r.hint : '');
         state._lastTestOk = false;
       }
     } catch (e) {
@@ -436,9 +441,9 @@ export function bindKeys() {
     const e = formEntry();
     // 允许「只有生图配置」：文本用不上 AI 的人不该被对话 Key 拦住
     const hasChat = e.apiKey && e.baseUrl;
-    const hasImg = e.imgKey && (e.imgBaseUrl || e.baseUrl) && e.imgModel;
+    const hasImg = !PURE && e.imgKey && (e.imgBaseUrl || e.baseUrl) && e.imgModel;
     if (!hasChat && !hasImg) {
-      $('#ksMsg').textContent = '至少配一条：对话（Base URL + API Key）或生图（生图模型 + Key）';
+      $('#ksMsg').textContent = PURE ? '先填 Base URL 和 API Key' : '至少配一条：对话（Base URL + API Key）或生图（生图模型 + Key）';
       return;
     }
     if (state._lastTestOk || state._lastImgTestOk) e.verifiedAt = Date.now();

@@ -7,6 +7,7 @@ import { ARTIST, PURE } from './env.mjs';
 import { store, KEYS } from './storage.mjs';
 import { toast } from './ui.mjs';
 import { openModal, closeModal } from './dialogs.mjs';
+import { setAutoMode } from './auto-mode.mjs';
 
 /* ================================================================== *
  * 面板管理：左栏每一块可显示 / 隐藏 / 调顺序；AI 功能一个总开关
@@ -14,17 +15,22 @@ import { openModal, closeModal } from './dialogs.mjs';
  * ================================================================== */
 const LAYOUT_KEY = KEYS.layout;
 
-/** 画师版默认：AI 面板收起；AI 版默认：全部显示；纯粹版：根本没有 AI 的面板 */
+/**
+ * 画师版默认：AI 面板收起；AI 版默认：全部显示；
+ * 纯粹版：没有作画的面板（风格跟随 / 角色参考图），AI 分镜默认开着（AI 导演卡在剧情下面）
+ */
 const layoutDefaults = () => (PURE
-  ? { order: ['plot', 'browse', 'help'], hidden: [], ai: false }
+  ? { order: ['plot', 'ai', 'browse', 'help'], hidden: [], ai: true }
   : ARTIST
     ? { order: ['plot', 'browse', 'chars', 'help', 'ai'], hidden: ['ai'], ai: false }
     : { order: ['plot', 'ai', 'chars', 'browse', 'help'], hidden: [], ai: true });
-const MODE_KEY = PURE ? 'pure' : ARTIST ? 'artist' : 'main';
+// 纯粹版用 pure2：最早一版纯粹版把 ai 存成了 false（那时它没有 AI），别让老记录把 AI 分镜藏起来
+const MODE_KEY = PURE ? 'pure2' : ARTIST ? 'artist' : 'main';
 
-/** 面板管理里列出来的面板（纯粹版不列 AI 专属的那几块） */
+/** 面板管理里列出来的面板：纯粹版不列作画的那几块；它的 AI 分镜关着时也不列 AI 的块 */
 const managed = () => [...document.querySelectorAll('.rail.left [data-panel]')]
-  .filter((el) => !(PURE && el.hasAttribute('data-ai-only')));
+  .filter((el) => !(PURE && (el.hasAttribute('data-no-pure')
+    || (document.body.dataset.ai === 'off' && el.hasAttribute('data-ai-only')))));
 
 /** 左栏面板在 HTML 里的真实顺序（新增卡片的落位依据） */
 function orderFromDom() {
@@ -64,7 +70,7 @@ function currentLayout() {
     // DOM 是"默认顺序"的真相：新卡片按 HTML 位置落位，老用户的自定义顺序照旧
     order: mergeOrder(stored, dom.length ? dom : stored),
     hidden: Array.isArray(v.hidden) ? v.hidden : d.hidden,
-    ai: PURE ? false : (typeof v.ai === 'boolean' ? v.ai : d.ai),
+    ai: typeof v.ai === 'boolean' ? v.ai : d.ai,
   };
 }
 
@@ -88,7 +94,8 @@ export function applyLayout(cfg = currentLayout()) {
     el.classList.toggle('panel-off', hide);
   }
   // AI 总开关：控制每格的生图区 / 候选图 / AI 优化 / Key 面板（AI 导演卡由上一条 hidden 控制）
-  document.body.dataset.ai = cfg.ai && !PURE ? 'on' : 'off';
+  // 纯粹版：这个开关管的是 AI 分镜，关掉就一点 AI 都不剩（styles.css 的 body[data-mode="pure"][data-ai="off"]）
+  document.body.dataset.ai = cfg.ai ? 'on' : 'off';
   const chk = $('#chkAi');
   if (chk) chk.checked = cfg.ai;
 }
@@ -123,8 +130,12 @@ export function bindPanelSheet() {
     cfg.ai = !!ev.target.checked;
     saveLayout(cfg);
     applyLayout(cfg);
+    // 纯粹版关掉 AI 分镜：分镜自动的卡片也跟着收，换回「剧情 → 分镜」
+    if (PURE && !cfg.ai) setAutoMode('off');
     renderPanelSheet();
-    toast(cfg.ai ? '已启用 AI 功能' : 'AI 功能已收起（随时可以再打开）');
+    toast(PURE
+      ? (cfg.ai ? '已启用 AI 分镜' : 'AI 分镜已收起（随时可以再打开）')
+      : (cfg.ai ? '已启用 AI 功能' : 'AI 功能已收起（随时可以再打开）'));
   });
   $('#panelList')?.addEventListener('click', (ev) => {
     const btn = ev.target.closest('button[data-act]');
