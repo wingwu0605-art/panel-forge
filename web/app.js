@@ -6,7 +6,7 @@ import { renderTemplateSVG, highlightMarkup, imageAttrs } from './lib/svg.mjs';
 import { pointInPoly } from './lib/geometry.mjs';
 import { BUBBLES, recommendBubbles, makeBubble, bubbleThumb, pickBubbleForText } from './lib/bubbles.mjs';
 import { $, $$, PERF, perfNow, perfDone, withTimeout, clamp, escapeHtml, debounce } from './util.mjs';
-import { params, DBG, FRESH, STATIC, ARTIST, SHELL, REPO_URL } from './env.mjs';
+import { params, DBG, FRESH, STATIC, ARTIST, PURE, SHELL, REPO_URL } from './env.mjs';
 import { store, KEYS } from './storage.mjs';
 import { app } from './ctx.mjs';
 import { fx, settled, staggerIn, setFold } from './motion.mjs';
@@ -48,8 +48,15 @@ function withUiLang(a) {
   }
   return a;
 }
+/** 纯粹版：API 上所有 AI 的口子都封死 —— 就算有人在控制台里手动调，也发不出任何 AI 请求 */
+const AI_METHODS = ['aiDecide', 'prompts', 'aiSplit', 'aiLines', 'llmStatus', 'llmTest', 'imageGenerate'];
+function withoutAi(a) {
+  for (const k of AI_METHODS) a[k] = async () => { throw new Error('纯粹版没有 AI 功能'); };
+  return a;
+}
 async function makeApi() {
-  return withUiLang(await makeApiRaw());
+  const raw = await makeApiRaw();
+  return PURE ? withoutAi(raw) : withUiLang(raw);
 }
 async function makeApiRaw() {
   if (STATIC) {
@@ -96,7 +103,11 @@ async function makeApiRaw() {
 const CULTURE_LABEL = { jp: '日', cn: '中', kr: '韩', core: '通' };
 const CULTURE_ZH = { jp: '日式页漫', cn: '中式漫画', kr: '韩式条漫', core: '通用/跨界' };
 
-if (ARTIST) {
+if (PURE) {
+  document.documentElement.dataset.pure = '1';
+  document.body.dataset.mode = 'pure';
+  document.title = 'PanelForge 纯粹版 · 分镜与绘制';
+} else if (ARTIST) {
   document.body.dataset.mode = 'artist';
   document.title = 'PanelForge 画师版 · 分镜与绘制';
 }
@@ -143,9 +154,12 @@ async function init() {
   if (PERF) import('./perf-hud.mjs').then((m) => m.initPerfHud());
   bindUI();
   // 各功能模块自己绑自己的界面（以前全塞在 bindUI 里，一千多行）
-  bindRefs();
-  bindKeys();
-  bindAutoUI();
+  // 纯粹版：角色参考图 / Key / 全自动都是给 AI 用的，不绑（?keys=1 也打不开 Key 面板）
+  if (!PURE) {
+    bindRefs();
+    bindKeys();
+    bindAutoUI();
+  }
   bindInboxUI();
   bindSlotZoom();
   initPaint();
@@ -171,8 +185,10 @@ async function init() {
   }
   renderList();
 
-  loadLlm();
-  syncLlmStatus();
+  if (!PURE) {
+    loadLlm();
+    syncLlmStatus();
+  }
 
   const want = new URLSearchParams(location.hash.slice(1)).get('tpl') || params.get('tpl');
   const first = want || 'ref-4band-2col';
@@ -207,8 +223,10 @@ async function init() {
     state.pageIdx = 0;
   }
   renderPageTabs();
-  loadKeyStore();
-  await loadChars();
+  if (!PURE) {   // 纯粹版不读也不碰存着的 Key 和角色参考图
+    loadKeyStore();
+    await loadChars();
+  }
 
   // 再尝试恢复草稿：IndexedDB 不可用 / 被策略卡住时 loadDraft 1.5s 内返回 null，不会拖死启动
   // ?fresh=1 跳过恢复（自动化测试要干净的初始状态，否则上一个用例的草稿会换掉模板）
@@ -1117,7 +1135,7 @@ function bindUI() {
     const lower = k.length === 1 ? k.toLowerCase() : k;
 
     // Ctrl+Shift+Enter：AI 导演（先判断带 Shift 的组合，否则会被下面的规则匹配吃掉）
-    if (mod && ev.shiftKey && k === 'Enter') { ev.preventDefault(); runAiDecide(); return; }
+    if (mod && ev.shiftKey && k === 'Enter') { ev.preventDefault(); if (!PURE) runAiDecide(); return; }
     // Ctrl+Enter：按规则匹配（输入框里也能用）
     if (mod && k === 'Enter') { ev.preventDefault(); runMatch(); return; }
 
@@ -1824,7 +1842,8 @@ function renderSlotBoard(panel) {
   const pr = document.querySelector('#slotBoardPrompts');
   if (!box) return;
   if (!panel) {
-    box.innerHTML = '<b>状态</b><span>先在左边写剧情并点「按规则匹配」，或让 AI 导演排一次戏</span>';
+    box.innerHTML = PURE ? '<b>状态</b><span>先在左边写剧情并点「按规则匹配」</span>'
+      : '<b>状态</b><span>先在左边写剧情并点「按规则匹配」，或让 AI 导演排一次戏</span>';
     if (pr) pr.innerHTML = '';
     const sum = document.querySelector('#secBoardSum');
     if (sum) sum.textContent = '待生成';
@@ -1834,13 +1853,13 @@ function renderSlotBoard(panel) {
   const rows = [
     ['景别', `${panel.roleZh || ''} ｜ ${panel.shot || ''}`],
     ['节拍', panel.beat || '通用镜头'],
-    ['画面', panel.content || '（未填，写剧情或让 AI 排戏）'],
+    ['画面', panel.content || (PURE ? '（未填，写一段剧情再按规则匹配）' : '（未填，写剧情或让 AI 排戏）')],
     ['台词', panel.dialogue ? '「' + panel.dialogue + '」' : '（无）'],
     ['构图', panel.beatHint || panel.composition || '—'],
   ];
   box.innerHTML = rows.map(([k, v]) => `<b>${k}</b><span>${escapeHtml(String(v))}</span>`).join('');
 
-  if (pr) {
+  if (pr && !PURE) {   // 纯粹版：不放提示词
     pr.innerHTML = `
       <div class="bp-row"><span class="bp-label">英文提示词</span><button class="btn tiny" id="btnBoardCopyEn">复制</button></div>
       <pre class="bp-pre">${escapeHtml(panel.promptEn || '—')}</pre>
@@ -1891,7 +1910,7 @@ function renderSlotPanel() {
     ['画幅比', panel ? panel.aspectLabel : (slot.w / slot.h).toFixed(2)],
     ['整页占比', (slot.area || 0).toFixed(1) + '%'],
     ['导出像素', `${px.w} × ${px.h}`],
-    ['建议出图', panel ? panel.genSize : '—'],
+    ...(PURE ? [] : [['建议出图', panel ? panel.genSize : '—']]),
   ].map(([k, v]) => `<b>${k}</b><span>${escapeHtml(String(v))}</span>`).join('');
 
   {
@@ -2157,16 +2176,16 @@ function renderScript() {
         ${p.aiOptimized ? '<span class="shape-chip ai-chip">AI</span>' : ''}
         <span class="bt">${escapeHtml(p.beat || '通用镜头')}</span>
       </div>
-      <div class="asp">${p.aspectLabel} · 建议出图 ${p.genSize} · 占页 ${p.areaPct}%</div>
+      <div class="asp">${PURE ? `${p.aspectLabel} · 占页 ${p.areaPct}%` : `${p.aspectLabel} · 建议出图 ${p.genSize} · 占页 ${p.areaPct}%`}</div>
       ${p.content ? `<div class="ct">${escapeHtml(p.content)}</div>` : ''}
       ${p.dialogue ? `<div class="dl" translate="no">「${escapeHtml(p.dialogue)}」</div>` : ''}
-      <div class="pr">${escapeHtml(effectivePrompt(p.id).prompt)}</div>
-      ${p.promptZh ? `<div class="pr zh" translate="no">${escapeHtml(p.promptZh)}</div>` : ''}
+      ${PURE ? ((p.beatHint || p.composition) ? `<div class="hint">${escapeHtml(p.beatHint || p.composition)}</div>` : '') : `<div class="pr">${escapeHtml(effectivePrompt(p.id).prompt)}</div>
+      ${p.promptZh ? `<div class="pr zh" translate="no">${escapeHtml(p.promptZh)}</div>` : ''}`}
       <div class="act">
-        <button class="btn tiny" data-act="copy">复制提示词</button>
+        ${PURE ? '' : `<button class="btn tiny" data-act="copy">复制提示词</button>
         <button class="btn tiny" data-act="prefix">复制形状词</button>
         <button class="btn tiny" data-act="prefixZh">复制中文形状词</button>
-        <button class="btn tiny" data-act="promptZh">复制中文提示词</button>
+        <button class="btn tiny" data-act="promptZh">复制中文提示词</button>`}
         <button class="btn tiny" data-act="fill">填入选中格</button>
       </div>
     </div>`).join('');
@@ -2752,20 +2771,24 @@ function scriptMarkdown() {
     `- 阅读顺序：${page.readingOrder}`,
     `- 格数：${page.panels.length}`,
     '',
-    '| 格 | 景别 | 形状 | 叙事节拍 | 画幅 | 建议出图 |',
-    '| --- | --- | --- | --- | --- | --- |',
-    ...page.panels.map((p) => `| ${p.order} | ${tr(p.roleZh)} | ${tr(p.shape?.zh || '常规格')} | ${tr(p.beat || '通用镜头')} | ${p.aspectLabel} | ${p.genSize} |`),
+    // 纯粹版：不要「建议出图」那一列和下面的提示词（那些是给生图模型用的）
+    PURE ? '| 格 | 景别 | 形状 | 叙事节拍 | 画幅 |' : '| 格 | 景别 | 形状 | 叙事节拍 | 画幅 | 建议出图 |',
+    PURE ? '| --- | --- | --- | --- | --- |' : '| --- | --- | --- | --- | --- | --- |',
+    ...page.panels.map((p) => `| ${p.order} | ${tr(p.roleZh)} | ${tr(p.shape?.zh || '常规格')} | ${tr(p.beat || '通用镜头')} | ${p.aspectLabel} |${PURE ? '' : ` ${p.genSize} |`}`),
     '',
     '## 逐格分镜',
     ...page.panels.map((p) => [
       '',
       `### ${p.order}. ${tr(p.roleZh)} · ${tr(p.shape?.zh || '常规格')} · ${tr(p.beat || '通用镜头')}`,
       p.content ? `- 画面：${p.content}` : `- 构图：${p.beatHint}`,
+      ...(PURE && p.content && p.beatHint ? [`- 构图：${p.beatHint}`] : []),
       `- 台词：${(state.lines[p.id] ?? p.dialogue) ? '「' + (state.lines[p.id] ?? p.dialogue) + '」' : '无'}`,
-      `- 形状开头词：\`${p.shape?.prefixEn || ''}\``,
-      `- 提示词：\`${effectivePrompt(p.id).prompt}\``,
-      `- 精简版：\`${p.promptShort || ''}\``,
-      `- 负面词：\`${p.negative}\``,
+      ...(PURE ? [] : [
+        `- 形状开头词：\`${p.shape?.prefixEn || ''}\``,
+        `- 提示词：\`${effectivePrompt(p.id).prompt}\``,
+        `- 精简版：\`${p.promptShort || ''}\``,
+        `- 负面词：\`${p.negative}\``,
+      ]),
     ].join('\n')),
     '',
     state.bubbles.length ? `## 气泡（${state.bubbles.length} 个）` : '',
@@ -2888,10 +2911,12 @@ function adaptTopLinksForStatic() {
   if (docs) docs.href = `${REPO}/blob/main/docs/API.md`;
   const tools = $('#lnkTools');
   if (tools) { tools.href = `${REPO}/blob/main/docs/AI-INTEGRATION.md`; tools.textContent = 'AI 接入说明'; }
+  // 一览页点进来、点「回到编辑器」都要回到当前这个版本（纯粹版的人不该被带回 AI 版）
+  if (sheet && (PURE || ARTIST)) sheet.href = './sheet.html?ed=' + (PURE ? 'pure' : 'painter');
   const chip = $('#statApi');
   if (chip) {
     chip.textContent = '静态版';
-    chip.title = '没有服务端：规则引擎在你的浏览器里跑，AI 直连你填的模型';
+    chip.title = PURE ? '没有服务端：规则引擎在你的浏览器里跑' : '没有服务端：规则引擎在你的浏览器里跑，AI 直连你填的模型';
     chip.style.opacity = '.8';
   }
 }

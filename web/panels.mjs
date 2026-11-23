@@ -3,7 +3,7 @@
  * 布局按「模式」分开记：画师版和 AI 版各有一套，互不影响。
  */
 import { $, escapeHtml } from './util.mjs';
-import { ARTIST } from './env.mjs';
+import { ARTIST, PURE } from './env.mjs';
 import { store, KEYS } from './storage.mjs';
 import { toast } from './ui.mjs';
 import { openModal, closeModal } from './dialogs.mjs';
@@ -14,10 +14,17 @@ import { openModal, closeModal } from './dialogs.mjs';
  * ================================================================== */
 const LAYOUT_KEY = KEYS.layout;
 
-/** 画师版默认：AI 面板收起；AI 版默认：全部显示 */
-const layoutDefaults = () => (ARTIST
-  ? { order: ['plot', 'browse', 'chars', 'help', 'ai'], hidden: ['ai'], ai: false }
-  : { order: ['plot', 'ai', 'chars', 'browse', 'help'], hidden: [], ai: true });
+/** 画师版默认：AI 面板收起；AI 版默认：全部显示；纯粹版：根本没有 AI 的面板 */
+const layoutDefaults = () => (PURE
+  ? { order: ['plot', 'browse', 'help'], hidden: [], ai: false }
+  : ARTIST
+    ? { order: ['plot', 'browse', 'chars', 'help', 'ai'], hidden: ['ai'], ai: false }
+    : { order: ['plot', 'ai', 'chars', 'browse', 'help'], hidden: [], ai: true });
+const MODE_KEY = PURE ? 'pure' : ARTIST ? 'artist' : 'main';
+
+/** 面板管理里列出来的面板（纯粹版不列 AI 专属的那几块） */
+const managed = () => [...document.querySelectorAll('.rail.left [data-panel]')]
+  .filter((el) => !(PURE && el.hasAttribute('data-ai-only')));
 
 /** 左栏面板在 HTML 里的真实顺序（新增卡片的落位依据） */
 function orderFromDom() {
@@ -48,7 +55,7 @@ function readLayouts() {
 
 function currentLayout() {
   const all = readLayouts();
-  const key = ARTIST ? 'artist' : 'main';
+  const key = MODE_KEY;
   const d = layoutDefaults();
   const v = all[key] || {};
   const dom = orderFromDom();
@@ -57,13 +64,13 @@ function currentLayout() {
     // DOM 是"默认顺序"的真相：新卡片按 HTML 位置落位，老用户的自定义顺序照旧
     order: mergeOrder(stored, dom.length ? dom : stored),
     hidden: Array.isArray(v.hidden) ? v.hidden : d.hidden,
-    ai: typeof v.ai === 'boolean' ? v.ai : d.ai,
+    ai: PURE ? false : (typeof v.ai === 'boolean' ? v.ai : d.ai),
   };
 }
 
 function saveLayout(cfg) {
   const all = readLayouts();
-  all[ARTIST ? 'artist' : 'main'] = cfg;
+  all[MODE_KEY] = cfg;
   store.setJSON(LAYOUT_KEY, all);
 }
 
@@ -81,7 +88,7 @@ export function applyLayout(cfg = currentLayout()) {
     el.classList.toggle('panel-off', hide);
   }
   // AI 总开关：控制每格的生图区 / 候选图 / AI 优化 / Key 面板（AI 导演卡由上一条 hidden 控制）
-  document.body.dataset.ai = cfg.ai ? 'on' : 'off';
+  document.body.dataset.ai = cfg.ai && !PURE ? 'on' : 'off';
   const chk = $('#chkAi');
   if (chk) chk.checked = cfg.ai;
 }
@@ -90,8 +97,7 @@ function renderPanelSheet() {
   const list = $('#panelList');
   if (!list) return;
   const cfg = currentLayout();
-  const panels = [...document.querySelectorAll('.rail.left [data-panel]')];
-  const byId = new Map(panels.map((el) => [el.dataset.panel, el]));
+  const byId = new Map(managed().map((el) => [el.dataset.panel, el]));
   const order = cfg.order.filter((id) => byId.has(id));
   list.innerHTML = order.map((id, i) => {
     const el = byId.get(id);

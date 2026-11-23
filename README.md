@@ -2,7 +2,9 @@
 
 **138 套中日韩漫画分镜模板 · 镂空填充网页编辑器 · 剧情匹配 API**
 
-> 🌐 在线试用：<https://wingwu0605-art.github.io/panel-forge/>
+> 🌐 在线试用：<https://wingwu0605-art.github.io/panel-forge/>（AI 版）·
+> [画师版](https://wingwu0605-art.github.io/panel-forge/painter.html) ·
+> [纯粹版（没有任何 AI）](https://wingwu0605-art.github.io/panel-forge/pure.html)
 > 📜 许可：**代码禁商用，产出物可商用** —— 见 [LICENSE-OUTPUTS.md](LICENSE-OUTPUTS.md)
 > 📦 Android 壳：`native/`（Capacitor，可装 APK）
 
@@ -521,7 +523,15 @@ node scripts/test-llm-mock.mjs   # 14 项 AI 导演链路（本地假模型，�
 - 准确说法是 **source-available（源码可见 / 非商业许可）**，不是 OSI 开源 —— OSI 许可证不允许禁止商用。
 - 第三方组件（Klecks、perfect-freehand）仍是 **MIT**，可单独商用 —— 见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
-### 两个独立网页，同一份源码
+### 三个独立网页，同一份源码
 
-- **AI 版**：`index.html`（默认）；**画师版**：`painter.html`（AI 界面全部收起，只留分镜 + 绘制）。
-- 本地开发用 `?mode=artist` 预览画师版；`node scripts/build-static.mjs` 会同时产出这两个入口。
+| 入口 | 给谁 | 有什么 |
+| --- | --- | --- |
+| `index.html`（**AI 版**，默认） | 想让 AI 帮忙出分镜、出图的人 | 全部功能：AI 导演、全自动、生图 / 候选图、提示词、角色参考图 |
+| `painter.html`（**画师版**） | 自己画、偶尔想用 AI 的人 | AI 界面默认收起，只留分镜 + 绘制；面板管理里还能把 AI 打开 |
+| `pure.html`（**纯粹版**） | 完全不想碰 AI 的人 | **没有任何 AI**：没有 AI 导演、全自动、生图、候选图、提示词、Key、角色参考图 / 风格跟随、AI 写台词，也打不开；剧情匹配只用本机规则 |
+
+- 三版共用：模板库、按规则匹配剧情、画布与图片填充、「绘制这一格」（Klecks）、气泡、分镜表、PNG / SVG 导出、四种界面语言。
+- 纯粹版不只是把按钮藏起来：AI 相关模块不启动，前端的 AI 接口在代码层直接拒绝（`纯粹版没有 AI 功能`），
+  整个会话里不会发出任何 AI 请求；分镜表、导出的 Markdown 也不带提示词，换成构图提示。
+- 本地开发用 `?mode=artist` / `?mode=pure` 预览；`node scripts/build-static.mjs` 会一次产出这三个入口。

@@ -1790,5 +1790,13 @@ export default {
 "读分享图片失败：{0}":"Gagal membaca gambar yang dibagikan: {0}",
 "列出分享目标失败：{0}":"Gagal menampilkan daftar tujuan berbagi: {0}",
 "缺少 package 或 uri":"package atau uri tidak ada",
-"直跳失败（该 App 可能不接受图片分享）：{0}":"Pengiriman langsung gagal (aplikasi itu mungkin tidak menerima gambar): {0}"
+"直跳失败（该 App 可能不接受图片分享）：{0}":"Pengiriman langsung gagal (aplikasi itu mungkin tidak menerima gambar): {0}",
+"PanelForge 纯粹版 · 分镜与绘制":"PanelForge Murni · Papan cerita & menggambar",
+"纯粹版没有 AI 功能":"Edisi Murni tidak punya fitur AI",
+"「分镜表」看每格的景别、节拍和构图提示；「导出」出 PNG/SVG。":"“Papan cerita” menampilkan bidikan, ketukan, dan tips komposisi tiap panel; “Ekspor” menghasilkan PNG/SVG.",
+"；纯粹版不连接任何 AI 服务，剧情也只在本机用规则匹配。":"; edisi Murni tidak terhubung ke layanan AI mana pun, dan alur cerita hanya dicocokkan dengan aturan di perangkat ini.",
+"「绘制」会把上面这张图当底稿放进画布 —— 可以在上面描线、擦、覆盖；画完自动裁成格子形状贴回来。":"“Gambar” meletakkan gambar di atas sebagai sketsa dasar di kanvas — jiplak, hapus, atau timpa; setelah selesai dipotong sesuai bentuk panel dan dikembalikan.",
+"先在左边写剧情并点「按规则匹配」":"Tulis alur cerita di kiri lalu klik “Cocokkan dengan aturan”",
+"（未填，写一段剧情再按规则匹配）":"(kosong — tulis alur cerita lalu cocokkan dengan aturan)",
+"没有服务端：规则引擎在你的浏览器里跑":"Tanpa server: mesin aturan berjalan di browser Anda"
 };

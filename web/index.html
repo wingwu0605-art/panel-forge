@@ -30,6 +30,7 @@ window.addEventListener("unhandledrejection", function (e) {
     var d = document.documentElement;
     var g = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
     var q = new URLSearchParams(location.search);
+    if (q.get('mode') === 'pure') d.dataset.pure = '1';   // 本地预览纯粹版：首帧就藏起 AI 的块
     var t = g('pf.theme');
     if (t === 'light' || t === 'dark') d.dataset.theme = t;
     var dark = t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -101,7 +102,7 @@ window.addEventListener("unhandledrejection", function (e) {
     <span class="sub" translate="no">分镜坊</span>
   </div>
       <!-- 全自动模式：关闭 / 分镜全自动 / 真正全自动 -->
-    <div class="auto-switch">
+    <div class="auto-switch" data-ai-only>
       <span class="auto-switch-label">自动</span>
       <div class="seg auto-seg" id="autoSeg" role="tablist" aria-label="全自动模式">
         <button type="button" data-auto="off" class="on">关</button>
@@ -116,9 +117,9 @@ window.addEventListener("unhandledrejection", function (e) {
   </div>
   <nav class="top-actions" id="topActions">
     <button class="btn ghost sm" id="btnPanels" type="button">面板管理</button>
-    <a class="btn ghost sm" id="lnkDocs" href="/api/docs" target="_blank" rel="noreferrer">API 文档</a>
+    <a class="btn ghost sm" data-ai-only id="lnkDocs" href="/api/docs" target="_blank" rel="noreferrer">API 文档</a>
     <a class="btn ghost sm" id="lnkSheet" href="/api/sheet" target="_blank" rel="noreferrer">全部模板接触表</a>
-    <a class="btn ghost sm" id="lnkTools" href="/api/ai-tools.json" target="_blank" rel="noreferrer">AI 工具定义</a>
+    <a class="btn ghost sm" data-ai-only id="lnkTools" href="/api/ai-tools.json" target="_blank" rel="noreferrer">AI 工具定义</a>
   </nav>
   <!-- 语言：常驻但低调（显示当前语言本身，点开外观面板里的完整列表） -->
   <button class="lang-btn" id="btnLang" type="button" title="界面语言" aria-haspopup="dialog" aria-expanded="false"><span translate="no">中文</span></button>
@@ -133,7 +134,7 @@ window.addEventListener("unhandledrejection", function (e) {
   <!-- ============================== 左栏：匹配 + 模板库 ============================== -->
   <aside class="rail left">
     <!-- 全自动：独立卡片，切到全自动时替代下面的「剧情 → 分镜」卡片 -->
-    <section class="card auto-card hidden" id="autoCard" data-panel="auto" data-panel-name="全自动" data-collapse="auto">
+    <section class="card auto-card hidden" id="autoCard" data-panel="auto" data-panel-name="全自动" data-collapse="auto" data-ai-only>
       <div class="card-head">
         <h2>全自动</h2>
         <span class="hint" id="autoModeName">分镜全自动</span>
@@ -214,7 +215,7 @@ window.addEventListener("unhandledrejection", function (e) {
         <kbd class="kbd-mod-enter">⌘⏎</kbd>
       </button>
       <!-- 两个选择放一起：规则（本地、免费） / AI（要 Key）。AI 关掉时这条自动收起 -->
-      <button class="btn wide ai-soft match-ai" id="btnMatchAi" title="让 AI 读剧情、挑版式、排戏（要填 Key）">
+      <button class="btn wide ai-soft match-ai" data-ai-only id="btnMatchAi" title="让 AI 读剧情、挑版式、排戏（要填 Key）">
         <span>让 AI 排戏</span>
         <kbd class="kbd-mod-enter">⌘⇧⏎</kbd>
       </button>
@@ -223,7 +224,7 @@ window.addEventListener("unhandledrejection", function (e) {
       <div class="results hidden" id="matchResults"></div>
     </section>
 
-    <section class="card ai" data-panel="ai" data-panel-name="AI 导演" data-collapse="ai">
+    <section class="card ai" data-panel="ai" data-panel-name="AI 导演" data-collapse="ai" data-ai-only>
       <div class="card-head">
         <h2>AI 导演 <span class="tag-opt">可选</span></h2>
         <span class="hint" id="llmBadge">未配置</span>
@@ -259,7 +260,7 @@ window.addEventListener("unhandledrejection", function (e) {
     </section>
 
     <!-- 风格跟随：生图时参考谁（人设图 / 样图 / 都参考） -->
-    <section class="card stylefollow" id="styleFollow" data-panel="style" data-panel-name="风格跟随" data-collapse="style">
+    <section class="card stylefollow" id="styleFollow" data-panel="style" data-panel-name="风格跟随" data-collapse="style" data-ai-only>
       <div class="card-head">
         <h2>风格跟随</h2>
         <span class="hint" id="styleHint">AI 生图时参考谁</span>
@@ -280,7 +281,7 @@ window.addEventListener("unhandledrejection", function (e) {
         <p class="muted small" style="margin:4px 0 0">按参考图的画风、线宽、上色方式画；有样图时不跟人设图（除非选「都参考」）。</p>
       </div>
     </section>
-    <section class="card chars" data-panel="chars" data-panel-name="角色参考图" data-collapse="chars">
+    <section class="card chars" data-panel="chars" data-panel-name="角色参考图" data-collapse="chars" data-ai-only>
       <div class="card-head">
         <h2>角色参考图</h2>
         <span class="hint">让同一个人每格都长一样</span>
@@ -328,9 +329,11 @@ window.addEventListener("unhandledrejection", function (e) {
         <li>在「分镜模板库」选一套版式（或先写剧情，让引擎替你挑）。</li>
         <li>点格子 → 选图；或把一批图<b>直接拖进画布</b>，按阅读顺序自动填。</li>
         <li>拖图可调位置，Alt+滚轮缩放；Ctrl+V 粘贴到选中格。</li>
-        <li>「分镜表」拿每格景别＋生图提示词；「导出」出 PNG/SVG。</li>
+        <li data-ai-only>「分镜表」拿每格景别＋生图提示词；「导出」出 PNG/SVG。</li>
+        <li data-pure-only>「分镜表」看每格的景别、节拍和构图提示；「导出」出 PNG/SVG。</li>
         <li>换模板时图片会按阅读顺序跟着搬家，方便横向对比版式。</li>
-        <li><b>隐私：</b>图片全程在你浏览器里处理（FileReader → SVG → canvas），<b>不上传、不落盘</b>；关掉标签页就清空。只有剧情文字会发给你自己配置的模型。</li>
+        <li data-ai-only><b>隐私：</b>图片全程在你浏览器里处理（FileReader → SVG → canvas），<b>不上传、不落盘</b>；关掉标签页就清空。只有剧情文字会发给你自己配置的模型。</li>
+        <li data-pure-only><b>隐私：</b>图片全程在你浏览器里处理（FileReader → SVG → canvas），<b>不上传、不落盘</b>；纯粹版不连接任何 AI 服务，剧情也只在本机用规则匹配。</li>
       </ol>
     </details>
   </aside>
@@ -459,11 +462,11 @@ window.addEventListener("unhandledrejection", function (e) {
                 <button class="btn tiny" id="btnBubbleFromLine" title="用这句话新建一个对话气泡">放进气泡</button>
               </div>
               <textarea id="slotLine" rows="2" placeholder="台词 / 旁白 / 内心独白（自动存到本机）"></textarea>
-              <div class="row2 line-ai-row">
+              <div class="row2 line-ai-row" data-ai-only>
                 <button class="btn tiny" id="btnAiLine" title="让模型按「这一格要表达什么」写一句台词/旁白">AI 写这一格</button>
                 <button class="btn tiny" id="btnAiLineReroll" title="换一句（告诉模型别重复刚才那句）">换一句</button>
               </div>
-              <div class="row2 line-ai-row">
+              <div class="row2 line-ai-row" data-ai-only>
                 <button class="btn tiny" id="btnAiLinesPage" title="把这一页所有空格子的台词都交给模型写">AI 写整页</button>
               </div>
               <div class="line-suggest" id="suggestBox">
@@ -483,7 +486,7 @@ window.addEventListener("unhandledrejection", function (e) {
           </button>
           <div class="sec-body">
             <div class="kv" id="slotBoard"></div>
-            <div class="board-prompts" id="slotBoardPrompts"></div>
+            <div class="board-prompts" data-ai-only id="slotBoardPrompts"></div>
           </div>
         </section>
 
@@ -497,7 +500,8 @@ window.addEventListener("unhandledrejection", function (e) {
             <button class="btn wide" id="btnPaint" title="按这一格的形状铺开画布，直接画（笔画出不了格子）">绘制这一格</button>
             <!-- 不进我们的画布，直接交给手机上的其它绘画 App；画完分享回来会按格子形状裁好 -->
             <button class="btn wide" id="btnExternalPaint" title="把这一格的底图（带形状参考）交给手机上别的绘画 App，画完分享回来自动填进这一格">用其他 App 画</button>
-            <p class="muted small" style="margin:6px 0 0">「绘制」会把上面这张图当底稿放进画布 —— 可以在上面描线、擦、覆盖；画完自动裁成格子形状贴回来。AI 生成的图、你自己拖进来的照片都是同一套流程。</p>
+            <p class="muted small" style="margin:6px 0 0" data-ai-only>「绘制」会把上面这张图当底稿放进画布 —— 可以在上面描线、擦、覆盖；画完自动裁成格子形状贴回来。AI 生成的图、你自己拖进来的照片都是同一套流程。</p>
+            <p class="muted small" style="margin:6px 0 0" data-pure-only>「绘制」会把上面这张图当底稿放进画布 —— 可以在上面描线、擦、覆盖；画完自动裁成格子形状贴回来。</p>
             <div class="row2">
               <button class="btn tiny" id="btnUrl">用图片链接</button>
               <button class="btn tiny danger" id="btnRemoveImage">移除图片</button>
@@ -517,7 +521,7 @@ window.addEventListener("unhandledrejection", function (e) {
         </section>
 
         <!-- AI 生成：与「这一格说什么 / 分镜 / 图片」同级的第四段，可单独收起 -->
-        <section class="slot-sec" data-sec="ai">
+        <section class="slot-sec" data-sec="ai" data-ai-only>
           <button type="button" class="sec-head" aria-expanded="true">
             <span>AI 生成</span><span class="sec-sum" id="secAiSum"></span><span class="caret"><svg viewBox="0 0 12 12" width="10" height="10"><path d="M2 4.2 6 8l4-3.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
           </button>
@@ -589,8 +593,8 @@ window.addEventListener("unhandledrejection", function (e) {
       <div class="script-head">
         <b>逐格分镜表</b>
         <span style="display:flex;gap:6px">
-          <button class="btn tiny primary" id="btnAiSplit" title="版式已经定死：让 AI 把源文本切成每格，并直接给出每格的生图提示词（长剧本 / 小说也切得准）">AI 切原文</button>
-          <button class="btn tiny" id="btnAiPrompts" title="用 AI 把每格压成高密度生图提示词（保留形状开头词）">AI 优化提示词</button>
+          <button class="btn tiny primary" data-ai-only id="btnAiSplit" title="版式已经定死：让 AI 把源文本切成每格，并直接给出每格的生图提示词（长剧本 / 小说也切得准）">AI 切原文</button>
+          <button class="btn tiny" data-ai-only id="btnAiPrompts" title="用 AI 把每格压成高密度生图提示词（保留形状开头词）">AI 优化提示词</button>
           <button class="btn tiny" id="btnCopyAll">复制全部</button>
         </span>
       </div>
@@ -727,17 +731,17 @@ window.addEventListener("unhandledrejection", function (e) {
       <button class="btn tiny" id="btnPanelClose" type="button" data-close>关闭</button>
     </header>
     <div class="sheet-body">
-      <label class="switch block"><input type="checkbox" id="chkAi"> 启用 AI 功能（AI 导演 / 生图 / 优化提示词 / API Key）</label>
+      <label class="switch block" data-ai-only><input type="checkbox" id="chkAi"> 启用 AI 功能（AI 导演 / 生图 / 优化提示词 / API Key）</label>
       <div class="panel-list" id="panelList"></div>
       <div class="row2">
         <button class="btn tiny" id="btnPanelReset">恢复默认</button>
       </div>
-      <p class="muted small sheet-note">关掉 AI 后，左栏的 AI 面板、每格的生图按钮和候选图会一起收起来；想用随时打开。</p>
+      <p class="muted small sheet-note" data-ai-only>关掉 AI 后，左栏的 AI 面板、每格的生图按钮和候选图会一起收起来；想用随时打开。</p>
     </div>
   </div>
 </dialog>
 
-<dialog class="sheet" id="keySheet" aria-labelledby="keySheetTitle">
+<dialog class="sheet" data-ai-only id="keySheet" aria-labelledby="keySheetTitle">
   <div class="sheet-panel">
     <header class="sheet-head">
       <b class="sheet-title" id="keySheetTitle">API Key 管理</b>
@@ -844,7 +848,7 @@ window.addEventListener("unhandledrejection", function (e) {
         <div class="sc-row"><span>跳到第 N 格</span><kbd>1</kbd>–<kbd>9</kbd></div>
         <div class="sc-row"><span>跳到下一个空格</span><kbd>N</kbd></div>
         <div class="sc-row"><span>按规则匹配剧情</span><kbd>Ctrl</kbd><kbd>Enter</kbd></div>
-        <div class="sc-row"><span>AI 导演</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Enter</kbd></div>
+        <div class="sc-row" data-ai-only><span>AI 导演</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Enter</kbd></div>
       </section>
       <section>
         <h4>图片</h4>
@@ -906,7 +910,7 @@ window.addEventListener("unhandledrejection", function (e) {
 </div>
 
   <!-- 批量生图：右下角悬浮（会花很多钱，所以每次都要二次确认） -->
-  <div class="fab-stack" id="fabStack">
+  <div class="fab-stack" data-ai-only id="fabStack">
     <button class="fab" id="fabGenPage" type="button" title="一键生成该页所有还没图的分镜 · 用每格现有提示词（含你手改过的），不会先做 AI 优化">
       <span class="fab-ico">▤</span><span class="fab-txt">一键生成<b>该页</b></span>
     </button>
@@ -916,7 +920,7 @@ window.addEventListener("unhandledrejection", function (e) {
   </div>
 
   <!-- 危险操作确认：必须勾选「我已知晓」才能继续 -->
-  <dialog class="sheet danger-sheet" id="dangerSheet" aria-labelledby="dangerTitle">
+  <dialog class="sheet danger-sheet" data-ai-only id="dangerSheet" aria-labelledby="dangerTitle">
     <div class="sheet-panel" style="--sheet-w:520px">
       <header class="sheet-head">
         <b class="sheet-title" id="dangerTitle">确认</b>

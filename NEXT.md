@@ -6,15 +6,26 @@
 > 再接入 Klecks 做「绘制这一格」；最后**换掉许可**（软件不可商用 / 产出物可商用）并产出**画师版独立入口**。
 > 第五节是这轮的结论与实测数字，别重复查。
 
-## 〇、两个网页 + 许可（先看这条，别搞混）
+## 〇、三个网页 + 许可（先看这条，别搞混）
 
 | | 入口 | 说明 |
 | --- | --- | --- |
 | AI 版 | `index.html` → `https://…/panel-forge/` | 原来的完整版（AI 导演 / 生图 / 候选图都在）|
-| 画师版 | `painter.html` → `https://…/panel-forge/painter.html` | 同一份源码，AI 界面全部收起，只留分镜 + 绘制 |
+| 画师版 | `painter.html` → `https://…/panel-forge/painter.html` | 同一份源码，AI 界面默认收起，只留分镜 + 绘制（面板管理里还能开回 AI）|
+| 纯粹版 | `pure.html` → `https://…/panel-forge/pure.html` | 同一份源码，**删掉一切 AI**：界面没有、开关没有、接口在代码层锁死 |
 
-- 本地预览画师版：`?mode=artist`（`painter.html` 只是构建时把 `window.PF_PAINTER` 预先注入的同一页）。
-- `scripts/build-static.mjs` **一次产出两个入口**，别手工改 HTML，改 `web/index.html` + 构建即可。
+- 本地预览：画师版 `?mode=artist`，纯粹版 `?mode=pure`（`painter.html` / `pure.html` 只是构建时预先注入
+  `window.PF_PAINTER` / `window.PF_PURE` 的同一页）。`PURE` 隐含 `ARTIST`，画师版有的改动纯粹版自动有。
+- 纯粹版怎么做到「没有 AI」（改代码时别破坏）：
+  - 标记：AI 专属元素加 `data-ai-only`，纯粹版专用的替代说明加 `data-pure-only`；CSS 认 `:root[data-pure]`
+    （启动脚本最先写，避免闪一下）和 `body[data-mode="pure"]`。**新加 AI 界面必须带 `data-ai-only`**，否则会漏进纯粹版。
+  - 代码：`app.js` 的 `withoutAi()` 把 `aiDecide / prompts / aiSplit / aiLines / llmStatus / llmTest / imageGenerate`
+    换成直接抛错；`bindRefs / bindKeys / bindAutoUI / loadLlm / loadKeyStore / loadChars` 在纯粹版不调用；
+    `panels.mjs` 的面板管理不列 AI 面板、没有 AI 总开关；右键菜单没有「AI 生成这一格」。
+  - 分镜表 / 导出 Markdown：纯粹版没有「建议出图」列和提示词，换成构图提示。
+  - 视觉测试 `pure-mode`（⑨b）逐条验：看不见 AI 界面、`?keys=1` 打不开 Key、7 个 AI 接口全部拒绝、没有 AI 网络请求。
+- `scripts/build-static.mjs` **一次产出三个入口**（`sheet.html?ed=pure|painter` 的返回链接也回对应版本），
+  别手工改 HTML，改 `web/index.html` + 构建即可。
 - **许可**：仓库根的 `LICENSE` 是「源码可见、非商业」自订条款 —— 软件本身不可商用，
   但**用它的产出物可以商用**。第三方组件（Klecks / perfect-freehand）仍是 MIT，
   单列在 `THIRD-PARTY-NOTICES.md`，那条不能被我们的许可限制。

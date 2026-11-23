@@ -1790,5 +1790,13 @@ export default {
 "读分享图片失败：{0}":"Couldn’t read the shared image: {0}",
 "列出分享目标失败：{0}":"Couldn’t list share targets: {0}",
 "缺少 package 或 uri":"Missing package or uri",
-"直跳失败（该 App 可能不接受图片分享）：{0}":"Direct handoff failed (that app may not accept shared images): {0}"
+"直跳失败（该 App 可能不接受图片分享）：{0}":"Direct handoff failed (that app may not accept shared images): {0}",
+"PanelForge 纯粹版 · 分镜与绘制":"PanelForge Pure · Storyboard & drawing",
+"纯粹版没有 AI 功能":"The Pure edition has no AI features",
+"「分镜表」看每格的景别、节拍和构图提示；「导出」出 PNG/SVG。":"“Storyboard” shows each panel’s shot, beat and composition tips; “Export” gives you PNG/SVG.",
+"；纯粹版不连接任何 AI 服务，剧情也只在本机用规则匹配。":"; the Pure edition connects to no AI service, and your plot is matched by rules on this device only.",
+"「绘制」会把上面这张图当底稿放进画布 —— 可以在上面描线、擦、覆盖；画完自动裁成格子形状贴回来。":"“Draw” puts the image above on the canvas as a base sketch — trace over it, erase, paint over; when you’re done it’s clipped to the panel shape and placed back.",
+"先在左边写剧情并点「按规则匹配」":"Write a plot on the left and click “Match by rules”",
+"（未填，写一段剧情再按规则匹配）":"(empty — write a plot and match by rules)",
+"没有服务端：规则引擎在你的浏览器里跑":"No server: the rule engine runs in your browser"
 };

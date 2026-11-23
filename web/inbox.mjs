@@ -17,6 +17,10 @@ import { setStyleFollow, followSamples, styleMode, addSamples, addCharCard } fro
 import { autoEstimate } from './auto-mode.mjs';
 import { openPaint, exportSlotImage } from './paint-ui.mjs';
 import { app } from './ctx.mjs';
+import { PURE } from './env.mjs';
+
+/** AI 现在能不能用：纯粹版永远不能；其他版本看「AI 总开关」 */
+const aiOn = () => !PURE && document.body.dataset.ai !== 'off';
 
 let inboxArea = 'slot';   // 'slot' | 'char' | 'sample'：粘贴时往哪儿放
 
@@ -479,7 +483,7 @@ function buildContextMenu(ev) {
       }, { danger: true }));
     } else {
       items.push(ctxItem('选图片填入这一格', () => { state.selectedId = sid; app.renderSlotPanel(); $('#filePick').dataset.mode = 'slot'; $('#filePick').click(); }));
-      items.push(ctxItem('AI 生成这一格', () => { state.selectedId = sid; app.renderSlotPanel(); app.generateSlotImage(sid); }));
+      if (aiOn()) items.push(ctxItem('AI 生成这一格', () => { state.selectedId = sid; app.renderSlotPanel(); app.generateSlotImage(sid); }));
       items.push(ctxItem('绘制这一格', () => { state.selectedId = sid; openPaint(sid); }));
     }
     // 选中的格与右键的格不同时，先把它选上，动作才不会作用错对象
@@ -512,7 +516,7 @@ function buildContextMenu(ev) {
   return {
     title: 'PanelForge',
     items: [
-      ctxItem('AI 生成这一格', () => app.generateSlotImage(state.selectedId)),
+      ...(aiOn() ? [ctxItem('AI 生成这一格', () => app.generateSlotImage(state.selectedId))] : []),
       ctxItem('绘制这一格', () => openPaint(state.selectedId)),
       { sep: true },
       ctxItem('导出这一页 PNG', () => app.exportPNG()),

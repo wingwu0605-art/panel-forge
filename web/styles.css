@@ -986,6 +986,8 @@ kbd{
 .err-title{color:var(--red-ink)}
 .ai-chip{color:var(--indigo) !important;background:color-mix(in srgb,var(--indigo) 14%,transparent) !important}
 .sc-card .ct{font-size:12.5px;color:var(--label);margin:5px 0 2px;line-height:1.55}
+/* 纯粹版的分镜表：提示词的位置换成这一格的构图提示 */
+.sc-card .hint{font-size:12px;color:var(--label-2);margin:4px 0 2px;line-height:1.5;padding-left:8px;border-left:2px solid var(--sep)}
 .sc-card .dl{font-size:12px;color:var(--orange-ink);margin-bottom:5px}
 
 /* ---------------------------------------------------------------- 画布 */
@@ -1144,6 +1146,22 @@ body[data-ai="off"] #btnMatchAi,
 body[data-ai="off"] #keySheet{display:none !important}
 /* 被面板管理隐藏的块 */
 .rail.left [data-panel][hidden]{display:none !important}
+
+/* ---------------------------------------------------------------- 纯粹版（pure.html / ?mode=pure） */
+/* 一点 AI 都不出现：HTML 里标了 data-ai-only 的块、每格的生图区和候选图、分镜表里的提示词。
+   只给纯粹版看的说明标 data-pure-only，其他版本里不出现。 */
+/* :root[data-pure] 由 <head> 里的启动脚本先打上（首帧就不会闪出 AI 的块），body[data-mode] 是 app.js 打的 */
+[data-pure-only]{display:none !important}
+:root[data-pure] [data-pure-only],
+body[data-mode="pure"] [data-pure-only]{display:revert !important}
+:root[data-pure] [data-ai-only],
+:root[data-pure] .ai-gen,
+:root[data-pure] #candStrip,
+:root[data-pure] .ai-chip,
+body[data-mode="pure"] [data-ai-only],
+body[data-mode="pure"] .ai-gen,
+body[data-mode="pure"] #candStrip,
+body[data-mode="pure"] .ai-chip{display:none !important}
 
 /* 面板管理列表 */
 .panel-list{display:flex;flex-direction:column;gap:6px;margin:10px 0}

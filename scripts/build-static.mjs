@@ -93,18 +93,23 @@ await writeFile(path.join(site, 'index.html'), html, 'utf8');
 
 /* ---------------- 画师版入口：同一份源码、独立网页 ---------------- */
 /* 和 index.html 唯一的区别是 pre-set 了 window.PF_PAINTER（AI 界面全部收起）。
-   这样两个版本共用一个源码库，部署成两个 URL：/panel-forge/ 和 /panel-forge/painter.html */
-{
-  let painter = html;
-  if (painter.includes('<script>window.PF_STATIC = true;</script>')) {
-    painter = painter.replace('<script>window.PF_STATIC = true;</script>',
-      '<script>window.PF_STATIC = true; window.PF_PAINTER = true;</script>');
+   同一个源码库部署成三个 URL：/panel-forge/（AI 版）、painter.html（画师版）、pure.html（纯粹版）。 */
+const entry = (flag, title) => {
+  let page = html;
+  if (page.includes('<script>window.PF_STATIC = true;</script>')) {
+    page = page.replace('<script>window.PF_STATIC = true;</script>', `<script>window.PF_STATIC = true; ${flag}</script>`);
   } else {
-    painter = painter.replace('</head>', '<script>window.PF_STATIC = true; window.PF_PAINTER = true;</script>\n</head>');
+    page = page.replace('</head>', `<script>window.PF_STATIC = true; ${flag}</script>\n</head>`);
   }
-  painter = painter.replace(/<title>[^<]*<\/title>/, '<title>PanelForge 画师版 · 分镜与绘制</title>');
-  await writeFile(path.join(site, 'painter.html'), painter, 'utf8');
-}
+  return page.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
+};
+/** 纯粹版的页面简介：不提生图提示词 */
+const pureMeta = (page) => page.replace(/<meta name="description" content="[^"]*">/,
+  '<meta name="description" content="138 套中·日·韩漫画分镜模板：镂空填充编辑器、剧情匹配、逐格手绘。纯粹版，不含任何 AI 功能。">');
+await writeFile(path.join(site, 'painter.html'), entry('window.PF_PAINTER = true;', 'PanelForge 画师版 · 分镜与绘制'), 'utf8');
+/* ---------------- 纯粹版：没有任何 AI（界面拿掉 + 代码层锁死，见 web/env.mjs 的 PURE） ---------------- */
+await writeFile(path.join(site, 'pure.html'),
+  pureMeta(entry("window.PF_PURE = true; document.documentElement.dataset.pure = '1';", 'PanelForge 纯粹版 · 分镜与绘制')), 'utf8');
 await writeFile(path.join(site, '.nojekyll'), '', 'utf8');
 
 /* ---------------- 模板一览（替代服务端的 /api/sheet） ---------------- */
@@ -175,9 +180,12 @@ ${Object.keys(GROUPS).map(section).join('\n')}
   if (lang && lang !== 'zh') installI18n(lang);
 </script>
 <script>
+  // 从哪个版本点进来就回哪个版本（?ed=pure|painter）：纯粹版的人不该被带回 AI 版
+  const ED = { pure: './pure.html', painter: './painter.html' }[new URLSearchParams(location.search).get('ed')] || './index.html';
+  document.querySelector('a.back').href = ED;
   document.querySelectorAll('figure').forEach((f) => {
     f.style.cursor = 'pointer';
-    f.addEventListener('click', () => { location.href = './index.html?tpl=' + encodeURIComponent(f.dataset.id); });
+    f.addEventListener('click', () => { location.href = ED + '?tpl=' + encodeURIComponent(f.dataset.id); });
   });
 </script>
 </body></html>`;

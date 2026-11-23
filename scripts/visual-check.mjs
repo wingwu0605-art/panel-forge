@@ -149,6 +149,11 @@ class Page {
       ws.addEventListener('error', () => rej(new Error('连不上 CDP WebSocket')), { once: true });
     });
     const page = new Page(ws);
+    // Klecks 有未保存笔画时会挂 beforeunload（真实用户该看到“确定离开吗”）；
+    // 测试里换页就直接确认离开，别让这个原生框把 Page.navigate 卡死
+    page.listeners.set('Page.javascriptDialogOpening', [(p) => {
+      if (p.type === 'beforeunload') page.send('Page.handleJavaScriptDialog', { accept: true }).catch(() => {});
+    }]);
     await page.send('Page.enable');
     await page.send('Runtime.enable');
     await page.send('Log.enable');
@@ -1006,6 +1011,112 @@ const scenarios = [
   },
 
   {
+    name: 'pure-mode',
+    title: '⑨b 纯粹版（pure.html / ?mode=pure）：看不到任何 AI、发不出 AI 请求，规则匹配和绘制照常',
+    async run(page, shot, { check }) {
+      await page.viewport(1280, 900);
+      // ?keys=1：AI 版会弹 Key 面板；纯粹版必须不理它
+      await page.goto('/?perf=1&fresh=1&mode=pure&tpl=ref-4band-2col&slot=p1&keys=1');
+      await page.ready();
+      await sleep(500);
+      // 记下之后所有的网络请求
+      await page.evaluate(`(() => {
+        window.__pfReq = [];
+        const f = window.fetch;
+        window.fetch = (u, o) => { window.__pfReq.push(String(u && u.url || u)); return f(u, o); };
+        const open = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function (m, u) { window.__pfReq.push(String(u)); return open.apply(this, arguments); };
+      })()`);
+
+      const st = await page.evaluate(`(() => {
+        const vis = (sel) => [...document.querySelectorAll(sel)].some((el) => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+        const AI = ['.auto-switch', '#autoCard', '#btnMatchAi', '.card.ai', '#styleFollow', '.card.chars', '.line-ai-row',
+          '[data-sec="ai"]', '#slotBoardPrompts', '#btnAiSplit', '#btnAiPrompts', '#fabStack', '#lnkDocs', '#lnkTools', '.ai-gen', '#candStrip'];
+        return {
+          mode: document.body.dataset.mode, pureRoot: document.documentElement.dataset.pure, title: document.title,
+          shown: AI.filter(vis), keySheetOpen: !!document.querySelector('#keySheet')?.open,
+          canvas: vis('#canvas svg'), match: vis('#btnMatch'), paint: vis('#btnPaintTop'),
+        };
+      })()`);
+      check('进入纯粹版（标题、模式）', st.mode === 'pure' && st.pureRoot === '1' && /纯粹版/.test(st.title), st.title);
+      check('AI 的入口一个都看不到', st.shown.length === 0, st.shown.length ? '还看得到：' + st.shown.join(' ') : '全部收掉');
+      check('?keys=1 也打不开 Key 面板', !st.keySheetOpen, st.keySheetOpen ? 'Key 面板开了' : '没开');
+      check('画布 / 按规则匹配 / 绘制都在', st.canvas && st.match && st.paint, JSON.stringify({ canvas: st.canvas, match: st.match, paint: st.paint }));
+
+      // 规则匹配照常（本机规则引擎，不走 AI）
+      await page.evaluate(`(() => {
+        const t = document.querySelector('#plot');
+        t.value = '雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋，两人在积水里僵持。';
+        t.dispatchEvent(new Event('input', { bubbles: true }));
+        document.querySelector('#btnMatch').click();
+      })()`);
+      await page.waitFor("document.querySelectorAll('#matchResults .result, #matchResults .tpl, #matchResults > *').length > 0", { label: '纯粹版规则匹配', timeout: 8000 });
+      await sleep(600);
+      // 打开分镜表、帮助，把会显示的文字都扫一遍：不能出现「AI」「提示词」
+      await page.evaluate(`(() => {
+        document.querySelector('#tabs [data-tab="script"]')?.click();
+        const help = document.querySelector('details.help'); if (help) help.open = true;
+      })()`);
+      await sleep(500);
+      const words = await page.evaluate(`(() => {
+        const bad = [];
+        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        while (w.nextNode()) {
+          const n = w.currentNode, el = n.parentElement;
+          if (!el || el.closest('script, style, #perfHud, #plot, textarea') || !el.getClientRects().length) continue;
+          const t = n.nodeValue.trim();
+          // 「纯粹版不连接任何 AI 服务」是说明没有 AI 的那句，不算
+          if (t && /\\bAI\\b|提示词|生图/.test(t) && !/不连接任何 AI/.test(t)) bad.push(t.slice(0, 40));
+        }
+        for (const el of document.querySelectorAll('[title],[aria-label]')) {
+          if (!el.getClientRects().length) continue;
+          for (const a of ['title', 'aria-label']) { const v = el.getAttribute(a) || ''; if (/\\bAI\\b|提示词|生图/.test(v)) bad.push(a + ':' + v.slice(0, 40)); }
+        }
+        return [...new Set(bad)];
+      })()`);
+      check('界面上看不到「AI / 提示词 / 生图」这些字', words.length === 0, words.slice(0, 6).join(' / ') || '一处都没有');
+      await shot('pure-mode');
+
+      // 第二道锁：就算在控制台里直接调，AI 的接口也全部拒绝
+      const locked = await page.evaluate(`(async () => {
+        const api = window.__pfApi(); const out = {};
+        for (const k of ['aiDecide', 'prompts', 'aiSplit', 'aiLines', 'llmStatus', 'llmTest', 'imageGenerate']) {
+          try { await api[k]({}); out[k] = 'ok'; } catch (e) { out[k] = String(e.message || e); }
+        }
+        return out;
+      })()`);
+      check('AI 接口全部封死（调了直接拒绝）', Object.values(locked).every((v) => /纯粹版没有 AI 功能/.test(v)), JSON.stringify(locked));
+
+      // 右键菜单里没有「AI 生成这一格」；面板管理里没有 AI 的面板和开关
+      const menus = await page.evaluate(`(() => {
+        const b = document.querySelector('#canvas svg').getBoundingClientRect();
+        const x = b.left + b.width * 0.3, y = b.top + b.height * 0.2;   // 第 1 格里面
+        const spec = window.__pfContextMenu({ target: document.elementFromPoint(x, y), clientX: x, clientY: y, preventDefault() {} });
+        document.querySelector('#btnPanels').click();
+        const rows = [...document.querySelectorAll('#panelList .panel-name')].map((x) => x.textContent.trim());
+        const chk = document.querySelector('#chkAi')?.closest('label');
+        const chkShown = !!(chk && chk.getClientRects().length);
+        document.querySelector('#btnPanelClose')?.click();
+        return { items: (spec?.items || []).map((x) => x.label || x.text || '').filter(Boolean), rows, chkShown };
+      })()`);
+      check('右键菜单没有 AI 项', !menus.items.some((x) => /AI/.test(x)), menus.items.join(' / '));
+      check('面板管理里没有 AI 的面板、也没有「启用 AI」开关',
+        !menus.chkShown && !menus.rows.some((x) => /AI|角色参考图|风格跟随|全自动/.test(x)), menus.rows.join(' / '));
+
+      // 绘制照常
+      await page.evaluate("document.querySelector('#btnPaintTop').click()");
+      await page.waitFor("window.__pfPaint.info().engine !== 'none'", { label: '纯粹版打开绘制', timeout: 30000 });
+      const info = await page.evaluate('window.__pfPaint.info()');
+      check('纯粹版里能画（Klecks 挂上）', info.engine === 'klecks' && info.sheetOpen, `engine=${info.engine}`);
+      await page.evaluate('window.__pfPaint.close()');
+
+      const req = await page.evaluate('window.__pfReq');
+      const aiReq = req.filter((u) => /\/api\/(ai|llm)\b|openai|anthropic|volces|siliconflow|dashscope|stability|deepseek/i.test(u));
+      check('整个过程没有发出任何 AI 请求', aiReq.length === 0, aiReq.length ? aiReq.slice(0, 4).join(' / ') : `共 ${req.length} 个请求，没有 AI 的`);
+    },
+  },
+
+  {
     name: 'paint-save-export',
     title: '⑩ 绘制：草稿保存 + 单独导出 + 图可再编辑',
     async run(page, shot, { check }) {
@@ -1465,7 +1576,7 @@ const scenarios = [
 
   {
     name: 'i18n-coverage',
-    title: '⑭b 英文 / 日文 / 印尼语界面里没有漏翻的中文（含确认框、Key 管理、快捷键、全自动、导出、画师版绘制页）',
+    title: '⑭b 英文 / 日文 / 印尼语界面里没有漏翻的中文（含确认框、Key 管理、快捷键、全自动、导出、画师版绘制页、纯粹版）',
     async run(page, shot, { check }) {
       await page.viewport(1440, 900);
       for (const lang of ['en', 'ja', 'id']) {
@@ -1553,6 +1664,22 @@ const scenarios = [
       check('画师版英文：标题、绘制页都翻了，Klecks 也是英文', painter.miss.length === 0 && /for artists/.test(painter.title) && painter.klecks === 'en',
         painter.miss.length ? painter.miss.slice(0, 6).join(' / ') : `${painter.title} · Klecks「${painter.sample}」`);
       await shot('i18n-coverage-painter-en');
+
+      // 纯粹版（日文）：纯粹版自己的说明、分镜表、帮助也要翻
+      await page.goto('/?fresh=1&mode=pure&tpl=ref-4band-2col&slot=p1&lang=ja');
+      await page.ready();
+      await sleep(400);
+      await page.evaluate(`window.__pfI18nMiss = new Set(); window.__pfI18nLang = 'ja';`);
+      await page.evaluate(`(async () => { const w = (ms) => new Promise((r) => setTimeout(r, ms));
+        document.querySelector('#langSeg [data-lang="zh"]').click(); await w(250);
+        document.querySelector('#langSeg [data-lang="ja"]').click(); await w(700);
+        const help = document.querySelector('details.help'); if (help) help.open = true;
+        document.querySelector('#tabs [data-tab="script"]')?.click(); await w(400);
+        document.querySelector('#tabs [data-tab="slot"]')?.click(); await w(300); })()`);
+      const pure = await page.evaluate(`({ miss: [...window.__pfI18nMiss], title: document.title,
+        help: [...document.querySelectorAll('details.help li')].filter((li) => li.getClientRects().length).map((li) => li.textContent.trim()).slice(-2) })`);
+      check('纯粹版日文：标题、帮助、分镜表都翻了', pure.miss.length === 0 && /ピュア版/.test(pure.title) && pure.help.some((t) => /ピュア版/.test(t)),
+        pure.miss.length ? pure.miss.slice(0, 6).join(' / ') : `${pure.title} · ${pure.help.join(' / ').slice(0, 80)}`);
       await page.evaluate("localStorage.removeItem('pf.lang.v1')");
     },
   },
