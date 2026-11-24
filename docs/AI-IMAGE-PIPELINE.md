@@ -50,7 +50,7 @@ POST /api/match  { plot, culture, ratio, limit }
 ```
 - 引擎：`lib/matcher.mjs` 规则版 —— **26 戏路 / 1150 关键词 / 113 节拍 / 7 幕景线 / 8 基调**
 - 输出：候选模板列表（含命中理由、分数）
-- 选一个 → 载入 `state.tpl`（138 套，带 `poly` / `clipPath` / 每格格型）
+- 选一个 → 载入 `state.tpl`（4938 套，带 `poly` / `clipPath` / 每格格型）
 
 > AI 版可跳过：`POST /api/ai/decide`（`aiDecide`）让模型在规则候选里自己挑并排戏。
 

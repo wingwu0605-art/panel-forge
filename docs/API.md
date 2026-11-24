@@ -22,7 +22,7 @@
 ## GET /api/health
 
 ```json
-{ "ok": true, "service": "panel-forge", "templates": 138, "version": "1.0.0" }
+{ "ok": true, "service": "panel-forge", "templates": 4938, "version": "1.0.0" }
 ```
 
 ## GET /api/meta
@@ -31,12 +31,12 @@
 
 ```json
 {
-  "templates": 138,
+  "templates": 4938,
   "cultures": {
-    "jp": { "zh": "日式页漫", "reading": "rtl", "count": 40, "tip": "黑白网点、大量速度线…" },
-    "cn": { "zh": "中式彩漫", "reading": "ltr", "count": 38, "tip": "彩色、干净线稿…" },
-    "kr": { "zh": "韩式条漫", "reading": "vertical", "count": 40, "tip": "细线＋柔和厚涂…" },
-    "core": { "zh": "通用/跨界", "reading": "ltr", "count": 20, "tip": "中性骨架…" }
+    "jp": { "zh": "日式页漫", "reading": "rtl", "count": 1240, "tip": "黑白网点、大量速度线…" },
+    "cn": { "zh": "中式彩漫", "reading": "ltr", "count": 1238, "tip": "彩色、干净线稿…" },
+    "kr": { "zh": "韩式条漫", "reading": "vertical", "count": 1240, "tip": "细线＋柔和厚涂…" },
+    "core": { "zh": "通用/跨界", "reading": "ltr", "count": 1220, "tip": "中性骨架…" }
   },
   "intents": [{ "id": "action", "zh": "战斗动作", "en": "action", "beats": 6, "keywords": 33 }],
   "roles":   [{ "id": "impact", "zh": "冲击大格", "shot": "impact panel, dramatic wide" }],
@@ -66,12 +66,13 @@
 | `ratio` | `a4` `b5` `p34` `square` `wide` `strip` `tall` `scroll` |
 | `density` | `low` `mid` `high` `dense` |
 | `minPanels` / `maxPanels` | 格数区间 |
-| `limit` / `offset` | 分页，`limit` ≤ 500 |
+| `curated` | `1` 只看手工精选（138 套），`0` 只看扩展（规则生成的 4800 套）；不填两者都要 |
+| `limit` / `offset` | 分页，`limit` ≤ 500（默认 500；全库近五千套，要全量就翻页） |
 | `sort` | `id`（默认）/ `panels` / `panels-desc` |
 
 ```json
 {
-  "total": 40,
+  "total": 1240,
   "items": [{
     "id": "jp-shonen-3tier", "name": "少年漫·三段落とし（标准事件页）",
     "culture": "jp", "reading": "rtl", "ratio": "a4",
@@ -80,6 +81,7 @@
     "tags": ["少年", "三段落", "大格", "全景", "特写"],
     "intents": ["action", "daily", "dialogue"],
     "desc": "上段「引き」交代空间…",
+    "curated": true, "family": null,
     "thumbSlots": [{ "id": "p1", "order": 1, "role": "wide", "poly": [[...]], "over": false }]
   }]
 }
@@ -104,6 +106,16 @@
   }]
 }
 ```
+
+模板有两种来源，接口完全一样：
+
+| 来源 | id 形如 | 多出来的字段 | 说明 |
+| --- | --- | --- | --- |
+| 手工精选（138 套） | `jp-shonen-3tier` | `curated: true` | 名字、说明、标签都是人写的；匹配分数接近时略占先 |
+| 扩展（4800 套） | `jpg-0001` / `krg-0001` / `cng-0001` / `cog-0001` | `generated: true`、`family` | `scripts/gen-library.mjs` 按各家分镜规律生成；固定种子，id 永远指向同一套版式 |
+
+`family` 是扩展模板的版式家族：`jp-page` / `jp-spread` / `jp-splash` / `jp-4koma`、`kr-strip` / `kr-fast`、
+`cn-strip` / `cn-page` / `cn-longscroll` / `cn-4koma`、`core-grid` / `core-bsp` / `core-page` / `core-wide` / `core-poster` / `core-splash` / `core-strip`。
 
 ## GET /api/templates/{id}/svg
 
@@ -158,7 +170,7 @@ curl -o panel.svg "http://127.0.0.1:7311/api/templates/jp-shonen-3tier/svg?width
     "why": ["主打戏路匹配「战斗动作」", "画面气质命中：少年、斜切、动势", "节拍命中 83%（6 拍）", "画风体系：日式页漫"],
     "breakdown": { "intent": 1, "tags": 0.667, "beats": 0.872, "panels": 1, "culture": 1, "ratio": 0.6, "pace": 1 }
   }],
-  "total": 138
+  "total": 4938
 }
 ```
 

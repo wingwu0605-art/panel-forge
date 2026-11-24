@@ -1812,3 +1812,136 @@ AI 分镜已收起（随时可以再打开）	AI storyboarding hidden (you can b
 ✓ 分镜自动结束 · 用时 {0}	✓ Auto storyboard finished · took {0}	✓ Papan cerita otomatis selesai · waktu {0}	✓ コマ割り自動が終わりました · 所要 {0}
 先在左边写剧情并点「按规则匹配」	Write a plot on the left and click “Match by rules”	Tulis alur cerita di kiri lalu klik “Cocokkan dengan aturan”	左であらすじを書いて「ルールでマッチ」を押してください
 （未填，写一段剧情再按规则匹配）	(empty — write a plot and match by rules)	(kosong — tulis alur cerita lalu cocokkan dengan aturan)	（未入力。あらすじを書いてルールでマッチしてください）
+一格通版	Single full-page panel	Satu panel satu halaman	全面 1 コマ
+一格通版＋一个角格	Full-page panel + 1 corner panel	Panel satu halaman + 1 panel sudut	全面 1 コマ＋角ゴマ 1 つ
+一格通版＋二个角格	Full-page panel + 2 corner panels	Panel satu halaman + 2 panel sudut	全面 1 コマ＋角ゴマ 2 つ
+一段三格	1-tier 3-panel	1 baris 3 panel	1 段 3 コマ
+一段二格	1-tier 2-panel	1 baris 2 panel	1 段 2 コマ
+一段四格	1-tier 4-panel	1 baris 4 panel	1 段 4 コマ
+七格分割	7-panel split	7 panel bebas	7 コマ分割
+七格竖排	7-panel vertical	7 panel vertikal	縦並び 7 コマ
+七格网格	7-panel grid	Grid 7 panel	7 コマのグリッド
+三格分割	3-panel split	3 panel bebas	3 コマ分割
+三格竖排	3-panel vertical	3 panel vertikal	縦並び 3 コマ
+三格网格	3-panel grid	Grid 3 panel	3 コマのグリッド
+三段七格	3-tier 7-panel	3 baris 7 panel	3 段 7 コマ
+三段三格	3-tier 3-panel	3 baris 3 panel	3 段 3 コマ
+三段九格	3-tier 9-panel	3 baris 9 panel	3 段 9 コマ
+三段五格	3-tier 5-panel	3 baris 5 panel	3 段 5 コマ
+三段八格	3-tier 8-panel	3 baris 8 panel	3 段 8 コマ
+三段六格	3-tier 6-panel	3 baris 6 panel	3 段 6 コマ
+三段四格	3-tier 4-panel	3 baris 4 panel	3 段 4 コマ
+三段长卷	3-section scroll	Gulungan 3 bagian	3 段の絵巻
+下半竖切	Tall panel in the lower half	Panel tinggi di bagian bawah	下半分に縦長ゴマ
+九格分割	9-panel split	9 panel bebas	9 コマ分割
+九格竖排	9-panel vertical	9 panel vertikal	縦並び 9 コマ
+九格网格	9-panel grid	Grid 9 panel	9 コマのグリッド
+二格分割	2-panel split	2 panel bebas	2 コマ分割
+二格竖排	2-panel vertical	2 panel vertikal	縦並び 2 コマ
+二格网格	2-panel grid	Grid 2 panel	2 コマのグリッド
+二段三格	2-tier 3-panel	2 baris 3 panel	2 段 3 コマ
+二段二格	2-tier 2-panel	2 baris 2 panel	2 段 2 コマ
+二段五格	2-tier 5-panel	2 baris 5 panel	2 段 5 コマ
+二段六格	2-tier 6-panel	2 baris 6 panel	2 段 6 コマ
+二段四格	2-tier 4-panel	2 baris 4 panel	2 段 4 コマ
+二段长卷	2-section scroll	Gulungan 2 bagian	2 段の絵巻
+五格分割	5-panel split	5 panel bebas	5 コマ分割
+五格竖排	5-panel vertical	5 panel vertikal	縦並び 5 コマ
+五格网格	5-panel grid	Grid 5 panel	5 コマのグリッド
+五段九格	5-tier 9-panel	5 baris 9 panel	5 段 9 コマ
+五段十一格	5-tier 11-panel	5 baris 11 panel	5 段 11 コマ
+五段十二格	5-tier 12-panel	5 baris 12 panel	5 段 12 コマ
+五段十格	5-tier 10-panel	5 baris 10 panel	5 段 10 コマ
+五段长卷	5-section scroll	Gulungan 5 bagian	5 段の絵巻
+停顿留白	Pause whitespace	Ruang kosong jeda	間を作る余白
+八格分割	8-panel split	8 panel bebas	8 コマ分割
+八格竖排	8-panel vertical	8 panel vertikal	縦並び 8 コマ
+八格网格	8-panel grid	Grid 8 panel	8 コマのグリッド
+六格分割	6-panel split	6 panel bebas	6 コマ分割
+六格竖排	6-panel vertical	6 panel vertikal	縦並び 6 コマ
+六格网格	6-panel grid	Grid 6 panel	6 コマのグリッド
+六段长卷	6-section scroll	Gulungan 6 bagian	6 段の絵巻
+出血大格	Bleeding big panel	Panel besar bleed	裁ち切り大ゴマ
+十一格分割	11-panel split	11 panel bebas	11 コマ分割
+十一格竖排	11-panel vertical	11 panel vertikal	縦並び 11 コマ
+十一格网格	11-panel grid	Grid 11 panel	11 コマのグリッド
+十二格竖排	12-panel vertical	12 panel vertikal	縦並び 12 コマ
+十格分割	10-panel split	10 panel bebas	10 コマ分割
+十格竖排	10-panel vertical	10 panel vertikal	縦並び 10 コマ
+十格网格	10-panel grid	Grid 10 panel	10 コマのグリッド
+双排四格	Two yonkoma strips	Dua strip yonkoma	4 コマ 2 本並び
+四格分割	4-panel split	4 panel bebas	4 コマ分割
+四格竖排	4-panel vertical	4 panel vertikal	縦並び 4 コマ
+四格网格	4-panel grid	Grid 4 panel	4 コマのグリッド
+四段七格	4-tier 7-panel	4 baris 7 panel	4 段 7 コマ
+四段九格	4-tier 9-panel	4 baris 9 panel	4 段 9 コマ
+四段八格	4-tier 8-panel	4 baris 8 panel	4 段 8 コマ
+四段六格	4-tier 6-panel	4 baris 6 panel	4 段 6 コマ
+四段十一格	4-tier 11-panel	4 baris 11 panel	4 段 11 コマ
+四段十格	4-tier 10-panel	4 baris 10 panel	4 段 10 コマ
+四段长卷	4-section scroll	Gulungan 4 bagian	4 段の絵巻
+国风条漫	Chinese-style webtoon	Webtoon gaya Tiongkok	国風縦読み
+国风长卷	Chinese-style handscroll	Gulungan gaya Tiongkok	国風絵巻
+国风页漫	Chinese-style page comic	Komik halaman gaya Tiongkok	国風ページ漫画
+大格压轴	Big panel finale	Panel besar penutup	大ゴマで締め
+大格叠格	Big panel + stacked pair	Panel besar + dua bertumpuk	大ゴマ＋重ね 2 コマ
+平稳叙事	Steady storytelling	Narasi tenang	落ち着いた語り
+并排对切	Side-by-side cuts	Potongan berdampingan	横並びの切り返し
+彩漫四格	Color yonkoma	Yonkoma berwarna	カラー4 コマ
+快剪	Fast cuts	Potongan cepat	速いカット割り
+手部插入	Hand insert	Sisipan tangan	手の差し込み
+整页	Splash page	Halaman penuh	一枚絵
+斜切出血	Diagonal + bleed	Diagonal + bleed	斜め＋裁ち切り
+斜切推进	Diagonal push	Dorongan diagonal	斜めゴマで畳みかけ
+无框留白	Borderless whitespace	Ruang kosong tanpa bingkai	枠なしの余白
+标题＋大图	Title + big image	Judul + gambar besar	タイトル＋大ゴマ
+海报	Poster	Poster	ポスター
+物件插入	Object insert	Sisipan objek	物の差し込み
+特写插入	Close-up insert	Sisipan close-up	アップの差し込み
+眼部插入	Eye insert	Sisipan mata	目の差し込み
+立轴留白	Hanging-scroll panels	Panel gulungan gantung	掛け軸風の縦長ゴマ
+起承转合	Kishōtenketsu	Kishōtenketsu	起承転結
+通天竖格	Full-height tall panel	Panel tinggi penuh	通しの縦長ゴマ
+错位留白	Staggered whitespace	Ruang kosong berselang	ずらした余白
+锯齿斜切	Zigzag diagonals	Diagonal zigzag	ジグザグ斜めゴマ
+静默收尾	Silent ending	Penutup hening	静かな締め
+题字留白	Calligraphy space	Ruang kaligrafi	題字の余白
+从右往左读，{#0} 段 {#1} 格	Read right to left, {0} tiers, {1} panels	Dibaca dari kanan ke kiri, {0} baris, {1} panel	右から左へ読む、{0} 段 {1} コマ
+从左往右读，{#0} 段 {#1} 格	Read left to right, {0} tiers, {1} panels	Dibaca dari kiri ke kanan, {0} baris, {1} panel	左から右へ読む、{0} 段 {1} コマ
+横版，{#0} 段 {#1} 格	Landscape, {0} tiers, {1} panels	Lanskap, {0} baris, {1} panel	横長、{0} 段 {1} コマ
+长卷从左往右展开，{#0} 段 {#1} 格	A handscroll unrolling left to right, {0} sections, {1} panels	Gulungan terbuka dari kiri ke kanan, {0} bagian, {1} panel	絵巻が左から右へ広がる、{0} 段 {1} コマ
+竖屏滚动，{#0} 格	Vertical scroll, {0} panels	Gulir vertikal, {0} panel	縦スクロール、{0} コマ
+自由切分，{#0} 格	Free split, {0} panels	Pembagian bebas, {0} panel	自由分割、{0} コマ
+网格切分，{#0} 格	Grid split, {0} panels	Pembagian grid, {0} panel	グリッド分割、{0} コマ
+最大的是第 {#0} 格，约占全部格子的 {#1}%	The biggest is panel {0}, about {1}% of the total panel area	Panel terbesar adalah panel {0}, sekitar {1}% dari total area panel	一番大きいのは {0} コマ目で、全コマの約 {1}%
+第 {#0} 格最长，停留最久	Panel {0} is the tallest, so readers linger there	Panel {0} paling panjang, pembaca berhenti paling lama di sana	{0} コマ目が一番長く、読者が長く留まる
+整页一格出血，压 {#0} 个角格	One full-bleed page panel with {0} corner panels on top	Satu panel bleed satu halaman dengan {0} panel sudut di atasnya	全面裁ち切りの 1 コマに角ゴマを {0} つ重ねる
+整页一格出血	One full-bleed page panel	Satu panel bleed satu halaman	全面裁ち切りの 1 コマ
+插入一格{0}，压在前一格上	An insert ({0}) overlaps the previous panel	Sisipan ({0}) menumpuk di panel sebelumnya	{0}の差し込みゴマが前のコマに重なる
+适合{0}	Good for {0}	Cocok untuk {0}	{0}向き
+斜切制造速度感	Diagonal cuts add speed	Potongan diagonal menambah kesan cepat	斜めゴマでスピード感を出す
+最重的一格出血，冲出页边	The key panel bleeds past the page edge	Panel utama bleed melewati tepi halaman	一番重いコマが裁ち切りでページの端を越える
+安静的格子去掉边框	Quiet panels drop their borders	Panel yang tenang tanpa bingkai	静かなコマは枠線なし
+一大格配两个叠起来的小格	One big panel beside two stacked small ones	Satu panel besar di samping dua panel kecil bertumpuk	大ゴマ 1 つに小ゴマ 2 つを重ねて添える
+锯齿斜切，节奏最急	Zigzag diagonals for the fastest rhythm	Diagonal zigzag untuk ritme paling cepat	ジグザグの斜めゴマで一番速いリズム
+一格竖长格贯穿整侧	A tall panel runs the full height of one side	Satu panel tinggi memenuhi satu sisi	縦長のコマが片側を上から下まで占める
+下半页一格竖长格	A tall panel in the lower half	Satu panel tinggi di bagian bawah	下半分に縦長のコマ
+两条四格并排，右边那条先读	Two yonkoma strips side by side; read the right one first	Dua strip yonkoma berdampingan; baca yang kanan dulu	4 コマを 2 本並べ、右の列から読む
+小格左右错位，留白当呼吸	Small panels stagger left and right; whitespace is the breath	Panel kecil berselang kiri-kanan; ruang kosong jadi napas	小ゴマを左右にずらし、余白で呼吸させる
+大格左右出血，撑满屏宽	Big panels bleed left and right to fill the screen width	Panel besar bleed kiri-kanan memenuhi lebar layar	大ゴマを左右に裁ち切り、画面幅いっぱいに
+两格并排，适合对切或反应	Two panels side by side for back-and-forth cuts or reactions	Dua panel berdampingan untuk potongan bolak-balik atau reaksi	2 コマを横に並べ、切り返しやリアクションに
+关键格前多留一段白，节奏停一下	Extra whitespace before key panels makes the rhythm pause	Ruang kosong ekstra sebelum panel penting membuat ritme berhenti sejenak	大事なコマの前に余白を足して、リズムに間を作る
+大格上留出题字区	Leaves a calligraphy title area on the big panel	Menyisakan area kaligrafi judul di panel besar	大ゴマに題字のスペースを残す
+立轴式竖长格，两边大留白	Hanging-scroll tall panels with wide whitespace on both sides	Panel tinggi ala gulungan gantung dengan ruang kosong lebar di kedua sisi	掛け軸のような縦長ゴマ、両側に大きな余白
+四格：起、承、转、合	Yonkoma: setup, development, twist, payoff	Yonkoma: pembuka, pengembangan, kejutan, penutup	4 コマ：起・承・転・結
+格子吸附网格，排版整齐	Panels snap to a grid for a tidy page	Panel mengikuti grid sehingga halaman rapi	コマがグリッドに揃い、整ったページに
+上面留标题，中间一张大图	Title space on top, one big image in the middle	Ruang judul di atas, satu gambar besar di tengah	上にタイトル、真ん中に大きな 1 枚
+再显示 {#0} 套（还有 {#1} 套）	Show {0} more ({1} left)	Tampilkan {0} lagi (sisa {1})	さらに {0} 種を表示（残り {1} 種）
+精选	Curated	Pilihan	厳選
+扩展	Extended	Tambahan	拡張
+来源	Source	Sumber	出どころ
+{#0} 套（精选 {#1} 套 + 扩展 {#2} 套）	{0} templates ({1} curated + {2} extended)	{0} template ({1} pilihan + {2} tambahan)	{0} 種（厳選 {1} 種＋拡張 {2} 種）
+中式 / 国风	Chinese / Chinese style	Tiongkok / gaya Tiongkok	中国式 / 国風
+通用 / 跨界	Universal / crossover	Umum / lintas gaya	汎用 / ジャンル横断
+只看精选	Curated only	Hanya pilihan	厳選のみ
+点开任意一套即可在编辑器里使用。精选是手做的版式；扩展是按日漫、韩漫条漫、国风、通用各自的分镜规律生成、逐套体检过的版式。	Open any template to use it in the editor. Curated ones are hand-made; extended ones are generated from the paneling conventions of Japanese manga, Korean webtoons, Chinese-style comics and universal layouts, and every one is checked.	Buka templat mana pun untuk memakainya di editor. Pilihan dibuat dengan tangan; tambahan dibuat dari kaidah panel manga Jepang, webtoon Korea, komik gaya Tiongkok, dan tata letak umum, dan setiap templat sudah diperiksa.	どれを開いてもエディターでそのまま使えます。厳選は手作りのレイアウト、拡張は日本の漫画・韓国の縦読み・国風・汎用それぞれのコマ割りの決まりから生成し、1 つずつ検査したレイアウトです。

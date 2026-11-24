@@ -13,7 +13,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { TEMPLATES, listTemplates, getTemplate, slim } from './lib/library.mjs';
+import { TEMPLATES, COUNTS, listTemplates, getTemplate, slim } from './lib/library.mjs';
+import { sheetPageHTML } from './lib/sheet-page.mjs';
 import { renderTemplateSVG } from './lib/svg.mjs';
 import { matchTemplates, planStory, analyzePlot, buildPlan, RULES_VERSION, RULE_STATS } from './lib/matcher.mjs';
 import { INTENTS, ROLES, STYLE_PACKS, COMMON_NEGATIVE, SCENES, TONES, DIRECTIVES, NEGATORS, VOCAB_STATS, BEAT_EN } from './lib/taxonomy.mjs';
@@ -475,6 +476,7 @@ const routes = [
       limit: q.get('limit') ? Math.min(500, Number(q.get('limit'))) : 500,
       offset: q.get('offset') ? Number(q.get('offset')) : 0,
       sort: q.get('sort') || 'id',
+      curated: q.get('curated') === '1' ? true : q.get('curated') === '0' ? false : undefined,
     });
     return { total: r.total, items: r.items.map(slim) };
   }],
@@ -631,7 +633,7 @@ const routes = [
     return { __raw: buf, __type: type };
   }],
 
-  ['GET', /^\/api\/sheet$/, async (req, url) => ({ __html: sheetHTML(url.searchParams.get('culture') || 'all') })],
+  ['GET', /^\/api\/sheet$/, async () => ({ __html: sheetHTML() })],
 
   ['GET', /^\/api\/docs$/, async () => ({ __html: docsHTML() })],
 ];
@@ -766,20 +768,9 @@ server.listen(PORT, HOST, () => {
 /* ------------------------------------------------------------------ *
  * 简易页面（/api/sheet 与 /api/docs）
  * ------------------------------------------------------------------ */
-function sheetHTML(culture) {
-  const list = culture === 'all' ? TEMPLATES : TEMPLATES.filter((t) => t.culture === culture);
-  const cards = list.map((t) => `
-    <figure>
-      ${renderTemplateSVG(t, { width: 260, showNumbers: true })}
-      <figcaption><b>${t.id}</b> · ${t.name}<br><span>${t.slots.length} 格 · ${t.ratio} · ${t.frame} · ${t.intents.join('/')}</span></figcaption>
-    </figure>`).join('');
-  return `<!doctype html><meta charset="utf-8"><title>PanelForge 接触表</title>
-  <style>body{background:#14151a;color:#e8e6e2;font:13px/1.5 system-ui,'Microsoft YaHei';padding:22px}
-  h1{font-size:18px}.grid{display:grid;grid-template-columns:repeat(auto-fill,260px);gap:18px}
-  figure{margin:0;background:#fff;color:#222;border-radius:8px;overflow:hidden}
-  svg{display:block;width:100%;height:auto}figcaption{padding:6px 8px;font-size:11px}
-  figcaption span{color:#777}</style>
-  <h1>PanelForge 分镜接触表 · ${culture} · ${list.length} 套</h1><div class="grid">${cards}</div>`;
+/** 全部模板一览：和静态版 sheet.html 同一个页面（浏览器里读模板库、分批画缩略图；?culture=jp 直接打开那一类） */
+function sheetHTML() {
+  return sheetPageHTML({ lib: '/lib/', i18n: '/i18n.mjs', home: '/', editions: { pure: '/?mode=pure', painter: '/?mode=artist' }, counts: COUNTS });
 }
 
 function docsHTML() {

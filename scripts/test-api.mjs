@@ -38,7 +38,18 @@ check('GET /api/meta', meta.status === 200 && meta.body.intents.length >= 16,
 
 // 2 模板
 const list = await get('/api/templates?limit=1000');
-check('GET /api/templates', list.status === 200 && list.body.total >= 100, `共 ${list.body.total} 套`);
+check('GET /api/templates', list.status === 200 && list.body.total >= 4000 && list.body.items.length === 500, `共 ${list.body.total} 套，一页 ${list.body.items.length}`);
+
+const cur = await get('/api/templates?curated=1&limit=500');
+const gen = await get('/api/templates?curated=0&culture=kr&limit=3&offset=10');
+check('GET /api/templates?curated=1|0（精选 / 扩展）',
+  cur.body.total === 138 && cur.body.items.every((t) => t.curated)
+  && gen.body.total >= 1000 && gen.body.items.length === 3 && gen.body.items.every((t) => !t.curated && t.culture === 'kr' && t.family && t.thumbSlots.length === t.panels),
+  `精选 ${cur.body.total} · 韩漫扩展 ${gen.body.total}（${gen.body.items.map((t) => t.id).join(' ')}）`);
+
+const g1 = await get('/api/templates/cng-0001');
+check('GET /api/templates/:id（扩展模板）', g1.status === 200 && g1.body.generated && g1.body.slots.length === g1.body.panels && g1.body.slots.every((s) => s.poly?.length >= 3 && s.shape),
+  `${g1.body.name} · ${g1.body.slots?.length} 格`);
 
 const jp = await get('/api/templates?culture=jp');
 check('GET /api/templates?culture=jp', jp.status === 200 && jp.body.items.every((t) => t.culture === 'jp'),
@@ -98,8 +109,12 @@ const tools = await get('/api/ai-tools.json');
 check('GET /api/ai-tools.json', tools.status === 200 && tools.body.tools.openai.length >= 6 && !!tools.body.systemPrompt,
   `${tools.body.tools.openai.length} 个工具`);
 
+// 一览页现在在浏览器里分批画（几千套不能在服务端一次拼完），所以只查页面骨架：读模板库、各类数量对得上
 const sheet = await get('/api/sheet?culture=kr');
-check('GET /api/sheet', sheet.status === 200 && String(sheet.body).includes('<svg'), `${String(sheet.body).length} 字节`);
+const sheetHtml = String(sheet.body);
+check('GET /api/sheet', sheet.status === 200 && sheetHtml.includes("from '/lib/library.mjs'")
+  && sheetHtml.includes(`<i>${health.body.templates}</i>`) && sheetHtml.includes(`<i>${meta.body.cultures.kr.count}</i>`),
+  `${sheetHtml.length} 字节`);
 
 const root = await get('/');
 check('GET / 网页', root.status === 200 && String(root.body).includes('PanelForge'));

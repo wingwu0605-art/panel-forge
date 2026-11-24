@@ -386,6 +386,70 @@ console.log('\n翻译引擎（英 / 日 / 印尼）');
   eq('中文界面：不加语言要求', core.langNote('zh'), '');
 }
 
+/* ---------------- 扩展模板库（生成的几千套） ---------------- */
+console.log('\n扩展模板库：数量 / 几何 / 不重复 / 可复现 / 名字能翻译');
+{
+  const L = await import('../lib/library.mjs');
+  const { fingerprint, DedupeIndex } = await import('./libgen/quality.mjs');
+  const { inspectSlots } = await import('../lib/geometry.mjs');
+  for (const c of ['jp', 'kr', 'cn', 'core']) {
+    ok(`「${{ jp: '日漫', kr: '韩漫条漫', cn: '国风', core: '通用' }[c]}」这一类 ≥ 1000 套`, L.COUNTS.byCulture[c].total >= 1000);
+  }
+  const gen = L.TEMPLATES.filter((t) => t.generated);
+  ok('精选 138 套都还在，扩展的有几千套', L.COUNTS.curated === 138 && gen.length >= 4000);
+  // 几何：每套展开后格数对得上、阅读顺序 1..n 连续、没有重叠 / 出界 / 过小
+  let badCount = 0, badOrder = 0, badGeo = 0;
+  for (const t of gen) {
+    const sl = t.slots;
+    if (sl.length !== t.panels) badCount++;
+    if (sl.some((s, i) => s.order !== i + 1)) badOrder++;
+    const scroll = t.page.kind === 'scroll';
+    // 和 validate.mjs 同一把尺子：条漫留白多，覆盖率门槛低一些
+    if (inspectSlots(sl, t.page, { minSide: scroll ? 70 : 44, minCoverage: scroll ? 0.55 : 0.72 }).length) badGeo++;
+  }
+  ok('每套展开后的格数 = 声明的格数', badCount === 0, `${badCount} 套不对`);
+  ok('每套的阅读顺序是 1..n 连续的', badOrder === 0, `${badOrder} 套不对`);
+  ok('每套都过版面体检（不重叠 / 不出界 / 不过小）', badGeo === 0, `${badGeo} 套不过`);
+  // 不重复：扩展的每一套都不和任何一套（精选 + 先生成的）「几乎一样」。
+  // 精选之间本来就有同骨架不同戏路的（jp-talk-4 / jp-climax-eyes），那是手工有意为之，不算
+  const idx = new DedupeIndex();
+  for (const t of L.TEMPLATES) if (!t.generated) idx.add(fingerprint(t.slots, t.page, t.ratio));
+  let dups = 0;
+  for (const t of gen) {
+    const fp = fingerprint(t.slots, t.page, t.ratio);
+    if (idx.has(fp)) dups++;
+    idx.add(fp);
+  }
+  ok('扩展的模板没有一套和别的「几乎一样」（逐格顶点平均位移 < 2.8%）', dups === 0, `${dups} 套近似`);
+  // 每套都有景别 / 戏路 / 标签，戏路都是已知的
+  const { INTENTS, ROLES } = await import('../lib/taxonomy.mjs');
+  ok('每套的景别都是已知的 22 种之一', gen.every((t) => t.slots.every((s) => ROLES[s.role])));
+  ok('每套至少一条戏路，都是已知戏路', gen.every((t) => t.intents.length >= 1 && t.intents.every((i) => INTENTS[i])));
+  const perIntent = Object.fromEntries(Object.keys(INTENTS).map((k) => [k, L.TEMPLATES.filter((t) => t.intents.includes(k)).length]));
+  ok('26 种戏路每种都有上百套可选', Object.values(perIntent).every((v) => v >= 100), JSON.stringify(perIntent));
+  // 可复现：同一个种子重跑，日漫前 40 套和包里的一模一样（编号才稳定）
+  const G = await import('./gen-library.mjs');
+  const fresh = await G.generate('jp', await G.curatedIndex(), 40);
+  const pack = (await import('../lib/packs/jp.mjs')).default;
+  ok('生成器可复现：同一种子重跑，前 40 套与包里完全一致', fresh.out.every((x, i) => JSON.stringify(x.entry) === JSON.stringify(pack[i])));
+  // 名字和说明在三种语言里都翻得出来（不留中文）
+  const { ensureLang, translate } = await import('../web/i18n.mjs');
+  for (const lang of ['en', 'id']) {
+    await ensureLang(lang);
+    const left = gen.filter((t) => /[\u4e00-\u9fff]/.test(translate(t.name, lang) + translate(t.desc, lang)));
+    ok(`扩展模板的名字和说明在 ${lang} 里没有漏翻`, left.length === 0, left.slice(0, 2).map((t) => t.name).join(' / '));
+  }
+  // 规则匹配：几千套里也很快，前几名不会是一排同家族同格数的
+  const M = await import('../lib/matcher.mjs');
+  const t0 = performance.now();
+  const r = M.matchTemplates('雨夜的屋顶上，他缓缓拔出刀；敌人从背后偷袭，他反手一刀斩断对方的刀锋', { limit: 12 });
+  const ms = performance.now() - t0;
+  const fam = {};
+  for (const x of r.results) if (!x.curated) { const t = L.getTemplate(x.id); const k = `${t.culture}|${t.family}|${t.panels}`; fam[k] = (fam[k] || 0) + 1; }
+  ok('规则匹配在几千套里 < 300ms', ms < 300, `${ms.toFixed(0)}ms`);
+  ok('匹配结果有多样性（同类同格数的扩展模板最多 2 套）', Object.values(fam).every((v) => v <= 2), JSON.stringify(fam));
+}
+
 console.log(`\n${fail ? '❌' : '✅'}  ${pass} 通过 / ${fail} 失败`);
 
 

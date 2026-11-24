@@ -5,6 +5,8 @@
 > 加零依赖目视检查工具；接着把手机端「拖动/缩放卡」从根上修了（拖动不再重建整页，图片走 Blob）；
 > 再接入 Klecks 做「绘制这一格」；最后**换掉许可**（软件不可商用 / 产出物可商用）并产出**画师版独立入口**。
 > 第五节是这轮的结论与实测数字，别重复查。
+> **再下一轮（2026-11）**：模板库从 138 套扩到 **4938 套**（日漫 / 韩漫条漫 / 国风 / 通用 各 1200 套扩展 + 原来的 138 套精选），
+> 见「五之四」——**改模板库之前必读**，尤其是「包是数据、只能 --append」那条。
 
 ## 〇、三个网页 + 许可（先看这条，别搞混）
 
@@ -64,7 +66,7 @@ $env:PATH = "D:\nodejs;$env:PATH"
 cd "D:\harness workspace\新建文件夹\panel-forge"
 node server.mjs                 # http://127.0.0.1:7311/
 node scripts/build-static.mjs   # 生成 site/ 给 Pages（会自动给 css/js 打内容哈希版本号）
-node scripts/validate.mjs       # 138 套模板版面体检
+node scripts/validate.mjs       # 4938 套模板版面体检（精选 138 + 扩展 4800）
 node scripts/test-units.mjs     # 25 项纯函数：生图尺寸映射（不启服务器）
 node scripts/test-api.mjs       # 41 项（要先 node server.mjs）
 node scripts/test-llm-mock.mjs  # 22 项（自己起 mock 在 7399，先确保 7399 没被占）
@@ -83,7 +85,12 @@ node scripts/perf-bench.mjs     # 拖动性能赛跑：灌 N 张图 → 合成�
 
 | 路径 | 内容 |
 | --- | --- |
-| `lib/library-*.mjs` | 138 套模板数据（jp 40 / cn 38 / kr 40 / core 20）|
+| `lib/library-*.mjs` | 138 套**精选**模板（手做；jp 40 / cn 38 / kr 40 / core 20）|
+| `lib/packs/{jp,kr,cn,core}.mjs` | 4800 套**扩展**模板（每类 1200，`gen-library.mjs` 的产物，**别手改**）· `decode.mjs` 把紧凑条目解回模板 |
+| `lib/library.mjs` | 总装：精选载入即算几何，扩展是「懒模板」（`slots` 是 getter，第一次读才展开并缓存）· `meta()` / `slim()` / `COUNTS` |
+| `scripts/gen-library.mjs` · `scripts/libgen/` | 扩展模板生成器：`beats`（戏路→节拍→格子轻重）· `grammar`（各家版面语法）· `quality`（体检 + 去重指纹）· `label`（景别 / 标签 / 戏路 / 名字 / 说明）· `rng`（固定种子）|
+| `lib/align.mjs` | 节拍 ↔ 格子对齐（`matcher.mjs` 和生成器共用；放单独文件是为了生成器不必加载整个模板库）|
+| `lib/sheet-page.mjs` | 全部模板一览页（`/api/sheet` 与静态版 `sheet.html` 同一个页面，浏览器里分批画）|
 | `lib/matcher.mjs` | 规则引擎 + `buildPlan()`（**提示词就是这里拼的**）|
 | `lib/shapes.mjs` | 10 类格子形状 → `prefixEn/prefixZh/suffixEn/suffixZh` |
 | `lib/svg.mjs` | 整页 SVG 渲染器（服务端/浏览器共用）+ `imageAttrs()`（热路径补丁与渲染共用同一份计算）|
@@ -128,7 +135,7 @@ node scripts/perf-bench.mjs     # 拖动性能赛跑：灌 N 张图 → 合成�
 
 ## 四、当前功能清单（都已上线）
 
-- 138 套模板浏览 / 镂空 / 拖图粘贴 / 按阅读顺序填充
+- 4938 套模板浏览（一次 48 套、滚到底续上；「来源」可筛 精选 / 扩展）/ 镂空 / 拖图粘贴 / 按阅读顺序填充
 - 剧情 → 规则匹配（26 戏路 / 1150 关键词）
 - 每格：本格句子、中英形状词（各带复制）、「这里应该是」建议句
 - 气泡：14 种、可拖/缩/转/调透明度、放进气泡
@@ -243,6 +250,45 @@ iPhone 上还叠了三个放大器：单标签内存天花板（解码结果被�
 > 注：合成 `PointerEvent` 进不了 Klecks 的笔刷管线（它有自己的指针栈），自动化里必须用 CDP
 > `Input.dispatchMouseEvent` 派发**可信**事件。
 
+## 五之四、模板库扩到 4938 套（2026-11）
+
+K 的原话：「帮我扩张我们的漫画模板库，让每一种模板都能达到上千量级」，范围是 **日漫 / 韩漫条漫 / 国风 + 通用**。
+取舍（已定，别再问）：韩漫只做**竖屏条漫**（kr 的印刷页漫不扩）；国风 = **国风条漫 + 国风页漫 + 长卷**；
+手做的 138 套原样保留，叫「精选」。
+
+| 类 | 精选 | 扩展 | 扩展里的版式家族 |
+| --- | --- | --- | --- |
+| 日漫 `jp` | 40 | 1200 | `jp-page`（分段 + 斜切 + 越界插格）/ `jp-spread`（跨页）/ `jp-splash`（扉页大图）/ `jp-4koma` |
+| 韩漫条漫 `kr` | 40 | 1200 | `kr-strip`（无框、按节拍留白）/ `kr-fast`（细线快节奏连打）|
+| 国风 `cn` | 38 | 1200 | `cn-strip` / `cn-page`（粗墨框、悬挂格、题字格）/ `cn-longscroll`（长卷）/ `cn-4koma` |
+| 通用 `core` | 20 | 1200 | `core-grid`（对齐网格）/ `core-bsp`（自由切分）/ `core-page` / `core-wide` / `core-poster` / `core-splash` / `core-strip` |
+
+**生成一套的流程**（`scripts/gen-library.mjs` 的 `realize()`）：按权重挑家族 → 挑戏路 → `beatScript()` 排出这页的节拍
+（冲击 / 全景重，眼神 / 反应轻，格子大小跟着节拍走）→ 家族的版面语法出盒子树 → `buildSlots` 算几何、放插入格、定阅读顺序
+（插入格紧跟在它压着的那格后面读）→ 体检（重叠 / 出界 / 过小 / 覆盖率 / 比例 / 斜边太短）→ 配景别、标签、戏路、名字、说明 →
+和已有的每一套（含精选、含别的类）比指纹，逐格顶点**平均位移 < 2.8% 且最大 < 9%** 算重复、丢掉。
+
+**必须守的规矩**
+
+- **包是数据，不是缓存**：id（`jpg-0001` / `krg-` / `cng-` / `cog-`）会被别人存进草稿和链接。种子固定（`panel-forge/<类>/v1`），
+  不带参数重跑 = 逐字节复现现在的包（单独 `--culture cn` 也一样，已验证）。**改了生成器就只能 `--append`**
+  （`node scripts/gen-library.mjs --append --target 1500`：已有的全留、新编号往后接、照样和全库去重）。
+  真要整库重来，等于让所有旧 id 指向别的版式——先问 K。
+- 名字 = `体系·结构·特征·#编号`，说明 = 固定子句用「；」连起来。**子句全在 `i18n/strings.tsv` 里**（batch-21），
+  翻译引擎按 `·` / `；` / `、` 切开逐段翻，`{#n}` 匹配编号。生成器加了新子句 → `--phrases` 列出全部短语 → 补进 TSV →
+  `node scripts/i18n-build.mjs`；`test-units` 会查 4800 套在 en / id 里一个汉字都不剩。
+- 包的写法是 `export default JSON.parse('…')`（单引号字符串、一条一行）：比同样内容的对象字面量**解析快约 6 倍**，
+  四个包 gzip 后约 300 KB。别改回对象字面量。
+- **懒几何**：列表 / 筛选 / 搜索 / 匹配预筛只读元数据（`meta()`），画缩略图、打开模板、节拍对齐时才读 `t.slots`。
+  新写的代码要遍历全库时**别顺手读 `slots`**，否则一下展开 4800 套（Node 里约 0.2 秒，手机上一秒上下）。要格数用 `t.panels`。
+- **匹配**：`matcher.mjs` 拆成 `scoreCore`（只看元数据，同时给出分数上界）+ `scoreFinish`（节拍对齐，要几何）；
+  `rankTemplates()` 按上界从高到低补算，上界低于当前第 k 名就停——结果和逐套全算完全一样，但只展开几十套。
+  前几名每个「类|家族|格数」最多 2 套，免得一排全是同一种骨架；精选在分数接近时 +1.5。
+- **界面**：模板库一次渲染 48 张卡（`GRID_PAGE`），`IntersectionObserver` + 「再显示 N 套」按钮续上；
+  卡片右下角「精选」；筛选多了「来源」一行。`sheet.html` / `/api/sheet` 是客户端分批渲染（一批 60），`?culture=jp` 直达。
+- 实测：生成整库约 11 秒；匹配 30–70ms（首次）；4× CPU 节流下首屏 1.7–1.9s（扩库前 1.5–1.8s）；
+  每类不同骨架 788–949 种，2–12 格，每种戏路都有 200+ 套。
+
 ## 六、已知待办
 
 - [ ] **iPhone 真机复测**上面那张表（`?perf=1` 浮层已经就位），确认 60fps 能兑现
@@ -307,6 +353,10 @@ iPhone 上还叠了三个放大器：单标签内存天花板（解码结果被�
   别在媒体查询里直接写整条 `grid-template-columns`（会把「收起」顶掉）
 - **触屏双击 = 进编辑页，鼠标双击 = 选图**：手机浏览器双击后会补发 `dblclick`，`onCanvasDblClick` 只认鼠标
 - **选中 / 悬停不走整页重绘**：`patchHighlight()` 只改高亮层；所以「改了内容」必须自己调 `queueSave()`，别指望下一次重绘顺手存
+- **精选模板之间本来就有 26 对「同骨架」**（如 `jp-talk-4` / `jp-climax-eyes`：格子一样、戏路和景别不同），是手工有意为之；
+  去重测试只查扩展的那 4800 套，别把精选也塞进去然后去「修」它们
+- **单元测试里的版面体检要用和 `validate.mjs` 同一把尺子**（`minCoverage` 页漫 0.72 / 条漫 0.55）：
+  `inspectSlots` 默认 0.82，条漫留白多，用默认值会误报上千套
 - GitHub Pages 对 `.css/.js` 有 10 分钟缓存：`build-static.mjs` 已按内容哈希自动换 `?v=`，别再手改
 - Render/公网部署**不要**配 `LLM_API_KEY`（无鉴权会被白嫖）；`/api/proxy` 要求 `x-pf-client` 头 + 内网黑名单
 

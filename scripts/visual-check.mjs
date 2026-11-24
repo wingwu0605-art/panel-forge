@@ -1468,25 +1468,41 @@ const scenarios = [
         chips: document.querySelectorAll('#facetBar .fchip').length,
         cardTags: document.querySelectorAll('.tpl .ttag').length,
       })`);
-      check('四行筛选（格数/题材/画幅/标签）都在', bar.rows.length === 4 && bar.chips > 20,
+      check('五行筛选（格数/题材/画幅/标签/来源）都在', bar.rows.length === 5 && bar.rows.includes('来源') && bar.chips > 20,
         `${bar.rows.join('/')} · ${bar.chips} 个 chip`);
       check('每张模板卡带可点标签', bar.cardTags > 50, `${bar.cardTags} 个标签`);
       await shot('facets-bar');
 
-      // 点「4格」
-      await page.evaluate(`(() => {
-        const c = [...document.querySelectorAll('#facetBar .fchip')].find((x) => x.textContent.startsWith('4格'));
+      // 几千套：先排一批，「再显示」/ 滚到底接着排
+      const lib = await page.evaluate(`({
+        stat: document.querySelector('#statTpl')?.textContent || '',
+        total: parseInt(document.querySelector('#listCount')?.textContent || '0', 10),
+        cards: document.querySelectorAll('#tplGrid .tpl').length,
+        more: document.querySelector('#tplGrid .tpl-more')?.textContent || '',
+      })`);
+      check('模板库几千套（日 / 中 / 韩 / 通各 1000+），先只排 48 张卡', lib.total >= 4000 && lib.cards === 48 && /再显示 48 套/.test(lib.more),
+        `${lib.stat} · ${lib.cards} 张 · ${lib.more}`);
+      await page.evaluate("document.querySelector('#tplGrid .tpl-more').click()");
+      await sleep(400);
+      const more2 = await page.evaluate("document.querySelectorAll('#tplGrid .tpl').length");
+      check('点「再显示」接着排下一批', more2 === 96, `${more2} 张`);
+
+      // 点「4格」：数量和 chip 上写的一致，排出来的全是四格
+      const chip4 = await page.evaluate(`(() => {
+        const c = [...document.querySelectorAll('#facetBar .fchip')].find((x) => x.dataset.facet === 'panels' && x.dataset.val === '4');
+        const n = parseInt(c.querySelector('i')?.textContent || c.textContent.replace(/^4格/, ''), 10);
         c.click();
+        return n;
       })()`);
       await sleep(500);
       const four = await page.evaluate(`({
         count: (document.querySelector('#listCount')?.textContent || '').trim(),
-        // 筛选只切 hidden（卡片缓存着不重建），所以数「看得见的」
-        allFour: [...document.querySelectorAll('.tpl:not([hidden]) .mt span:first-child')].every((s) => s.textContent === '4格'),
-        n: document.querySelectorAll('.tpl:not([hidden])').length,
+        allFour: [...document.querySelectorAll('#tplGrid .tpl .mt span:first-child')].every((s) => s.textContent === '4格'),
+        n: document.querySelectorAll('#tplGrid .tpl').length,
         clear: !!document.querySelector('#facetClear'),
       })`);
-      check('点「4格」只剩四格模板', four.allFour && four.n === 24 && /24/.test(four.count), `${four.count} / ${four.n} 张`);
+      check('点「4格」只剩四格模板（数量对得上 chip）', four.allFour && parseInt(four.count, 10) === chip4 && four.n === Math.min(48, chip4),
+        `${four.count} / chip ${chip4} / 排出 ${four.n} 张`);
       check('有「清除筛选」', four.clear);
 
       // 点卡片上的标签（题材）也能筛选
@@ -1501,6 +1517,30 @@ const scenarios = [
       })`);
       check('点卡片标签能筛选（且过滤条高亮）', byTag.on && byTag.count !== four.count, `${four.count} → ${byTag.count}`);
 
+      // 来源：只看精选（手做的 138 套）
+      await page.evaluate("document.querySelector('#facetClear')?.click()");
+      await sleep(300);
+      await page.evaluate(`[...document.querySelectorAll('#facetBar .fchip')].find((x) => x.dataset.facet === 'pick' && x.dataset.val === 'curated')?.click()`);
+      await sleep(400);
+      const pick = await page.evaluate(`({
+        count: parseInt(document.querySelector('#listCount')?.textContent || '0', 10),
+        allPick: [...document.querySelectorAll('#tplGrid .tpl')].every((c) => c.querySelector('.pick')),
+      })`);
+      check('「来源：精选」只剩手做的 138 套，卡片都带「精选」', pick.count === 138 && pick.allPick, `${pick.count} 套`);
+
+      // 打开一套生成的模板：画布正常、名字带编号
+      await page.evaluate("document.querySelector('#facetClear')?.click()");
+      await sleep(300);
+      await page.evaluate(`[...document.querySelectorAll('#facetBar .fchip')].find((x) => x.dataset.facet === 'pick' && x.dataset.val === 'generated')?.click()`);
+      await sleep(400);
+      await page.evaluate("document.querySelector('#tplGrid .tpl')?.click()");
+      await sleep(700);
+      const gen = await page.evaluate(`({
+        name: document.querySelector('#tplName')?.textContent || '',
+        slots: document.querySelectorAll('#canvas [data-slot]').length || document.querySelectorAll('#canvas svg path, #canvas svg polygon').length,
+      })`);
+      check('打开一套扩展模板：画布出来、名字带编号', /#\d+/.test(gen.name) && gen.slots > 0, `${gen.name} · ${gen.slots}`);
+
       // 清除 + 用搜索框搜「战斗」（中文戏路名要能命中）
       await page.evaluate("document.querySelector('#facetClear')?.click()");
       await sleep(400);
@@ -1511,7 +1551,7 @@ const scenarios = [
       })()`);
       await sleep(600);
       const searched = await page.evaluate("(document.querySelector('#listCount')?.textContent || '').trim()");
-      check('搜索框能搜中文戏路（战斗）', /^[1-9]\d* 套/.test(searched) && searched !== '138 套', searched);
+      check('搜索框能搜中文戏路（战斗）', /^[1-9]\d* 套/.test(searched) && parseInt(searched, 10) < lib.total, `${searched} / ${lib.total}`);
       await shot('facets-search');
     },
   },

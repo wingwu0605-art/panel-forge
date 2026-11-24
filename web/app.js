@@ -191,9 +191,11 @@ async function init() {
   app.api = api = await makeApi();
   adaptTopLinksForStatic();
   const meta = await api.meta();
-  const list = await api.templates();
-  state.items = list.items;
-  state.filtered = list.items;
+  // 模板列表直接读本地同一份模板库（服务端版 /api/templates 一次最多给 500 条，而库里有几千套）；
+  // 缩略图要画的时候才展开那一套的几何
+  LIB = await import('./lib/library.mjs');
+  state.items = LIB.TEMPLATES.map(LIB.meta);
+  state.filtered = state.items;
   state.engine = meta.engine || null;
   // 戏路 id → 中文，模板库的题材筛选和搜索都要用
   state.intentZh = Object.fromEntries((Array.isArray(meta.intents) ? meta.intents : [])
@@ -321,8 +323,10 @@ function intentZh(id) {
 }
 
 /* ---------------- 模板库 ----------------
- * 138 张卡的缩略图只在第一次生成；之后搜索 / 筛选 / 换选中只切 hidden 和 .on。
- * 以前每敲一个字就把 138 个缩略图 SVG 重新拼一遍再 innerHTML（40–90ms），整排入场动画也跟着重放。 */
+ * 库里有几千套：只先排前 48 张卡，往下滚（或点「再显示」）再接着排；卡片做过就缓存，
+ * 搜索 / 筛选 / 换选中不重画缩略图。缩略图要画时才展开那一套的几何（lib/library.mjs 的懒加载）。 */
+let LIB = null;               // lib/library.mjs（init 里载入）
+const GRID_PAGE = 48;
 const tplCards = new Map();   // 模板 id → 卡片元素
 const tplHay = (t) => {
   const lang = getLang();
@@ -347,11 +351,12 @@ function tplCard(t) {
     ...t.tags.slice(0, 2).map((x) => `<button class="ttag" data-facet="tag" data-val="${escapeHtml(x)}">${escapeHtml(x)}</button>`),
     ...(t.intents[0] ? [`<button class="ttag" data-facet="intent" data-val="${escapeHtml(t.intents[0])}">${escapeHtml(intentZh(t.intents[0]))}</button>`] : []),
   ].join('');
+  const full = LIB?.getTemplate(t.id) || t;
   el.innerHTML = `
-    <div class="th">${renderTemplateSVG({ ...t, slots: t.thumbSlots }, { width: 220, showEmptyTint: false, slotOutline: true })}</div>
+    <div class="th">${renderTemplateSVG(full, { width: 220, showEmptyTint: false, slotOutline: true })}</div>
     <div class="nm">${escapeHtml(t.name)}</div>
     <div class="mt">
-      <span>${t.panels}格</span><span>·</span><span>${ratioName(t.ratio)}</span><span>·</span><span>${CULTURE_LABEL[t.culture]}</span>
+      <span>${t.panels}格</span><span>·</span><span>${ratioName(t.ratio)}</span><span>·</span><span>${CULTURE_LABEL[t.culture]}</span>${t.curated ? '<span class="pick">精选</span>' : ''}
     </div>
     <div class="tpl-tags">${chips}</div>
     <span class="bd">${t.panels}</span>
@@ -373,15 +378,16 @@ function renderList({ rebuild = false } = {}) {
   renderFacetBar();
 
   const grid = $('#tplGrid');
-  if (rebuild || grid._items !== state.items) {
-    tplCards.clear();
-    grid._items = state.items;
-    grid.replaceChildren(...state.items.map(tplCard));
-    staggerIn(grid, '.tpl:nth-child(-n+18)', { cap: 14, step: 24 });
-  }
+  if (rebuild) tplCards.clear();
+  const first = !grid._list;
+  grid._list = list;
+  grid._shown = 0;
+  grid.replaceChildren();
+  appendGrid(grid, { animate: first ? 'stagger' : 'rise' });
   if (!grid.dataset.bound) {
     grid.dataset.bound = '1';
     grid.addEventListener('click', (ev) => {
+      if (ev.target.closest('.tpl-more')) { appendGrid(grid); return; }
       const card = ev.target.closest('.tpl');
       if (!card) return;
       const tag = ev.target.closest('[data-facet]');
@@ -393,21 +399,52 @@ function renderList({ rebuild = false } = {}) {
       selectTemplate(card.dataset.id); goCanvasOnCompact();
     });
   }
-  const show = new Set(list.map((t) => t.id));
+}
+
+/** 往模板库里再排一批卡片（滚到底自动接着排；也可以点「再显示」） */
+let gridIO = null;
+function appendGrid(grid, { animate = null } = {}) {
+  const list = grid._list || [];
+  const start = grid._shown || 0;
+  const end = Math.min(list.length, start + GRID_PAGE);
   const cur = state.tpl?.id;
-  const revealed = [];
-  for (const [id, el] of tplCards) {
-    const hide = !show.has(id);
-    if (el.hidden && !hide) revealed.push(el);
-    el.hidden = hide;
-    el.classList.toggle('on', id === cur);
+  const frag = document.createDocumentFragment();
+  const added = [];
+  for (let i = start; i < end; i++) {
+    const el = tplCard(list[i]);
+    el.hidden = false;
+    el.classList.toggle('on', list[i].id === cur);
+    frag.append(el);
+    added.push(el);
   }
-  // 筛选 / 搜索后新出现的卡片依次浮上来（只动前十几张，屏幕外的不浪费）
-  revealed.slice(0, 14).forEach((el, i) => fx.rise(el, i * 22));
+  grid.querySelector('.tpl-more')?.remove();
+  grid.append(frag);
+  grid._shown = end;
+  if (end < list.length) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'btn tiny tpl-more';
+    more.textContent = `再显示 ${Math.min(GRID_PAGE, list.length - end)} 套（还有 ${list.length - end} 套）`;
+    grid.append(more);
+    if ('IntersectionObserver' in window) {
+      gridIO ||= new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting || !e.target.isConnected) continue;
+          gridIO.unobserve(e.target);
+          appendGrid(e.target.closest('#tplGrid'));
+        }
+      }, { rootMargin: '0px 0px 700px 0px' });
+      gridIO.observe(more);
+    }
+  }
+  // 入场：第一次整排依次浮上来；筛选 / 搜索后只动前十几张；滚动接着排的不动画
+  if (animate === 'stagger') staggerIn(grid, '.tpl:nth-child(-n+18)', { cap: 14, step: 24 });
+  else if (animate === 'rise') added.slice(0, 14).forEach((el, i) => fx.rise(el, i * 22));
 }
 
 /* ---------------- 模板库的标签筛选（格数 / 题材 / 画幅 / 标签） ---------------- */
 function matchFacet(t, f) {
+  if (f.kind === 'pick') return f.value === 'curated' ? t.curated : !t.curated;
   if (f.kind === 'panels') return t.panels === Number(f.value);
   if (f.kind === 'intent') return t.intents.includes(f.value);
   if (f.kind === 'ratio') return t.ratio === f.value;
@@ -453,6 +490,9 @@ function renderFacetBar() {
     { kind: 'intent', label: '题材', entries: intentEntries, fmt: (v) => intentZh(v) },
     { kind: 'ratio', label: '画幅', entries: ratioEntries, fmt: (v) => ratioName(v) },
     { kind: 'tag', label: '标签', entries: tagEntries, fmt: (v) => v },
+    // 来源：手做的精选 / 按各家规律生成的扩展
+    { kind: 'pick', label: '来源', entries: [['curated', items.filter((t) => t.curated).length], ['generated', items.filter((t) => !t.curated).length]],
+      fmt: (v) => (v === 'curated' ? '精选' : '扩展') },
   ];
   bar.innerHTML = groups.map((g) => {
     let entries = g.entries;

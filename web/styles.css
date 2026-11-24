@@ -859,6 +859,10 @@ input[type=range]::-moz-range-thumb{
   width:19px;height:19px;display:grid;place-items:center;border-radius:6px;background:rgba(0,0,0,.5);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
 }
+/* 手做的精选模板 */
+.tpl .mt .pick{color:var(--tint);font-weight:600}
+/* 库里几千套：先排一批，滚到底接着排；这个按钮占满一整行 */
+.tpl-grid > .tpl-more{grid-column:1 / -1;justify-self:center;margin:4px 0 2px;color:var(--label-2)}
 
 /* ---------------------------------------------------------------- 本格句子 */
 .line-box{
